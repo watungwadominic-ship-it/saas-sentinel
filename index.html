@@ -1,32 +1,74 @@
-<!-- Custom Code for SaaS Sentinel -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS Sentinel | B2B Insights</title>
+    
+    <!-- PROFESSIONAL SEO & SOCIAL PREVIEW -->
+    <title>SaaS Sentinel | Autonomous B2B Market Analysis</title>
+    <meta name="description" content="Daily decision-grade analysis on the 2026 SaaS market. Powered by autonomous AI intelligence.">
+    <meta property="og:title" content="SaaS Sentinel | B2B Market Intel">
+    <meta property="og:type" content="website">
+    <meta property="og:description" content="Get the 'So What?' behind every major SaaS headline, 24/7.">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body class="bg-slate-50 text-slate-900 font-sans">
-    <nav class="bg-white border-b py-4 px-6 flex justify-between shadow-sm">
-        <h1 class="text-2xl font-bold text-indigo-600">SaaS Sentinel</h1>
-        <div class="hidden sm:block text-sm text-slate-500 italic">"Global-First" B2B Analysis</div>
-    </nav>
     
-    <header class="bg-indigo-700 text-white py-12 px-6 text-center mb-8">
-        <h2 class="text-3xl font-extrabold mb-2">Automated Tech News for SaaS Leaders</h2>
-        <p class="text-indigo-100">Zero-overhead, 24/7 automated intelligence.</p>
+    <!-- Professional Google Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Professional Glow Effect for CTAs */
+        .btn-glow:hover { box-shadow: 0 0 15px rgba(79, 70, 229, 0.4); }
+        /* Bento Grid Style for Articles */
+        .bento-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .bento-card:hover { transform: translateY(-4px); }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] text-[#0F172A] leading-relaxed">
+    
+    <!-- Professional Navigation bar -->
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 py-3 px-6 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">S</div>
+            <h1 class="text-xl font-extrabold tracking-tight">SaaS<span class="text-indigo-600">Sentinel</span></h1>
+        </div>
+        <div class="hidden md:flex gap-6 text-sm font-semibold text-slate-500">
+            <a href="#" class="hover:text-indigo-600 transition">Market Intelligence</a>
+            <a href="#" class="hover:text-indigo-600 transition">Founder Deep-Dives</a>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <header class="py-16 px-6 max-w-6xl mx-auto text-center border-b border-slate-100">
+        <span class="inline-block bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full mb-6">Autonomous Intelligence 2026</span>
+        <h2 class="text-5xl font-[800] tracking-tighter mb-4 max-w-3xl mx-auto leading-[1.1]">The B2B Analyst That <span class="text-indigo-600">Never Sleeps.</span></h2>
+        <p class="text-lg text-slate-500 max-w-xl mx-auto">Providing strategic clarity for SaaS leaders through automated market forensics.</p>
     </header>
 
-    <main class="max-w-4xl mx-auto p-6">
-        <div id="news-feed" class="grid gap-8">
-            <p class="text-slate-400 animate-pulse">Connecting to live database...</p>
+    <!-- News Feed (Bento Grid) -->
+    <main class="max-w-6xl mx-auto p-6 py-12">
+        <div id="news-feed" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="col-span-full text-center py-20 text-slate-400">
+                <div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                Initializing database connection...
+            </div>
         </div>
     </main>
 
+    <!-- Professional Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-12 px-6 text-center text-sm border-t border-slate-800">
+        <p class="mb-4">© 2026 SaaS Sentinel. All reports generated autonomously by AI.</p>
+        <div class="flex justify-center gap-4">
+            <a href="#" class="hover:text-white transition">Privacy</a>
+            <a href="#" class="hover:text-white transition">Terms</a>
+            <a href="#" class="hover:text-white transition">Contact</a>
+        </div>
+    </footer>
+
     <script>
-        // Your Custom Keys are pre-filled below!
+        // Your Verified Credentials
         const supabaseUrl = 'https://dpwkojtfeoxlpyevutfc.supabase.co'; 
         const supabaseKey = 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE'; 
         const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
@@ -37,22 +79,31 @@
                 .select('*')
                 .order('created_at', { ascending: false });
 
+            const feed = document.getElementById('news-feed');
+            
             if (error) {
-                document.getElementById('news-feed').innerText = 'Error: Check your Public Keys in Supabase.';
+                feed.innerHTML = '<div class="col-span-full text-center text-red-500">Connection Error. Please check Supabase RLS policies.</div>';
                 return;
             }
 
-            const feed = document.getElementById('news-feed');
+            if (data.length === 0) {
+                feed.innerHTML = '<div class="col-span-full text-center text-slate-400 py-20">Waiting for first autonomous update...</div>';
+                return;
+            }
+
             feed.innerHTML = data.map(article => `
-                <article class="bg-white p-8 rounded-xl shadow-md border border-slate-100 mb-8">
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="text-xs font-bold text-indigo-600 uppercase tracking-widest">${article.category || 'MARKET'}</span>
-                        <time class="text-xs text-slate-400">${new Date(article.created_at).toLocaleDateString()}</time>
+                <article class="bento-card bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-6">
+                            <span class="px-3 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-md">${article.category || 'INTEL'}</span>
+                            <span class="text-slate-300 text-xs">/</span>
+                            <time class="text-[11px] text-slate-400">${new Date(article.created_at).toLocaleDateString()}</time>
+                        </div>
+                        <h3 class="text-2xl font-extrabold tracking-tight mb-4 leading-tight hover:text-indigo-600 cursor-pointer">${article.title}</h3>
+                        <div class="text-slate-600 text-sm mb-8 leading-relaxed whitespace-pre-line">${article.content.substring(0, 500)}...</div>
                     </div>
-                    <h3 class="text-2xl font-bold mb-4">${article.title}</h3>
-                    <div class="prose prose-slate text-slate-700 mb-6">${article.content}</div>
-                    <div class="pt-4 border-t border-slate-100">
-                         <a href="${article.source_url}" target="_blank" class="text-indigo-600 font-medium text-sm">Read Source Story &rarr;</a>
+                    <div class="pt-6 border-t border-slate-50 flex justify-between items-center">
+                        <a href="${article.source_url}" target="_blank" class="text-indigo-600 font-bold text-xs btn-glow px-4 py-2 bg-indigo-50 rounded-lg transition">Read Full Intel &rarr;</a>
                     </div>
                 </article>
             `).join('');
