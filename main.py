@@ -10,14 +10,14 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 def run_news_bot():
-    print("🚀 Starting SaaS Sentinel Zero-Card Bot...")
+    print("🚀 Running SaaS Sentinel Executive Analyst...")
     
     # 2. FETCH RAW NEWS
     week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
     news_params = {
-        "q": "SaaS B2B startup",
+        "q": "SaaS B2B startup funding",
         "from": week_ago,
-        "sortBy": "publishedAt",
+        "sortBy": "relevancy",
         "apiKey": NEWS_API_KEY
     }
     headers_news = {"User-Agent": "SaaSSentinelBot/1.0"}
@@ -27,31 +27,43 @@ def run_news_bot():
         response_news.raise_for_status() 
         raw_data = response_news.json()
     except Exception as e:
-        print(f"❌ NEWS FETCH FAILED: {e}")
+        print(f"❌ FETCH FAILED: {e}")
         return
 
     articles = raw_data.get('articles', [])
     if not articles:
-        print("⚠️ No stories found. Check your NewsAPI key.")
+        print("⚠️ No news found.")
         return
 
     latest_story = articles[0]
-    print(f"✅ Analyzing with Groq: {latest_story['title']}")
     
-    # 3. ASK GROQ AI (No card required!)
+    # 3. PROFESSIONAL ANALYSIS PROMPT
     try:
         client = Groq(api_key=GROQ_API_KEY)
-        prompt = f"Act as a B2B SaaS Analyst in March 2026. Deep-dive into this news: {latest_story['title']}. Content: {latest_story['description']}. Write a 400-word analysis with 'The News', 'The Context', and 'Market Impact'."
+        # 2026 Executive Prompt: Focusing on Outcomes and Strategy
+        prompt = f"""
+        ACT AS: Senior B2B SaaS Analyst (March 2026).
+        ANALYSIS GOAL: Write for a busy CEO/Founder who needs 'Decision-Grade' insights.
+        STORY: {latest_story['title']}
+        CONTEXT: {latest_story['description']}
         
-        # Using Llama 3.3 70B (Fast & Free on Groq)
+        STRUCTURE:
+        1. [TL;DR Summary]: 2 sentences max.
+        2. [The News]: Direct facts only.
+        3. [Strategic 'So What?']: Why this matters for the 2026 SaaS market.
+        4. [Competitive Impact]: Who loses and who wins from this?
+        
+        TONE: Authoritative, data-focused, no hype, no 'cringe' marketing words.
+        """
+        
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}]
         )
         article_content = completion.choices[0].message.content
-        print("✅ Groq analysis successful.")
+        print("✅ Analysis finalized.")
     except Exception as e:
-        print(f"❌ GROQ AI FAILED: {e}")
+        print(f"❌ AI FAILED: {e}")
         return
     
     # 4. SAVE TO SUPABASE
@@ -64,16 +76,16 @@ def run_news_bot():
     payload = {
         "title": latest_story['title'],
         "content": article_content,
-        "category": "Market Intelligence",
+        "category": "Market Intel",
         "source_url": latest_story['url']
     }
     
     try:
         r = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers_db, json=payload)
         if r.status_code == 201:
-            print("🎉 SUCCESS: Article published via Groq!")
+            print("🎉 SUCCESS: Professional report published!")
         else:
-            print(f"⚠️ DB Error {r.status_code}: {r.text}")
+            print(f"⚠️ DB Error: {r.text}")
     except Exception as e:
         print(f"❌ DB SAVE FAILED: {e}")
 
