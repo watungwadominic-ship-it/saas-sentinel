@@ -1,0 +1,63 @@
+<!-- Custom Code for SaaS Sentinel -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS Sentinel | B2B Insights</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans">
+    <nav class="bg-white border-b py-4 px-6 flex justify-between shadow-sm">
+        <h1 class="text-2xl font-bold text-indigo-600">SaaS Sentinel</h1>
+        <div class="hidden sm:block text-sm text-slate-500 italic">"Global-First" B2B Analysis</div>
+    </nav>
+    
+    <header class="bg-indigo-700 text-white py-12 px-6 text-center mb-8">
+        <h2 class="text-3xl font-extrabold mb-2">Automated Tech News for SaaS Leaders</h2>
+        <p class="text-indigo-100">Zero-overhead, 24/7 automated intelligence.</p>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-6">
+        <div id="news-feed" class="grid gap-8">
+            <p class="text-slate-400 animate-pulse">Connecting to live database...</p>
+        </div>
+    </main>
+
+    <script>
+        // Your Custom Keys are pre-filled below!
+        const supabaseUrl = 'https://dpwkojtfeoxlpyevutfc.supabase.co'; 
+        const supabaseKey = 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE'; 
+        const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function fetchNews() {
+            const { data, error } = await _supabase
+                .from('news_articles')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                document.getElementById('news-feed').innerText = 'Error: Check your Public Keys in Supabase.';
+                return;
+            }
+
+            const feed = document.getElementById('news-feed');
+            feed.innerHTML = data.map(article => `
+                <article class="bg-white p-8 rounded-xl shadow-md border border-slate-100 mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-xs font-bold text-indigo-600 uppercase tracking-widest">${article.category || 'MARKET'}</span>
+                        <time class="text-xs text-slate-400">${new Date(article.created_at).toLocaleDateString()}</time>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">${article.title}</h3>
+                    <div class="prose prose-slate text-slate-700 mb-6">${article.content}</div>
+                    <div class="pt-4 border-t border-slate-100">
+                         <a href="${article.source_url}" target="_blank" class="text-indigo-600 font-medium text-sm">Read Source Story &rarr;</a>
+                    </div>
+                </article>
+            `).join('');
+        }
+        fetchNews();
+    </script>
+</body>
+</html>
