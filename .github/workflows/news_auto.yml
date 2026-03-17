@@ -1,24 +1,30 @@
 name: SaaS Sentinel Newsroom
+
 on:
   schedule:
-    - cron: '0 */12 * * *' # Every 12 hours (Midnight and Noon UTC)
-  workflow_dispatch:      # Adds a "Run" button for testing
+    # Runs every 12 hours (12:00 and 00:00 UTC)
+    - cron: '0 0,12 * * *'
+  workflow_dispatch: # Allows you to run it manually
 
 jobs:
   write_news:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
       - name: Install dependencies
         run: pip install -r requirements.txt
+
       - name: Run News Bot
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python main.py
