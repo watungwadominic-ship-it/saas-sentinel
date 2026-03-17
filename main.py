@@ -1,48 +1,62 @@
 import os
 import requests
 from google import genai
+from datetime import datetime, timedelta
 
-# 1. SETUP KEYS (GitHub Actions will provide these from 'Secrets')
+# 1. SETUP KEYS
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 def run_news_bot():
-    print("🚀 Starting SaaS Sentinel Automated Run...")
+    print("🚀 Starting SaaS Sentinel Super-Robust Run...")
     
-    # 2. FETCH RAW NEWS
-    # Added 'User-Agent' header to prevent 403 errors in 2026
-    news_url = f"https://newsapi.org{NEWS_API_KEY}"
+    # Check if keys are missing
+    if not all([SUPABASE_URL, SUPABASE_KEY, GEMINI_API_KEY, NEWS_API_KEY]):
+        print("❌ ERROR: One or more GitHub Secrets are missing!")
+        return
+
+    # 2. FETCH RAW NEWS (Using professional params to avoid URL typos)
+    # We look for news from the last 7 days to ensure the table gets filled
+    week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+    
+    news_params = {
+        "q": "SaaS B2B startup",
+        "from": week_ago,
+        "sortBy": "publishedAt",
+        "language": "en",
+        "apiKey": NEWS_API_KEY
+    }
     headers_news = {"User-Agent": "SaaSSentinelBot/1.0"}
     
     try:
-        print("Checking NewsAPI.org for tech updates...")
-        response_news = requests.get(news_url, headers=headers_news)
+        print("Connecting to NewsAPI.org...")
+        response_news = requests.get("https://newsapi.org/v2/everything", params=news_params, headers=headers_news)
         response_news.raise_for_status() 
         raw_data = response_news.json()
     except Exception as e:
-        print(f"❌ FAILED to fetch news: {e}")
+        print(f"❌ FAILED to reach news source: {e}")
         return
 
-    if not raw_data.get('articles'):
-        print("No new news found today. Check your API key or search terms.")
+    articles = raw_data.get('articles', [])
+    if not articles:
+        print("⚠️ No articles found. Try broader keywords like 'AI Tech'.")
         return
 
-    latest_story = raw_data['articles'][0]
-    print(f"✅ Found news: {latest_story['title']}")
+    latest_story = articles[0]
+    print(f"✅ Found story: {latest_story['title']}")
     
     # 3. ASK GEMINI TO ANALYZE
     try:
-        print("Sending to Gemini AI for professional analysis...")
+        print("Sending to Gemini AI for 2026 market analysis...")
         client = genai.Client(api_key=GEMINI_API_KEY)
         prompt = f"""
-        Act as a Senior B2B Tech Analyst. Analyze this news headline and snippet:
-        Headline: {latest_story['title']}
-        Snippet: {latest_story['description']}
+        Act as a Senior B2B Tech Analyst in March 2026. 
+        Analyze this news: {latest_story['title']}
+        Context: {latest_story['description']}
         
-        Write a 400-word deep-dive analysis for SaaS founders. 
-        Include 'The News', 'The So What?', 'Market Context', and an 'Action Plan'.
+        Write a 400-word deep-dive. Include 'The News', 'The So What?', and 'Action Plan'.
         """
         
         response = client.models.generate_content(
@@ -56,7 +70,6 @@ def run_news_bot():
         return
     
     # 4. SAVE TO SUPABASE
-    print("Connecting to Supabase to publish...")
     headers_db = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -73,13 +86,10 @@ def run_news_bot():
     try:
         db_url = f"{SUPABASE_URL}/rest/v1/news_articles"
         r = requests.post(db_url, headers=headers_db, json=payload)
-        print(f"Database Response Code: {r.status_code}")
-        
         if r.status_code == 201:
-            print("🎉 SUCCESS: Article published to SaaS Sentinel!")
+            print("🎉 SUCCESS: News published to SaaS Sentinel!")
         else:
-            print(f"⚠️ Warning: Database returned error code {r.status_code}")
-            print(f"Details: {r.text}")
+            print(f"⚠️ Database Error {r.status_code}: {r.text}")
     except Exception as e:
         print(f"❌ Database Save FAILED: {e}")
 
