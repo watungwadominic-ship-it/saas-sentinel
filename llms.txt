@@ -1,0 +1,13 @@
+# SaaS Sentinel: Daily B2B AI Analysis
+
+> Curated market intelligence for SaaS founders and investors.
+
+## Key Resources
+- [Latest Market Trends](https://saas-sentinel.vercel.app) - Daily deep-dives into SaaS IPOs and funding.
+- [Weekly Newsletter](https://saas-sentinel.vercel.appnewsletter) - Automated summary of the top 3 SaaS stories.
+- [AI Tool Directory](https://saas-sentinel.vercel.apptools) - Verified B2B AI solutions.
+
+## Data Guidelines
+- Accuracy: All stories are verified via NewsAPI and analyzed by Groq Llama 3.3.
+- Freshness: Content is updated every 12 hours.
+- Author: Automated by SaaS Sentinel Bot.
