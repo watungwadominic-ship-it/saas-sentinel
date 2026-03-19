@@ -3,84 +3,89 @@ import requests
 from groq import Groq
 from datetime import datetime, timedelta
 
-# 1. SETUP KEYS (Must match your GitHub Secrets exactly)
+# GitHub Secrets
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 def run_news_bot():
-    print("🚀 Starting SaaS Sentinel Visual Bot...")
+    print("🚀 Starting SaaS Sentinel Filtered Cycle...")
     
-    # 2. FETCH RAW NEWS (Robust URL construction to prevent masking errors)
+    # 1. Fetch News with "Strict" B2B Filters
+    # The minus (-) signs tell the API to EXCLUDE these topics
+    search_query = 'B2B SaaS "enterprise AI" -restaurant -food -cooking -recipe'
+    
     week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
     news_params = {
-        "q": "SaaS B2B startup AI",
+        "q": search_query,
         "from": week_ago,
         "language": "en",
         "sortBy": "publishedAt",
         "apiKey": NEWS_API_KEY
     }
-    headers_news = {"User-Agent": "SaaSSentinelBot/1.0"}
     
     try:
-        response_news = requests.get("https://newsapi.org/v2/everything", params=news_params, headers=headers_news)
-        response_news.raise_for_status() 
-        raw_data = response_news.json()
+        response = requests.get("https://newsapi.org/v2/everything", params=news_params)
+        articles = response.json().get('articles', [])
     except Exception as e:
-        print(f"❌ NEWS FETCH FAILED: {e}")
+        print(f"❌ NewsAPI Error: {e}")
         return
 
-    articles = raw_data.get('articles', [])
     if not articles:
-        print("⚠️ No stories found for these keywords.")
+        print("⚠️ No relevant SaaS news found.")
         return
 
-    # Pick the top story
-    latest_story = articles[0]
-    image_url = latest_story.get('urlToImage')
-    print(f"✅ Found: {latest_story['title']}")
-    
-    # 3. ASK GROQ AI (Using the Llama 3.3 70B high-speed model)
-    try:
-        client = Groq(api_key=GROQ_API_KEY)
-        # Using the standard 2026 Groq versatile model
-        prompt = f"Act as a professional B2B SaaS Journalist. Analyze this news: {latest_story['title']}. Content: {latest_story['description']}. Write a deep-dive analysis."
+    # Process the top 3 news items
+    for latest in articles[:3]:
+        title = latest['title']
         
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        article_content = completion.choices[0].message.content
-    except Exception as e:
-        print(f"❌ GROQ AI FAILED: {e}")
-        return
-    
-    # 4. SAVE TO SUPABASE (Including image_url)
-    headers_db = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-    }
-    
-    payload = {
-        "title": latest_story['title'],
-        "content": article_content,
-        "category": "Market Analysis",
-        "source_url": latest_story['url'],
-        "image_url": image_url
-    }
-    
-    try:
-        r = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers_db, json=payload)
-        if r.status_code in [200, 201]:
-            print("🎉 SUCCESS: Article with image saved to Supabase!")
-        else:
-            print(f"⚠️ DB Error {r.status_code}: {r.text}")
-            print("Check if you ran the ALTER TABLE command in Section 7.")
-    except Exception as e:
-        print(f"❌ DB SAVE FAILED: {e}")
+        # 2. DUPLICATE CHECK: Ask Supabase if this title exists
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        check_url = f"{SUPABASE_URL}/rest/v1/news_articles?title=eq.{title}&select=id"
+        check_res = requests.get(check_url, headers=headers)
+        
+        if check_res.json():
+            print(f"⏭️ Skipping duplicate: {title[:30]}...")
+            continue
+
+        print(f"✅ Processing New Story: {title}")
+        
+        # 3. AI Analysis via Groq (Llama 3.3)
+        try:
+            client = Groq(api_key=GROQ_API_KEY)
+            prompt = (
+                f"Act as a B2B SaaS Expert. Analyze this news: {title}. "
+                f"Context: {latest['description']}. Write a professional market analysis "
+                "focusing on enterprise impact. Do not mention food or restaurants."
+            )
+            
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            article_analysis = completion.choices[0].message.content
+        except Exception as e:
+            print(f"❌ Groq AI Error: {e}")
+            continue
+        
+        # 4. Save to Supabase
+        payload = {
+            "title": title,
+            "content": article_analysis,
+            "image_url": latest.get('urlToImage'),
+            "source_url": latest.get('url'),
+            "category": "Market Analysis"
+        }
+        
+        requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, json=payload)
+
+    print("🎉 Cycle Complete.")
 
 if __name__ == "__main__":
     run_news_bot()
