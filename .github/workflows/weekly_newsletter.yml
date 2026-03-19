@@ -2,7 +2,7 @@ name: Weekly Newsletter
 on:
   schedule:
     - cron: '0 9 * * 5' # Every Friday at 9:00 AM
-  workflow_dispatch:   # THIS ENABLES THE MANUAL BUTTON IN ACTIONS TAB
+  workflow_dispatch:   # THIS ENABLES THE MANUAL BUTTON
 
 jobs:
   build:
@@ -20,5 +20,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }} # Matches your renamed secret
         run: python newsletter.py
