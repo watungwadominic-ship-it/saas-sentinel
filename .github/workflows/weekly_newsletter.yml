@@ -2,6 +2,8 @@ name: Weekly Newsletter
 on:
   schedule:
     - cron: '0 9 * * 5' # Every Friday at 9:00 AM
+  workflow_dispatch:   # THIS ENABLES THE MANUAL BUTTON IN ACTIONS TAB
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -9,9 +11,14 @@ jobs:
       - uses: actions/checkout@v3
       - name: Set up Python
         uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests
       - name: Run Script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
         run: python newsletter.py
