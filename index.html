@@ -7,41 +7,51 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8f7f4; color: #1a1a1a; }
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
-        .executive-shadow { box-shadow: 0 20px 50px rgba(0,0,0,0.05); }
+        body { font-family: 'Inter', sans-serif; background-color: #f4f2ee; color: #1a1a1a; scroll-behavior: smooth; }
+        .glass { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.4); }
+        .executive-shadow { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08); }
+        .tab-active { color: #f97316; border-bottom: 2px solid #f97316; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="p-6">
+<body class="p-4 md:p-10">
 
-    <header class="max-w-6xl mx-auto mb-12 flex justify-between items-center">
+    <header class="max-w-6xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-            <h1 class="text-2xl font-600 tracking-tight text-graphite">SAAS <span class="text-orange-500">SENTINEL</span></h1>
-            <p class="text-sm text-gray-500">Curated Intelligence for B2B Founders</p>
+            <h1 class="text-3xl font-bold tracking-tighter text-gray-900 uppercase">SAAS <span class="text-orange-600">SENTINEL</span></h1>
+            <p class="text-gray-500 font-medium text-sm">Strategic Intelligence for B2B Founders</p>
         </div>
+        
+        <nav class="flex gap-8 border-b border-gray-200 w-full md:w-auto">
+            <button id="tab-feed" onclick="switchTab('feed')" class="pb-2 text-sm font-bold uppercase tracking-widest tab-active transition-all">The Radar</button>
+            <button id="tab-analysis" onclick="switchTab('analysis')" class="pb-2 text-sm font-bold uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-all">Deep Analysis</button>
+        </nav>
     </header>
 
     <main id="news-grid" class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         </main>
 
-    <div id="article-modal" class="hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="glass executive-shadow w-full max-w-2xl rounded-3xl overflow-hidden relative">
-            <button onclick="closeModal()" class="absolute top-4 right-4 z-10 bg-white/50 p-2 rounded-full hover:bg-white transition">✕</button>
+    <div id="article-modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="glass executive-shadow w-full max-w-3xl rounded-[2.5rem] overflow-hidden relative max-h-[90vh] flex flex-col">
+            <button onclick="closeModal()" class="absolute top-6 right-6 z-20 bg-white/90 p-3 rounded-full hover:scale-110 transition shadow-sm">✕</button>
             
-            <img id="modal-image" class="w-full h-64 object-cover" src="" alt="">
-            
-            <div class="p-8">
-                <h2 id="modal-title" class="text-2xl font-semibold mb-4 leading-tight"></h2>
+            <div class="overflow-y-auto hide-scroll">
+                <img id="modal-image" class="w-full h-80 object-cover" src="" alt="Article Header">
                 
-                <div class="mb-6">
-                    <h4 class="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">The Analysis</h4>
-                    <p id="modal-content" class="text-gray-700 leading-relaxed text-sm"></p>
-                </div>
+                <div class="p-8 md:p-14">
+                    <span class="text-[10px] font-bold text-orange-600 uppercase tracking-[0.3em] mb-4 block">Confidential Intelligence</span>
+                    <h2 id="modal-title" class="text-3xl font-bold mb-10 leading-tight text-gray-900"></h2>
+                    
+                    <div class="bg-gray-900/5 rounded-3xl p-8 mb-10 border border-gray-200/60">
+                        <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6">The Sentinel's Take</h4>
+                        <div id="modal-breakdown" class="space-y-5">
+                            </div>
+                    </div>
 
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Sentinel's Take</h4>
-                    <div id="modal-breakdown">
-                        </div>
+                    <div>
+                        <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Strategic Market Impact</h4>
+                        <p id="modal-content" class="text-gray-700 leading-relaxed text-md font-normal whitespace-pre-wrap"></p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -51,54 +61,87 @@
         const SB_URL = "YOUR_SUPABASE_URL";
         const SB_KEY = "YOUR_SUPABASE_KEY";
         let articlesData = [];
+        let currentTab = 'feed';
 
         async function fetchNews() {
-            const res = await fetch(`${SB_URL}/rest/v1/news_articles?select=*&order=created_at.desc`, {
-                headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
-            });
-            articlesData = await res.json();
-            renderGrid();
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/news_articles?select=*&order=created_at.desc`, {
+                    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+                });
+                articlesData = await res.json();
+                renderContent();
+            } catch (err) {
+                console.error("Data fetch failed", err);
+            }
         }
 
-        function renderGrid() {
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-feed').className = tab === 'feed' ? 'pb-2 text-sm font-bold tracking-widest tab-active' : 'pb-2 text-sm font-bold tracking-widest text-gray-400';
+            document.getElementById('tab-analysis').className = tab === 'analysis' ? 'pb-2 text-sm font-bold tracking-widest tab-active' : 'pb-2 text-sm font-bold tracking-widest text-gray-400';
+            renderContent();
+        }
+
+        function renderContent() {
             const grid = document.getElementById('news-grid');
-            grid.innerHTML = articlesData.map((art, i) => `
-                <div onclick="openModal(${i})" class="glass rounded-2xl p-4 cursor-pointer hover:scale-[1.02] transition-transform duration-300">
-                    <img src="${art.image_url}" class="w-full h-40 object-cover rounded-xl mb-4">
-                    <span class="text-[10px] font-bold text-orange-500 uppercase">${art.category}</span>
-                    <h3 class="font-semibold text-lg mt-1 leading-tight">${art.title}</h3>
-                </div>
-            `).join('');
+            
+            if (currentTab === 'feed') {
+                // THE RADAR: Short cards with punchy summaries
+                grid.innerHTML = articlesData.map((art, i) => `
+                    <div onclick="openModal(${i})" class="glass rounded-3xl p-6 cursor-pointer hover:translate-y-[-6px] transition-all duration-300 group">
+                        <div class="overflow-hidden rounded-2xl mb-5 h-40">
+                            <img src="${art.image_url}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                        </div>
+                        <h3 class="font-bold text-lg mb-3 leading-tight group-hover:text-orange-600 transition">${art.title}</h3>
+                        <p class="text-xs text-gray-500 italic leading-relaxed line-clamp-2">${art.summary || "Tap for full intelligence report..."}</p>
+                    </div>
+                `).join('');
+            } else {
+                // DEEP ANALYSIS: High-density cards for serious reading
+                grid.innerHTML = articlesData.map((art, i) => `
+                    <div onclick="openModal(${i})" class="bg-white border border-gray-200 rounded-3xl p-8 cursor-pointer hover:shadow-xl transition-all">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Analysis Report</span>
+                        <h3 class="font-bold text-xl mt-2 mb-4">${art.title}</h3>
+                        <div class="h-1 w-12 bg-orange-500 rounded-full mb-4"></div>
+                        <p class="text-sm text-gray-600 line-clamp-3 leading-relaxed">${art.content}</p>
+                        <button class="mt-6 text-orange-600 font-bold text-xs uppercase tracking-tighter">View Full Impact →</button>
+                    </div>
+                `).join('');
+            }
         }
 
         function openModal(index) {
             const art = articlesData[index];
             document.getElementById('modal-title').innerText = art.title;
-            document.getElementById('modal-image').src = art.image_url;
+            document.getElementById('modal-image').src = art.image_url || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa';
+            
+            // Populate the Deep Analysis (Long text)
             document.getElementById('modal-content').innerText = art.content;
 
-            // Safe Parse Logic to handle the "JSON in text" issue
+            // Populate the Quick Take (Bullet points)
             let points = [];
             try {
                 points = typeof art.breakdown === 'string' ? JSON.parse(art.breakdown) : art.breakdown;
-                if (!Array.isArray(points)) points = Object.values(points)[0]; // Fallback for nested JSON
-            } catch (e) { points = ["Analysis pending..."]; }
+            } catch (e) { points = ["Analysis pending completion..."]; }
 
             const listHtml = points.map(p => `
-                <div class="flex items-start mb-3">
-                    <span class="text-orange-500 mr-2">•</span>
-                    <p class="text-sm text-gray-600 italic font-medium">"${p}"</p>
+                <div class="flex items-start">
+                    <div class="h-1.5 w-1.5 rounded-full bg-orange-500 mt-2 mr-4 shrink-0 shadow-[0_0_10px_rgba(249,115,22,0.5)]"></div>
+                    <p class="text-sm text-gray-800 leading-snug font-semibold italic">"${p}"</p>
                 </div>
             `).join('');
 
             document.getElementById('modal-breakdown').innerHTML = listHtml;
             document.getElementById('article-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
         }
 
         function closeModal() {
             document.getElementById('article-modal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
         }
 
+        // Initialize
         fetchNews();
     </script>
 </body>
