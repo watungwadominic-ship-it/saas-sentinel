@@ -11,9 +11,9 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 def run_news_bot():
-    print("🚀 Starting SaaS Sentinel Filtered Cycle...")
+    print("🚀 Starting SaaS Sentinel Fast Intelligence Cycle...")
     
-    # 1. Weekend Logic
+    # 1. Date Logic
     now = datetime.now()
     is_weekend = now.weekday() >= 5
     days_back = 3 if is_weekend else 1
@@ -60,7 +60,7 @@ def run_news_bot():
             print(f"⏭️ Skipping duplicate: {title[:30]}...")
             continue
 
-        print(f"🧠 Generating Fast Intelligence for: {title}")
+        print(f"🧠 Generating Intelligence for: {title}")
         
         try:
             client = Groq(api_key=GROQ_API_KEY)
@@ -72,9 +72,9 @@ def run_news_bot():
                 "2. 'points': A list of exactly 3 specific, unique strategic takeaways for founders."
             )
             
-            # SWITCHED TO 8B MODEL FOR SPEED
+            # Using the correct model ID for Groq
             completion = client.chat.completions.create(
-                model="llama-3-8b-8192", 
+                model="llama3-8b-8192", 
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"} 
             )
@@ -88,7 +88,6 @@ def run_news_bot():
                 "image_url": latest.get('urlToImage'),
                 "source_url": latest.get('url'),
                 "category": "Market Analysis"
-                # Removed published_at to avoid Supabase Column Error
             }
             
             res = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, json=payload)
@@ -112,7 +111,7 @@ def generate_sentiment_post():
             "Respond in JSON with 'analysis' (market mood) and 'points' (3 weekly trends)."
         )
         completion = client.chat.completions.create(
-            model="llama-3-8b-8192",
+            model="llama3-8b-8192",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
