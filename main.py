@@ -72,9 +72,9 @@ def run_news_bot():
                 "2. 'points': A list of exactly 3 specific, unique strategic takeaways for founders."
             )
             
-            # Using the correct model ID for Groq
+            # UPDATED: Using the currently active Llama 3.1 8B model
             completion = client.chat.completions.create(
-                model="llama3-8b-8192", 
+                model="llama-3.1-8b-instant", 
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"} 
             )
@@ -111,7 +111,7 @@ def generate_sentiment_post():
             "Respond in JSON with 'analysis' (market mood) and 'points' (3 weekly trends)."
         )
         completion = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
