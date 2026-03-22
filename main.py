@@ -72,11 +72,12 @@ def run_news_bot():
         # 5. AI Analysis via Groq (Llama 3.3)
         try:
             client = Groq(api_key=GROQ_API_KEY)
+            # Instructing the AI to provide a clear summary and 3 bullet points
             prompt = (
                 f"Act as a B2B SaaS Expert. Analyze this news: {title}. "
-                f"Context: {latest['description']}. Write a professional market analysis "
-                "focusing on enterprise impact. Provide a 'breakdown' section at the end "
-                "explaining why this matters for SaaS founders."
+                f"Context: {latest['description']}. "
+                "1. Write a professional market analysis focusing on enterprise impact. "
+                "2. Provide exactly 3 short bullet points summarizing why this matters for founders."
             )
             
             completion = client.chat.completions.create(
@@ -85,11 +86,16 @@ def run_news_bot():
             )
             analysis_text = completion.choices[0].message.content
             
-            # 6. Save to Supabase
+            # 6. Save to Supabase (Fixed for Array Column)
             payload = {
                 "title": title,
                 "content": analysis_text,
-                "breakdown": "Strategic Impact Analysis for SaaS Stakeholders",
+                # Sending as a list [] to satisfy the malformed array literal error
+                "breakdown": [
+                    "Strategic Impact Analysis", 
+                    "Market Shift Detection", 
+                    "Founder Action Item"
+                ],
                 "image_url": latest.get('urlToImage'),
                 "source_url": latest.get('url'),
                 "category": "Market Analysis"
@@ -111,8 +117,8 @@ def generate_sentiment_post():
         client = Groq(api_key=GROQ_API_KEY)
         prompt = (
             "Write a high-level Weekly Sentiment report on the state of SaaS and Enterprise AI. "
-            "Summarize the general market mood for late March 2026, focus on B2B trends, "
-            "and provide a 'breakdown' of the week's overall direction."
+            "Summarize the general market mood, focus on B2B trends, "
+            "and provide 3 short bullet points on the week's overall direction."
         )
         
         completion = client.chat.completions.create(
@@ -130,7 +136,7 @@ def generate_sentiment_post():
         payload = {
             "title": f"SaaS Sentinel: Weekly Market Sentiment ({datetime.now().strftime('%b %d')})",
             "content": sentiment_text,
-            "breakdown": "Market-wide intelligence summary.",
+            "breakdown": ["Market mood summary", "B2B Trend Tracking", "Weekly Outlook"],
             "category": "Weekly Sentiment",
             "image_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71"
         }
