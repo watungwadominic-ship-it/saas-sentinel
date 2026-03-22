@@ -3,75 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- PROFESSIONAL SEO & SOCIAL PREVIEW -->
     <title>SaaS Sentinel | Autonomous B2B Market Analysis</title>
-    <meta name="description" content="Daily decision-grade analysis on the 2026 SaaS market. Powered by autonomous AI intelligence.">
-    <meta property="og:title" content="SaaS Sentinel | B2B Market Intel">
-    <meta property="og:type" content="website">
-    <meta property="og:description" content="Get the 'So What?' behind every major SaaS headline, 24/7.">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
-    <!-- Professional Google Font: Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        /* Professional Glow Effect for CTAs */
-        .btn-glow:hover { box-shadow: 0 0 15px rgba(79, 70, 229, 0.4); }
-        /* Bento Grid Style for Articles */
-        .bento-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .bento-card:hover { transform: translateY(-4px); }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f1e6; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .bento-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .bento-card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        /* Deep Dive Overlay */
+        #modal-overlay { transition: opacity 0.3s ease; }
     </style>
 </head>
-<body class="bg-[#F8FAFC] text-[#0F172A] leading-relaxed">
-    
-    <!-- Professional Navigation bar -->
-    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 py-3 px-6 flex justify-between items-center">
+<body class="text-slate-900 leading-relaxed">
+
+    <nav class="sticky top-0 z-40 bg-white/60 backdrop-blur-md border-b border-slate-200 py-4 px-8 flex justify-between items-center">
         <div class="flex items-center gap-2">
             <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">S</div>
-            <h1 class="text-xl font-extrabold tracking-tight">SaaS<span class="text-indigo-600">Sentinel</span></h1>
+            <h1 class="text-xl font-extrabold tracking-tight italic">SaaS<span class="text-indigo-600">Sentinel</span></h1>
         </div>
-        <div class="hidden md:flex gap-6 text-sm font-semibold text-slate-500">
-            <a href="#" class="hover:text-indigo-600 transition">Market Intelligence</a>
-            <a href="#" class="hover:text-indigo-600 transition">Founder Deep-Dives</a>
-        </div>
+        <div class="text-xs font-bold uppercase tracking-widest text-slate-400">System Status: <span class="text-emerald-500">Active</span></div>
     </nav>
 
-    <!-- Header Section -->
-    <header class="py-16 px-6 max-w-6xl mx-auto text-center border-b border-slate-100">
-        <span class="inline-block bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full mb-6">Autonomous Intelligence 2026</span>
-        <h2 class="text-5xl font-[800] tracking-tighter mb-4 max-w-3xl mx-auto leading-[1.1]">The B2B Analyst That <span class="text-indigo-600">Never Sleeps.</span></h2>
-        <p class="text-lg text-slate-500 max-w-xl mx-auto">Providing strategic clarity for SaaS leaders through automated market forensics.</p>
+    <header class="py-20 px-6 max-w-6xl mx-auto text-center">
+        <span class="inline-block bg-white border border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-[0.3em] px-4 py-1.5 rounded-full mb-6 shadow-sm">Intelligence Cycle: 2026.03</span>
+        <h2 class="text-6xl font-[800] tracking-tighter mb-4 leading-[0.9]">Strategic Clarity. <br><span class="text-indigo-600">Automated.</span></h2>
     </header>
 
-    <!-- News Feed (Bento Grid) -->
-    <main class="max-w-6xl mx-auto p-6 py-12">
-        <div id="news-feed" class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="col-span-full text-center py-20 text-slate-400">
-                <div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                Initializing database connection...
+    <main class="max-w-6xl mx-auto p-6 pb-32">
+        <div id="news-feed" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             </div>
-        </div>
     </main>
 
-    <!-- Professional Footer -->
-    <footer class="bg-slate-900 text-slate-400 py-12 px-6 text-center text-sm border-t border-slate-800">
-        <p class="mb-4">© 2026 SaaS Sentinel. All reports generated autonomously by AI.</p>
-        <div class="flex justify-center gap-4">
-            <a href="#" class="hover:text-white transition">Privacy</a>
-            <a href="#" class="hover:text-white transition">Terms</a>
-            <a href="#" class="hover:text-white transition">Contact</a>
+    <div id="modal-overlay" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-[2.5rem] shadow-2xl relative">
+            
+            <div class="h-64 w-full relative">
+                <img id="modal-image" src="" class="w-full h-full object-cover rounded-t-[2.5rem]" alt="Article Header">
+                <button onclick="closeModal()" class="absolute top-6 right-6 bg-white/20 hover:bg-white/40 backdrop-blur-md p-2 rounded-full text-white transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-10 grid grid-cols-1 md:grid-cols-3 gap-10">
+                <div class="md:col-span-2">
+                    <div class="flex gap-2 mb-6">
+                        <span id="modal-cat" class="bg-orange-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded">DEEP DIVE</span>
+                        <span class="bg-slate-100 text-slate-400 text-[9px] font-bold px-2 py-0.5 rounded uppercase">6 MIN READ</span>
+                    </div>
+                    <h2 id="modal-title" class="text-4xl font-extrabold tracking-tighter leading-tight mb-8">Title Loading...</h2>
+                    
+                    <div id="modal-content" class="text-slate-600 text-sm leading-relaxed whitespace-pre-line space-y-4">
+                        Analysis is currently being generated...
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="bg-orange-100/50 border border-orange-200 p-6 rounded-3xl">
+                        <h4 class="text-[10px] font-black uppercase tracking-widest text-orange-600 mb-4">Market Impact</h4>
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="text-[10px] font-bold text-slate-500">Sector</span>
+                            <span class="text-[10px] font-black text-orange-600 uppercase">Market</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] font-bold text-slate-500">Sentiment</span>
+                            <span class="text-[10px] font-black text-emerald-600 uppercase italic">Bullish</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl text-white">
+                        <h4 class="text-[9px] font-black uppercase tracking-widest text-orange-400 mb-4 flex items-center gap-2">
+                            <span class="animate-pulse">✦</span> The Sentinel's Take
+                        </h4>
+                        <ul id="modal-breakdown" class="text-[11px] font-medium leading-relaxed space-y-3 list-none">
+                            </ul>
+                    </div>
+                </div>
+            </div>
         </div>
-    </footer>
+    </div>
 
     <script>
-        // Your Verified Credentials
-        const supabaseUrl = 'https://dpwkojtfeoxlpyevutfc.supabase.co'; 
-        const supabaseKey = 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE'; 
+        const supabaseUrl = 'https://dpwkojtfeoxlpyevutfc.supabase.co';
+        const supabaseKey = 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
         const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        let articlesData = [];
 
         async function fetchNews() {
             const { data, error } = await _supabase
@@ -79,35 +101,42 @@
                 .select('*')
                 .order('created_at', { ascending: false });
 
-            const feed = document.getElementById('news-feed');
+            if (error) return console.error(error);
+            articlesData = data;
             
-            if (error) {
-                feed.innerHTML = '<div class="col-span-full text-center text-red-500">Connection Error. Please check Supabase RLS policies.</div>';
-                return;
-            }
-
-            if (data.length === 0) {
-                feed.innerHTML = '<div class="col-span-full text-center text-slate-400 py-20">Waiting for first autonomous update...</div>';
-                return;
-            }
-
-            feed.innerHTML = data.map(article => `
-                <article class="bento-card bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center gap-3 mb-6">
-                            <span class="px-3 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-md">${article.category || 'INTEL'}</span>
-                            <span class="text-slate-300 text-xs">/</span>
-                            <time class="text-[11px] text-slate-400">${new Date(article.created_at).toLocaleDateString()}</time>
-                        </div>
-                        <h3 class="text-2xl font-extrabold tracking-tight mb-4 leading-tight hover:text-indigo-600 cursor-pointer">${article.title}</h3>
-                        <div class="text-slate-600 text-sm mb-8 leading-relaxed whitespace-pre-line">${article.content.substring(0, 500)}...</div>
+            const feed = document.getElementById('news-feed');
+            feed.innerHTML = data.map((article, index) => `
+                <article onclick="openModal(${index})" class="bento-card bg-white p-6 rounded-3xl border border-slate-200 cursor-pointer">
+                    <div class="flex justify-between items-start mb-6">
+                        <span class="text-[9px] font-bold bg-slate-100 px-2 py-1 rounded-md text-slate-500 uppercase tracking-tighter">${article.category || 'MARKET'}</span>
+                        <time class="text-[9px] font-bold text-slate-300 uppercase">${new Date(article.created_at).toLocaleDateString()}</time>
                     </div>
-                    <div class="pt-6 border-t border-slate-50 flex justify-between items-center">
-                        <a href="${article.source_url}" target="_blank" class="text-indigo-600 font-bold text-xs btn-glow px-4 py-2 bg-indigo-50 rounded-lg transition">Read Full Intel &rarr;</a>
-                    </div>
+                    <h3 class="text-xl font-extrabold tracking-tighter leading-tight mb-4">${article.title}</h3>
+                    <p class="text-slate-500 text-xs line-clamp-3 mb-6">${article.content}</p>
+                    <div class="text-[10px] font-bold text-indigo-600 flex items-center gap-1">Open Intelligence Brief &rarr;</div>
                 </article>
             `).join('');
         }
+
+        function openModal(index) {
+            const article = articlesData[index];
+            document.getElementById('modal-title').innerText = article.title;
+            document.getElementById('modal-content').innerText = article.content;
+            document.getElementById('modal-image').src = article.image_url || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa';
+            
+            // Map the breakdown array
+            const breakdownHtml = Array.isArray(article.breakdown) 
+                ? article.breakdown.map(p => `<li class="border-b border-white/10 pb-2 italic">"${p}"</li>`).join('')
+                : '<li>Analyzing strategic shift...</li>';
+            
+            document.getElementById('modal-breakdown').innerHTML = breakdownHtml;
+            document.getElementById('modal-overlay').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+        }
+
         fetchNews();
     </script>
 </body>
