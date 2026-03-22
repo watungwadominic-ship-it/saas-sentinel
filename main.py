@@ -60,26 +60,25 @@ def run_news_bot():
             print(f"⏭️ Skipping duplicate: {title[:30]}...")
             continue
 
-        print(f"🧠 Generating Unique Intelligence for: {title}")
+        print(f"🧠 Generating Fast Intelligence for: {title}")
         
         try:
             client = Groq(api_key=GROQ_API_KEY)
             
-            # Professional Prompt for JSON Extraction
             prompt = (
                 f"Analyze this SaaS news: {title}. Context: {latest['description']}. "
                 "You are a B2B SaaS Analyst. Respond ONLY in JSON format with: "
                 "1. 'analysis': A 2-paragraph professional impact report. "
-                "2. 'points': A list of exactly 3 specific, unique strategic takeaways for SaaS founders."
+                "2. 'points': A list of exactly 3 specific, unique strategic takeaways for founders."
             )
             
+            # SWITCHED TO 8B MODEL FOR SPEED
             completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="llama-3-8b-8192", 
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"} 
             )
             
-            # Extract JSON data safely
             ai_data = json.loads(completion.choices[0].message.content)
             
             payload = {
@@ -88,8 +87,8 @@ def run_news_bot():
                 "breakdown": ai_data.get('points', ["Strategic Pivot", "Market Expansion", "Tech Integration"]),
                 "image_url": latest.get('urlToImage'),
                 "source_url": latest.get('url'),
-                "category": "Market Analysis",
-                "published_at": latest.get('publishedAt')
+                "category": "Market Analysis"
+                # Removed published_at to avoid Supabase Column Error
             }
             
             res = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, json=payload)
@@ -113,7 +112,7 @@ def generate_sentiment_post():
             "Respond in JSON with 'analysis' (market mood) and 'points' (3 weekly trends)."
         )
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3-8b-8192",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
