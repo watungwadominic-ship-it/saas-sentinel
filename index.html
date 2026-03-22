@@ -1,131 +1,99 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS Sentinel | Intelligence Dashboard</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SaaS Sentinel</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { background-color: #d6d3cb; font-family: 'Inter', sans-serif; color: #1a1a1a; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* Sidebar Navigation */
-        .sidebar { width: 260px; background-color: #6d6a63; display: flex; flex-direction: column; padding: 40px 24px; border-right: 1px solid rgba(0,0,0,0.1); }
-        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; color: #b0aea8; font-weight: 600; font-size: 14px; transition: 0.3s; margin-bottom: 8px; cursor: pointer; }
-        .nav-item:hover, .nav-item.active { background-color: rgba(255,255,255,0.1); color: #f97316; }
-        .subscribe-btn { margin-top: auto; background-color: #f97316; color: white; padding: 14px; border-radius: 14px; font-weight: 700; text-align: center; cursor: pointer; }
-
-        /* Dashboard Layout */
-        .content-area { flex: 1; overflow-y: auto; padding: 40px; }
-        .glass-card { background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(20px); border-radius: 32px; border: 1px solid rgba(255, 255, 255, 0.3); padding: 24px; transition: 0.3s; }
-        .search-bar { background: rgba(255, 255, 255, 0.6); border-radius: 20px; padding: 16px 24px; width: 100%; border: none; font-size: 14px; outline: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
-        
-        /* Market Pulse Widget */
-        .market-pulse { background: rgba(255, 255, 255, 0.5); border-radius: 24px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.3); }
-        
-        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    </style>
-</head>
-<body>
-
-    <aside class="sidebar">
-        <div class="flex items-center gap-3 mb-12">
-            <div class="bg-orange-500 p-2 rounded-lg text-lg">📊</div>
-            <h1 class="text-white font-bold text-xl tracking-tight">SaaS Sentinel</h1>
-        </div>
-        
-        <nav>
-            <div onclick="switchTab('feed')" id="nav-feed" class="nav-item active">📈 Feed</div>
-            <div onclick="switchTab('analysis')" id="nav-analysis" class="nav-item">📊 Analysis</div>
-            <div class="nav-item">📂 Archive</div>
-            <div class="nav-item">🧠 About</div>
-        </nav>
-
-        <div class="subscribe-btn shadow-lg">✉️ Subscribe</div>
-    </aside>
-
-    <main class="content-area">
-        <div class="max-w-6xl mx-auto">
-            
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12 items-start">
-                <div class="lg:col-span-2">
-                    <input type="text" id="searchInput" class="search-bar" placeholder="Search Intelligence (e.g. AI, Microsoft, Funding)...">
-                </div>
-                <div class="market-pulse shadow-sm">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">📈 Market Pulse</span>
-                        <div class="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></div>
-                    </div>
-                    <div class="flex justify-between items-baseline">
-                        <span class="text-xs font-bold text-gray-800">PLTR $24.50</span>
-                        <span class="text-[10px] text-green-600 font-bold">+2.1%</span>
-                    </div>
-                    <p class="text-[9px] text-gray-400 mt-2 font-bold uppercase tracking-tighter">Live SaaS Index Tracking</p>
-                </div>
-            </div>
-
-            <div class="flex justify-between items-center mb-8">
-                <h2 id="view-title" class="text-2xl font-bold tracking-tight text-gray-800">Intelligence Feed</h2>
-                <span class="text-[10px] font-bold text-orange-600 uppercase tracking-[0.3em]">● Live Updates</span>
-            </div>
-
-            <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-                <div class="col-span-full text-center py-20 text-gray-400 font-bold uppercase tracking-widest text-xs">
-                    Syncing Intelligence...
-                </div>
-            </div>
-        </div>
-    </main>
-
     <script>
-        // Use your specific Supabase credentials
-        const SB_URL = "YOUR_SUPABASE_URL"; 
-        const SB_KEY = "YOUR_SUPABASE_ANON_KEY";
-
-        let articlesData = [];
-        let currentTab = 'feed';
-
-        async function fetchNews() {
-            try {
-                const res = await fetch(`${SB_URL}/rest/v1/news_articles?select=*&order=created_at.desc`, {
-                    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
-                });
-                articlesData = await res.json();
-                renderCards();
-            } catch (err) {
-                document.getElementById('news-grid').innerHTML = `
-                    <div class="col-span-full text-center py-20 text-orange-700 font-bold">
-                        CONNECTION FAILED: CHECK SUPABASE CREDENTIALS
-                    </div>`;
-            }
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: { accent: '#f08924', bg: '#d6d3cb', sidebar: '#6d6a63' }
+          }
         }
-
-        function switchTab(tab) {
-            currentTab = tab;
-            document.getElementById('nav-feed').classList.toggle('active', tab === 'feed');
-            document.getElementById('nav-analysis').classList.toggle('active', tab === 'analysis');
-            document.getElementById('view-title').innerText = tab === 'feed' ? 'Intelligence Feed' : 'Market Analysis';
-            renderCards();
-        }
-
-        function renderCards() {
-            const grid = document.getElementById('news-grid');
-            grid.innerHTML = articlesData.map(art => `
-                <div class="glass-card shadow-sm hover:translate-y-[-4px] transition-all cursor-pointer">
-                    <img src="${art.image_url}" class="w-full h-44 object-cover rounded-2xl mb-5 shadow-sm">
-                    <div class="flex justify-between items-center mb-3">
-                        <span class="text-[9px] font-bold text-orange-600 uppercase tracking-widest bg-orange-500/10 px-2 py-1 rounded-md">SaaS Sentinel</span>
-                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">5 min read</span>
-                    </div>
-                    <h3 class="font-bold text-lg leading-snug mb-4 line-clamp-2 text-gray-900">${art.title}</h3>
-                    <p class="text-xs text-gray-600 leading-relaxed italic line-clamp-3">
-                        "${currentTab === 'feed' ? (art.summary || "Click for summary...") : (art.content || "Click for analysis...")}"
-                    </p>
-                </div>
-            `).join('');
-        }
-
-        fetchNews();
+      }
     </script>
-</body>
+    <style>
+      :root {
+        --color-bg: #d6d3cb;
+        --color-sidebar-bg: #6d6a63;
+        --color-accent: #f08924;
+      }
+      body { background-color: var(--color-bg); font-family: 'Inter', sans-serif; }
+      .glass-card { 
+        background: rgba(255, 255, 255, 0.4); 
+        backdrop-filter: blur(20px); 
+        border: 1px solid rgba(255, 255, 255, 0.2); 
+        border-radius: 24px; 
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" class="min-h-screen flex flex-col lg:flex-row">
+      <aside class="w-72 bg-[#6d6a63] text-white hidden lg:flex flex-col p-8 fixed h-full">
+        <div class="flex items-center gap-3 mb-12">
+          <div class="bg-[#f08924] p-2 rounded-lg">📰</div>
+          <h1 class="text-xl font-bold">SaaS Sentinel</h1>
+        </div>
+        <nav class="space-y-4">
+          <div class="font-bold text-orange-400">📈 Feed</div>
+          <div class="opacity-60 hover:opacity-100 cursor-pointer">📊 Analysis</div>
+        </nav>
+      </aside>
+
+      <main class="flex-1 lg:ml-72 p-12">
+        <div class="max-w-5xl mx-auto">
+          <div class="mb-10 bg-white/30 backdrop-blur-md p-4 rounded-2xl flex items-center border border-white/20">
+            <span class="mr-4 opacity-30">🔍</span>
+            <input type="text" id="searchInput" placeholder="Search Intelligence..." class="bg-transparent w-full outline-none font-medium">
+          </div>
+
+          <h2 class="text-2xl font-black mb-8">Intelligence Feed</h2>
+          
+          <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+             <div id="loading" class="col-span-full py-20 text-center opacity-40 font-bold uppercase tracking-widest text-xs">
+                Sourcing Intelligence...
+             </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module">
+      import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+      // 1. FILL THESE IN
+      const supabaseUrl = 'YOUR_SUPABASE_URL'
+      const supabaseKey = 'YOUR_SUPABASE_ANON_KEY'
+      const supabase = createClient(supabaseUrl, supabaseKey)
+
+      async function loadNews() {
+        const { data, error } = await supabase
+          .from('news_articles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        const grid = document.getElementById('news-grid');
+        const loading = document.getElementById('loading');
+
+        if (error) {
+          grid.innerHTML = `<div class="text-red-500 font-bold">Connection Failed: Check Credentials</div>`;
+          return;
+        }
+
+        loading.style.display = 'none';
+        grid.innerHTML = data.map(article => `
+          <div class="glass-card p-6 hover:-translate-y-1 transition-all cursor-pointer">
+            <img src="${article.image_url || 'https://via.placeholder.com/400x200'}" class="w-full h-40 object-cover rounded-xl mb-4">
+            <h3 class="font-bold text-lg mb-2">${article.title}</h3>
+            <p class="text-xs opacity-70 italic line-clamp-3">"${article.summary}"</p>
+          </div>
+        `).join('');
+      }
+
+      loadNews();
+    </script>
+  </body>
 </html>
