@@ -3,98 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS Sentinel | Executive Intelligence</title>
-    
+    <title>SaaS Sentinel | Intelligence Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Sand and Graphite Palette */
-        body { 
-            background-color: #f4f2ee; 
-            font-family: 'Inter', sans-serif;
-            color: #1a1a1a;
-        }
-
-        /* Glassmorphism 2.0 Engine */
-        .glass { 
-            background: rgba(255, 255, 255, 0.7); 
-            backdrop-filter: blur(20px) saturate(160%); 
-            -webkit-backdrop-filter: blur(20px) saturate(160%);
-            border: 1px solid rgba(255, 255, 255, 0.4); 
-            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
-        }
-
-        .executive-modal {
-            box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.15);
-        }
-
-        .tab-active { 
-            color: #f97316; 
-            border-bottom: 3px solid #f97316; 
-            font-weight: 800;
-        }
-
-        /* Hide scrollbar but allow scrolling */
-        .hide-scroll::-webkit-scrollbar { display: none; }
+        body { background-color: #d6d3cb; font-family: 'Inter', sans-serif; color: #1a1a1a; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* Smooth transitions for cards */
-        .card-hover { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        /* Sidebar Navigation */
+        .sidebar { width: 260px; background-color: #6d6a63; display: flex; flex-direction: column; padding: 40px 24px; border-right: 1px solid rgba(0,0,0,0.1); }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; color: #b0aea8; font-weight: 600; font-size: 14px; transition: 0.3s; margin-bottom: 8px; cursor: pointer; }
+        .nav-item:hover, .nav-item.active { background-color: rgba(255,255,255,0.1); color: #f97316; }
+        .subscribe-btn { margin-top: auto; background-color: #f97316; color: white; padding: 14px; border-radius: 14px; font-weight: 700; text-align: center; cursor: pointer; }
+
+        /* Dashboard Layout */
+        .content-area { flex: 1; overflow-y: auto; padding: 40px; }
+        .glass-card { background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(20px); border-radius: 32px; border: 1px solid rgba(255, 255, 255, 0.3); padding: 24px; transition: 0.3s; }
+        .search-bar { background: rgba(255, 255, 255, 0.6); border-radius: 20px; padding: 16px 24px; width: 100%; border: none; font-size: 14px; outline: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        
+        /* Market Pulse Widget */
+        .market-pulse { background: rgba(255, 255, 255, 0.5); border-radius: 24px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.3); }
+        
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     </style>
 </head>
-<body class="p-6 md:p-12">
+<body>
 
-    <header class="max-w-6xl mx-auto mb-16 flex flex-col md:flex-row justify-between items-end gap-8">
-        <div class="space-y-1">
-            <h1 class="text-4xl font-extrabold tracking-tighter uppercase leading-none">
-                SAAS <span class="text-orange-600">SENTINEL</span>
-            </h1>
-            <p class="text-gray-500 font-medium tracking-wide text-sm opacity-80">PROPRIETARY MARKET INTELLIGENCE FEED</p>
+    <aside class="sidebar">
+        <div class="flex items-center gap-3 mb-12">
+            <div class="bg-orange-500 p-2 rounded-lg text-lg">📊</div>
+            <h1 class="text-white font-bold text-xl tracking-tight">SaaS Sentinel</h1>
         </div>
         
-        <nav class="flex gap-10 border-b border-gray-200 w-full md:w-auto">
-            <button id="tab-feed" onclick="switchTab('feed')" class="pb-3 text-xs font-bold uppercase tracking-[0.2em] tab-active transition-all">The Radar</button>
-            <button id="tab-analysis" onclick="switchTab('analysis')" class="pb-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-gray-600 transition-all">Deep Analysis</button>
+        <nav>
+            <div onclick="switchTab('feed')" id="nav-feed" class="nav-item active">📈 Feed</div>
+            <div onclick="switchTab('analysis')" id="nav-analysis" class="nav-item">📊 Analysis</div>
+            <div class="nav-item">📂 Archive</div>
+            <div class="nav-item">🧠 About</div>
         </nav>
-    </header>
 
-    <div id="loader" class="text-center py-32 animate-pulse text-gray-400 font-semibold tracking-widest uppercase text-xs">
-        Establishing Secure Connection to Intelligence Database...
-    </div>
+        <div class="subscribe-btn shadow-lg">✉️ Subscribe</div>
+    </aside>
 
-    <main id="news-grid" class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-20"></main>
-
-    <div id="article-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="glass executive-modal w-full max-w-4xl rounded-[3rem] overflow-hidden relative max-h-[90vh] flex flex-col">
-            <button onclick="closeModal()" class="absolute top-8 right-8 z-30 bg-white/90 p-3 rounded-full hover:bg-white hover:scale-110 transition shadow-lg text-black">✕</button>
+    <main class="content-area">
+        <div class="max-w-6xl mx-auto">
             
-            <div class="overflow-y-auto hide-scroll">
-                <div class="relative h-96">
-                    <img id="modal-image" class="w-full h-full object-cover" src="" alt="">
-                    <div class="absolute inset-0 bg-gradient-to-t from-[#f4f2ee] via-transparent to-transparent"></div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12 items-start">
+                <div class="lg:col-span-2">
+                    <input type="text" id="searchInput" class="search-bar" placeholder="Search Intelligence (e.g. AI, Microsoft, Funding)...">
                 </div>
-                
-                <div class="p-10 md:p-16 -mt-20 relative z-10">
-                    <span class="text-[10px] font-bold text-orange-600 uppercase tracking-[0.4em] mb-6 block">Intelligence Report // Strategic Analysis</span>
-                    <h2 id="modal-title" class="text-4xl font-extrabold mb-12 leading-[1.1] text-gray-900 tracking-tight"></h2>
-                    
-                    <div class="bg-gray-900/5 rounded-[2rem] p-8 mb-12 border border-white/50">
-                        <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">Sentinel Strategic Takeaways</h4>
-                        <div id="modal-breakdown" class="space-y-6">
-                            </div>
+                <div class="market-pulse shadow-sm">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">📈 Market Pulse</span>
+                        <div class="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></div>
                     </div>
+                    <div class="flex justify-between items-baseline">
+                        <span class="text-xs font-bold text-gray-800">PLTR $24.50</span>
+                        <span class="text-[10px] text-green-600 font-bold">+2.1%</span>
+                    </div>
+                    <p class="text-[9px] text-gray-400 mt-2 font-bold uppercase tracking-tighter">Live SaaS Index Tracking</p>
+                </div>
+            </div>
 
-                    <div class="max-w-2xl">
-                        <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6">Deep Analysis</h4>
-                        <p id="modal-content" class="text-gray-700 leading-relaxed text-lg font-normal whitespace-pre-wrap"></p>
-                    </div>
+            <div class="flex justify-between items-center mb-8">
+                <h2 id="view-title" class="text-2xl font-bold tracking-tight text-gray-800">Intelligence Feed</h2>
+                <span class="text-[10px] font-bold text-orange-600 uppercase tracking-[0.3em]">● Live Updates</span>
+            </div>
+
+            <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                <div class="col-span-full text-center py-20 text-gray-400 font-bold uppercase tracking-widest text-xs">
+                    Syncing Intelligence...
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
-        // REPLACE THESE WITH YOUR ACTUAL SUPABASE DETAILS
+        // Use your specific Supabase credentials
         const SB_URL = "YOUR_SUPABASE_URL"; 
         const SB_KEY = "YOUR_SUPABASE_ANON_KEY";
 
@@ -102,78 +86,43 @@
         let currentTab = 'feed';
 
         async function fetchNews() {
-            console.log("📡 Initializing Sentinel Fetch...");
             try {
                 const res = await fetch(`${SB_URL}/rest/v1/news_articles?select=*&order=created_at.desc`, {
                     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
                 });
-                
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                
                 articlesData = await res.json();
-                console.log("✅ Intelligence Received:", articlesData.length, "Files Synced.");
-                
-                document.getElementById('loader').classList.add('hidden');
-                renderContent();
+                renderCards();
             } catch (err) {
-                console.error("❌ Link Severed:", err.message);
-                document.getElementById('loader').innerHTML = `<p class="text-red-500 text-xs tracking-widest uppercase">Connection Failed: Check Credentials</p>`;
+                document.getElementById('news-grid').innerHTML = `
+                    <div class="col-span-full text-center py-20 text-orange-700 font-bold">
+                        CONNECTION FAILED: CHECK SUPABASE CREDENTIALS
+                    </div>`;
             }
         }
 
         function switchTab(tab) {
             currentTab = tab;
-            document.getElementById('tab-feed').className = tab === 'feed' ? 'pb-3 text-xs font-bold uppercase tracking-[0.2em] tab-active' : 'pb-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-400';
-            document.getElementById('tab-analysis').className = tab === 'analysis' ? 'pb-3 text-xs font-bold uppercase tracking-[0.2em] tab-active' : 'pb-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-400';
-            renderContent();
+            document.getElementById('nav-feed').classList.toggle('active', tab === 'feed');
+            document.getElementById('nav-analysis').classList.toggle('active', tab === 'analysis');
+            document.getElementById('view-title').innerText = tab === 'feed' ? 'Intelligence Feed' : 'Market Analysis';
+            renderCards();
         }
 
-        function renderContent() {
+        function renderCards() {
             const grid = document.getElementById('news-grid');
-            if (articlesData.length === 0) {
-                grid.innerHTML = "<div class='col-span-3 text-center text-gray-400 text-xs uppercase tracking-widest py-20 italic'>Archive Empty. Run Intelligence Bot.</div>";
-                return;
-            }
-
-            grid.innerHTML = articlesData.map((art, i) => `
-                <div onclick="openModal(${i})" class="glass rounded-[2.5rem] p-6 cursor-pointer card-hover group">
-                    <div class="overflow-hidden rounded-[1.8rem] mb-6 h-48 bg-gray-200">
-                        <img src="${art.image_url || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa'}" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
+            grid.innerHTML = articlesData.map(art => `
+                <div class="glass-card shadow-sm hover:translate-y-[-4px] transition-all cursor-pointer">
+                    <img src="${art.image_url}" class="w-full h-44 object-cover rounded-2xl mb-5 shadow-sm">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-[9px] font-bold text-orange-600 uppercase tracking-widest bg-orange-500/10 px-2 py-1 rounded-md">SaaS Sentinel</span>
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">5 min read</span>
                     </div>
-                    <span class="text-[9px] font-bold text-orange-600 uppercase tracking-widest mb-3 block">Intelligence Unit</span>
-                    <h3 class="font-extrabold text-xl mb-4 leading-tight group-hover:text-orange-600 transition-colors">${art.title}</h3>
-                    <p class="text-xs text-gray-500 leading-relaxed italic line-clamp-2">
-                        ${currentTab === 'feed' ? (art.summary || "Summary pending...") : (art.content || "Deep analysis pending...")}
+                    <h3 class="font-bold text-lg leading-snug mb-4 line-clamp-2 text-gray-900">${art.title}</h3>
+                    <p class="text-xs text-gray-600 leading-relaxed italic line-clamp-3">
+                        "${currentTab === 'feed' ? (art.summary || "Click for summary...") : (art.content || "Click for analysis...")}"
                     </p>
                 </div>
             `).join('');
-        }
-
-        function openModal(index) {
-            const art = articlesData[index];
-            document.getElementById('modal-title').innerText = art.title;
-            document.getElementById('modal-image').src = art.image_url || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa';
-            document.getElementById('modal-content').innerText = art.content;
-            
-            let points = [];
-            try { 
-                points = typeof art.breakdown === 'string' ? JSON.parse(art.breakdown) : art.breakdown; 
-            } catch(e) { points = ["Strategic insights arriving soon..."]; }
-            
-            document.getElementById('modal-breakdown').innerHTML = points.map(p => `
-                <div class="flex items-start">
-                    <div class="h-2 w-2 rounded-full bg-orange-500 mt-2 mr-5 shrink-0 shadow-[0_0_15px_rgba(249,115,22,0.6)]"></div>
-                    <p class="text-sm font-semibold italic text-gray-800 leading-snug tracking-tight">"${p}"</p>
-                </div>
-            `).join('');
-            
-            document.getElementById('article-modal').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeModal() {
-            document.getElementById('article-modal').classList.add('hidden');
-            document.body.style.overflow = 'auto';
         }
 
         fetchNews();
