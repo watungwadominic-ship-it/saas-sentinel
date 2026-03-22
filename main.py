@@ -1,9 +1,10 @@
 import os
+import json
 import requests
 from groq import Groq
 from datetime import datetime, timedelta
 
-# GitHub Secrets (Ensure these are set in your GitHub Repo Settings)
+# GitHub Secrets
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
@@ -12,21 +13,16 @@ NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 def run_news_bot():
     print("🚀 Starting SaaS Sentinel Filtered Cycle...")
     
-    # 1. Weekend Logic: Expand search if it's Saturday (5) or Sunday (6)
+    # 1. Weekend Logic
     now = datetime.now()
     is_weekend = now.weekday() >= 5
-    days_to_look_back = 3 if is_weekend else 1
+    days_back = 3 if is_weekend else 1
+    start_date = (now - timedelta(days=days_back)).strftime('%Y-%m-%d')
     
-    if is_weekend:
-        print(f"📅 Weekend Mode Active: Looking back {days_to_look_back} days.")
-    else:
-        print(f"📅 Standard Mode: Looking back {days_to_look_back} day.")
-    
-    start_date = (now - timedelta(days=days_to_look_back)).strftime('%Y-%m-%d')
-    
-    # 2. Refined Search Query for NewsAPI
+    print(f"📅 Mode: {'Weekend' if is_weekend else 'Standard'} ({days_back} days back)")
+
+    # 2. NewsAPI Fetch
     search_query = 'B2B SaaS OR "Enterprise AI" OR "Cloud Computing"'
-    
     news_params = {
         "q": search_query,
         "from": start_date,
@@ -42,108 +38,99 @@ def run_news_bot():
         print(f"❌ NewsAPI Error: {e}")
         return
 
-    # 3. Fallback Logic: If no news is found, generate a Weekly Sentiment Analysis
     if not articles:
-        print("⚠️ No fresh news found. Triggering Weekly Sentiment Fallback...")
+        print("⚠️ No news found. Running Sentiment Fallback...")
         generate_sentiment_post()
         return
 
-    # 4. Process the top 3 news items
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
+        "Content-Type": "application/json"
     }
 
+    # 3. Process Top 3 Articles
     for latest in articles[:3]:
         title = latest['title']
         
-        # Duplicate Check: Ask Supabase if this title exists
+        # Duplicate Check
         check_url = f"{SUPABASE_URL}/rest/v1/news_articles?title=eq.{title}&select=id"
         check_res = requests.get(check_url, headers=headers)
-        
         if check_res.status_code == 200 and check_res.json():
             print(f"⏭️ Skipping duplicate: {title[:30]}...")
             continue
 
-        print(f"✅ Processing New Story: {title}")
+        print(f"🧠 Generating Unique Intelligence for: {title}")
         
-        # 5. AI Analysis via Groq (Llama 3.3)
         try:
             client = Groq(api_key=GROQ_API_KEY)
-            # Instructing the AI to provide a clear summary and 3 bullet points
+            
+            # Professional Prompt for JSON Extraction
             prompt = (
-                f"Act as a B2B SaaS Expert. Analyze this news: {title}. "
-                f"Context: {latest['description']}. "
-                "1. Write a professional market analysis focusing on enterprise impact. "
-                "2. Provide exactly 3 short bullet points summarizing why this matters for founders."
+                f"Analyze this SaaS news: {title}. Context: {latest['description']}. "
+                "You are a B2B SaaS Analyst. Respond ONLY in JSON format with: "
+                "1. 'analysis': A 2-paragraph professional impact report. "
+                "2. 'points': A list of exactly 3 specific, unique strategic takeaways for SaaS founders."
             )
             
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"} 
             )
-            analysis_text = completion.choices[0].message.content
             
-            # 6. Save to Supabase (Fixed for Array Column)
+            # Extract JSON data safely
+            ai_data = json.loads(completion.choices[0].message.content)
+            
             payload = {
                 "title": title,
-                "content": analysis_text,
-                # Sending as a list [] to satisfy the malformed array literal error
-                "breakdown": [
-                    "Strategic Impact Analysis", 
-                    "Market Shift Detection", 
-                    "Founder Action Item"
-                ],
+                "content": ai_data.get('analysis', "Analysis currently being refined."),
+                "breakdown": ai_data.get('points', ["Strategic Pivot", "Market Expansion", "Tech Integration"]),
                 "image_url": latest.get('urlToImage'),
                 "source_url": latest.get('url'),
-                "category": "Market Analysis"
+                "category": "Market Analysis",
+                "published_at": latest.get('publishedAt')
             }
             
             res = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, json=payload)
             if res.status_code > 299:
-                print(f"❌ Supabase Save Error: {res.text}")
+                print(f"❌ Supabase Error: {res.text}")
+            else:
+                print(f"✅ Successfully posted: {title[:40]}...")
 
         except Exception as e:
-            print(f"❌ Error during AI Analysis: {e}")
+            print(f"❌ Processing Error: {e}")
             continue
 
-    print("🎉 Cycle Complete.")
+    print("🎉 SaaS Sentinel Intelligence Update Complete.")
 
 def generate_sentiment_post():
-    """Fallback function to keep the feed fresh when NewsAPI is empty"""
+    """Fallback for empty news days"""
     try:
         client = Groq(api_key=GROQ_API_KEY)
         prompt = (
-            "Write a high-level Weekly Sentiment report on the state of SaaS and Enterprise AI. "
-            "Summarize the general market mood, focus on B2B trends, "
-            "and provide 3 short bullet points on the week's overall direction."
+            "Generate a Weekly Sentiment Report for the SaaS market. "
+            "Respond in JSON with 'analysis' (market mood) and 'points' (3 weekly trends)."
         )
-        
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"}
         )
-        sentiment_text = completion.choices[0].message.content
+        ai_data = json.loads(completion.choices[0].message.content)
         
-        headers = {
-            "apikey": SUPABASE_KEY, 
-            "Authorization": f"Bearer {SUPABASE_KEY}", 
-            "Content-Type": "application/json"
-        }
-        
+        headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json"}
         payload = {
             "title": f"SaaS Sentinel: Weekly Market Sentiment ({datetime.now().strftime('%b %d')})",
-            "content": sentiment_text,
-            "breakdown": ["Market mood summary", "B2B Trend Tracking", "Weekly Outlook"],
+            "content": ai_data.get('analysis'),
+            "breakdown": ai_data.get('points'),
             "category": "Weekly Sentiment",
             "image_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71"
         }
         requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, json=payload)
-        print("📝 Sentiment Fallback Post Created.")
+        print("📝 Sentiment Post Created.")
     except Exception as e:
-        print(f"❌ Sentiment Fallback Failed: {e}")
+        print(f"❌ Fallback Failed: {e}")
 
 if __name__ == "__main__":
     run_news_bot()
