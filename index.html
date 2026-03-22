@@ -3,8 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SaaS Sentinel | Intelligence Dashboard</title>
-    
+    <title>SaaS Sentinel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -12,164 +11,150 @@
         theme: {
           extend: {
             colors: {
-              accent: '#f08924',
-              bg: '#d6d3cb',
-              sidebar: '#6d6a63',
-              ticker: '#b8b5ad'
+              accent: 'var(--color-accent)',
+              text: 'var(--color-text)',
+              bg: 'var(--color-bg)',
+            },
+            fontFamily: { sans: ['Inter', 'sans-serif'] },
+            animation: { 'marquee': 'marquee 40s linear infinite', 'shimmer': 'shimmer 2s infinite linear' },
+            keyframes: {
+              marquee: { '0%': { transform: 'translateX(0)' }, '100%': { transform: 'translateX(-50%)' } },
+              shimmer: { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } }
             }
           }
         }
       }
     </script>
-
-    <style>
+    <style type="text/css">
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
       :root {
         --color-bg: #d6d3cb;
-        --color-sidebar-bg: #6d6a63;
+        --color-text: #333333;
         --color-accent: #f08924;
+        --color-ticker-bg: #b8b5ad;
+        --color-sidebar-bg: #6d6a63;
+        --color-sidebar-text: #ffffff;
+        --color-glass: rgba(232, 228, 219, 0.85);
+        --color-glass-border: rgba(255, 255, 255, 0.2);
       }
-      body { 
-        background-color: var(--color-bg); 
-        font-family: 'Inter', sans-serif; 
-        color: #333333;
-        margin: 0;
+      .dark {
+        --color-bg: #0A0A10;
+        --color-text: #F5F5F5;
+        --color-accent: #E67E22;
+        --color-sidebar-bg: #1A1A1A;
+        --color-sidebar-text: #A0A0A0;
+        --color-ticker-bg: #1F1F25;
+        --color-glass: rgba(20, 20, 25, 0.6);
       }
-      .glass-card { 
-        background: rgba(255, 255, 255, 0.4); 
-        backdrop-filter: blur(20px); 
-        border: 1px solid rgba(255, 255, 255, 0.2); 
-        border-radius: 24px; 
-        transition: transform 0.3s ease;
-      }
-      .glass-card:hover { transform: translateY(-4px); }
-      .sidebar { background-color: var(--color-sidebar-bg); }
+      body { background-color: var(--color-bg); color: var(--color-text); transition: background-color 0.5s; }
+      .glass-panel { backdrop-filter: blur(40px); background-color: var(--color-glass); border: 1px solid var(--color-glass-border); }
+      .nav-active { background: rgba(255, 255, 255, 0.1); color: var(--color-accent) !important; opacity: 1 !important; }
     </style>
   </head>
-  <body>
-    <div id="root" class="min-h-screen flex flex-col lg:flex-row">
-      
-      <aside class="w-72 sidebar text-white hidden lg:flex flex-col p-8 fixed h-full z-50 shadow-2xl">
-        <div class="flex items-center gap-3 mb-12">
-          <div class="bg-accent p-2 rounded-xl shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
-          </div>
-          <h1 class="text-xl font-black tracking-tight">SaaS Sentinel</h1>
-        </div>
-        
-        <nav class="flex-1 space-y-2">
-          <div class="flex items-center gap-3 px-4 py-3 rounded-2xl text-accent bg-white/5 font-bold text-sm">
-            <span>📈</span> Feed
-          </div>
-          <div class="flex items-center gap-3 px-4 py-3 rounded-2xl opacity-60 hover:opacity-100 hover:bg-white/5 font-bold text-sm transition-all cursor-pointer">
-            <span>📊</span> Analysis
-          </div>
-          <div class="flex items-center gap-3 px-4 py-3 rounded-2xl opacity-60 hover:opacity-100 hover:bg-white/5 font-bold text-sm transition-all cursor-pointer">
-            <span>📂</span> Archive
-          </div>
-        </nav>
-
-        <div class="mt-auto pt-6 border-t border-white/10">
-           <button class="w-full bg-accent hover:bg-orange-500 text-white font-bold py-3 rounded-2xl shadow-lg transition-all">
-             Subscribe
-           </button>
-        </div>
-      </aside>
-
-      <main class="flex-1 lg:ml-72 p-6 md:p-12">
-        <div class="max-w-6xl mx-auto">
-          
-          <div class="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8 mb-12 items-start">
-            <div class="bg-white/30 backdrop-blur-md p-2 rounded-3xl flex items-center px-6 border border-white/20 shadow-xl">
-              <span class="mr-4 opacity-40">🔍</span>
-              <input type="text" id="searchInput" placeholder="Search Intelligence..." class="bg-transparent w-full py-3 outline-none font-medium placeholder:text-gray-500">
+  <body class="overflow-x-hidden">
+    <div id="root">
+      <div class="min-h-screen flex flex-col lg:flex-row">
+        <aside class="fixed left-0 top-0 bottom-0 w-72 bg-[var(--color-sidebar-bg)] text-[var(--color-sidebar-text)] backdrop-blur-2xl border-r border-white/10 z-[120] hidden lg:flex flex-col p-8 shadow-2xl">
+          <div class="flex items-center gap-3 mb-12">
+            <div class="bg-[var(--color-accent)] p-2.5 rounded-xl shadow-lg shadow-[var(--color-accent)]/20">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
             </div>
+            <h1 class="text-xl font-black tracking-tight">SaaS Sentinel</h1>
+          </div>
+          <nav class="flex-1 space-y-2">
+            <button onclick="changeTab('feed')" id="feed-tab" class="nav-active w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all">
+               Feed
+            </button>
+            <button onclick="changeTab('analysis')" id="analysis-tab" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl opacity-60 hover:bg-white/5 hover:opacity-100 font-bold text-sm transition-all text-white">
+               Analysis
+            </button>
+          </nav>
+          <div class="pt-6 border-t border-white/5 space-y-4">
+            <button onclick="toggleDarkMode()" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 font-bold text-sm hover:bg-white/10 transition-all text-white">
+              <span id="theme-icon">🌙</span> <span id="theme-text">Dark Mode</span>
+            </button>
+          </div>
+        </aside>
 
-            <div class="glass-card p-6 border border-white/10">
-              <div class="flex justify-between items-center mb-4">
-                <h4 class="text-[10px] font-black uppercase tracking-widest opacity-60">Market Pulse</h4>
-                <span class="w-2 h-2 rounded-full bg-accent animate-pulse"></span>
-              </div>
-              <div class="bg-[#b8b5ad] rounded-xl p-3 flex justify-between items-center font-bold text-xs">
-                <span>PLTR $24.50</span>
-                <span class="text-green-700">+2.1%</span>
-              </div>
+        <main class="flex-1 lg:ml-72 min-h-screen relative">
+          <div class="max-w-[1400px] mx-auto px-4 md:px-12 py-12">
+            <div class="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-12">
+              <section>
+                <div class="mb-12 glass-panel rounded-3xl flex items-center px-6 py-2 border-white/20 shadow-xl">
+                  <span class="mr-4 opacity-30">🔍</span>
+                  <input type="text" id="newsSearch" oninput="doSearch()" placeholder="Search Intelligence..." class="w-full bg-transparent py-3 outline-none font-medium">
+                </div>
+
+                <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div id="loader" class="col-span-full flex flex-col items-center py-20">
+                    <div class="w-12 h-12 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
+                    <p class="mt-6 text-[10px] font-black opacity-40 uppercase tracking-[0.3em]">Sourcing Intelligence...</p>
+                  </div>
+                </div>
+              </section>
+
+              <aside class="hidden lg:block space-y-8">
+                <div class="glass-panel p-8 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden">
+                  <div class="flex items-center justify-between mb-6">
+                    <h4 class="text-xs font-black uppercase tracking-widest opacity-60">Market Pulse</h4>
+                    <span class="w-2 h-2 rounded-full bg-accent animate-pulse"></span>
+                  </div>
+                  <div class="bg-[var(--color-ticker-bg)] -mx-8 px-8 py-4 border-y border-white/5 font-bold text-xs">
+                    <span>PLTR $24.50 <span class="text-green-600">+2.1%</span></span>
+                  </div>
+                </div>
+              </aside>
             </div>
           </div>
-
-          <div class="flex justify-between items-center mb-8">
-            <h2 class="text-3xl font-black tracking-tighter text-gray-800">Intelligence Feed</h2>
-            <span class="text-[10px] font-bold text-accent uppercase tracking-[0.3em]">● Live Updates</span>
-          </div>
-
-          <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-             <div id="loading" class="col-span-full flex flex-col items-center justify-center py-20">
-                <div class="w-10 h-10 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
-                <p class="mt-4 text-[10px] font-black opacity-40 uppercase tracking-widest">Sourcing Intelligence...</p>
-             </div>
-          </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
 
     <script type="module">
       import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+      const supabase = createClient('https://dpwkojtfeoxlpyevutfc.supabase.co', 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE');
+      
+      let localData = [];
 
-      // Your Credentials
-      const supabaseUrl = 'https://dpwkojtfeoxlpyevutfc.supabase.co';
-      const supabaseKey = 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      // FUNCTIONS
+      window.toggleDarkMode = () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        document.getElementById('theme-text').innerText = isDark ? 'Light Mode' : 'Dark Mode';
+        document.getElementById('theme-icon').innerText = isDark ? '☀️' : '🌙';
+      };
 
-      async function fetchNews() {
-        const grid = document.getElementById('news-grid');
-        const loading = document.getElementById('loading');
+      window.changeTab = (type) => {
+        document.getElementById('feed-tab').classList.toggle('nav-active', type === 'feed');
+        document.getElementById('analysis-tab').classList.toggle('nav-active', type === 'analysis');
+        render(localData);
+      };
 
-        try {
-          // Fetching from your 'news_articles' table
-          const { data, error } = await supabase
-            .from('news_articles')
-            .select('*')
-            .order('created_at', { ascending: false });
+      window.doSearch = () => {
+        const q = document.getElementById('newsSearch').value.toLowerCase();
+        const filtered = localData.filter(i => i.title.toLowerCase().includes(q));
+        render(filtered);
+      };
 
-          if (error) throw error;
-
-          loading.style.display = 'none';
-
-          if (!data || data.length === 0) {
-            grid.innerHTML = `<div class="col-span-full text-center py-10 opacity-50">No intelligence found in database.</div>`;
-            return;
-          }
-
-          grid.innerHTML = data.map(article => `
-            <article class="glass-card p-6 shadow-sm overflow-hidden group">
-              <div class="relative overflow-hidden rounded-2xl mb-5">
-                <img src="${article.image_url || 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=800'}" 
-                     class="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500">
-                <div class="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-[9px] font-bold text-white px-2 py-1 rounded-md uppercase tracking-widest">
-                  Intelligence
-                </div>
-              </div>
-              <h3 class="font-bold text-lg leading-tight mb-3 line-clamp-2">${article.title}</h3>
-              <p class="text-xs text-gray-600 leading-relaxed italic line-clamp-3 mb-4">
-                "${article.summary || 'No summary provided.'}"
-              </p>
-              <div class="pt-4 border-t border-black/5 flex justify-between items-center text-[9px] font-black uppercase tracking-widest opacity-40">
-                <span>SaaS Sentinel</span>
-                <span>${new Date(article.created_at).toLocaleDateString()}</span>
-              </div>
-            </article>
-          `).join('');
-
-        } catch (err) {
-          console.error(err);
-          grid.innerHTML = `
-            <div class="col-span-full text-center py-20">
-              <div class="text-red-500 font-bold mb-2 uppercase tracking-widest text-xs">Connection Failed</div>
-              <div class="text-[10px] opacity-50">Please check your Supabase RLS policies and table name.</div>
-            </div>`;
-        }
+      async function init() {
+        const { data } = await supabase.from('news_articles').select('*').order('created_at', { ascending: false });
+        localData = data || [];
+        render(localData);
       }
 
-      fetchNews();
+      function render(items) {
+        const grid = document.getElementById('news-grid');
+        document.getElementById('loader').style.display = 'none';
+        grid.innerHTML = items.map(i => `
+          <div class="glass-panel p-6 rounded-3xl shadow-lg">
+            <h3 class="font-bold text-lg mb-2">${i.title}</h3>
+            <p class="text-xs opacity-60 line-clamp-3 italic">"${i.summary || ''}"</p>
+          </div>
+        `).join('');
+      }
+
+      init();
+      if(localStorage.getItem('theme') === 'dark') toggleDarkMode();
     </script>
   </body>
 </html>
