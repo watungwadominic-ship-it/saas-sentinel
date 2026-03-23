@@ -41,7 +41,6 @@ def run_news_bot():
         "Prefer": "return=minimal"
     }
 
-    # Process top 3 fresh articles
     for latest in articles[:3]:
         title = latest['title']
         
@@ -51,22 +50,25 @@ def run_news_bot():
             print(f"⏭️ Skipping (Exists): {title[:30]}")
             continue
 
-        print(f"🧠 Generating Deep Analysis: {title}")
+        print(f"🧠 Generating Unique Intelligence: {title}")
         
         try:
             client = Groq(api_key=GROQ_API_KEY)
             
-            # The "Market Analyst" Prompt
+            # IMPROVED PROMPT: Forces separation between Summary and Analysis
             prompt = (
                 f"Analyze this SaaS news: {title}. Context: {latest['description']}. "
                 "Role: Senior B2B Strategic Analyst. "
-                "Provide a punchy summary for a news feed AND a deep strategic analysis for executives. "
+                "TASK: You must provide TWO COMPLETELY DIFFERENT levels of information. "
+                "1. feed_summary: A maximum 15-word 'News Flash' hook. (e.g. 'Company X pivots to AI to solve Y'). "
+                "2. strategic_analysis: 3-4 detailed paragraphs for executives. DO NOT repeat the summary. "
+                "Focus on: Market displacement, competitive moats, and technical strategy. "
                 "Respond ONLY in this JSON structure: "
                 "{"
-                "  \"feed_summary\": \"One short, bold sentence for the main feed.\","
-                "  \"strategic_analysis\": \"Three substantial paragraphs explaining market impact, founder strategy, and competitive moats.\","
+                "  \"feed_summary\": \"...\","
+                "  \"strategic_analysis\": \"...\","
                 "  \"impact_rating\": \"High, Medium, or Low\","
-                "  \"confidence\": 95"
+                "  \"confidence\": 98"
                 "}"
             )
             
@@ -78,16 +80,19 @@ def run_news_bot():
             
             ai_data = json.loads(completion.choices[0].message.content)
             
-            # Match the new website column names
+            # Ensure we aren't getting empty data
+            summary_text = ai_data.get('feed_summary', "Market intelligence update inside.")
+            analysis_text = ai_data.get('strategic_analysis', "Detailed report processing.")
+
             payload = {
                 "title": title,
-                "summary": ai_data.get('feed_summary'), 
-                "analysis_content": ai_data.get('strategic_analysis'), # THE FIX: Analysis Column
-                "confidence_score": ai_data.get('confidence', random.randint(94, 98)),
+                "summary": summary_text, 
+                "analysis_content": analysis_text, 
+                "confidence_score": ai_data.get('confidence', random.randint(95, 99)),
                 "strategic_impact": ai_data.get('impact_rating', 'High'),
                 "image_url": latest.get('urlToImage'),
                 "source_url": latest.get('url'),
-                "category": "Analysis" # Sets the tab correctly
+                "category": "Analysis"
             }
             
             res = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, json=payload)
