@@ -54,9 +54,9 @@ def run_news_bot():
 
         print(f"🧠 Analyzing: {title}")
         
-        # --- AI GENERATION WITH RETRY LOOP ---
+        # AI GENERATION WITH RETRY LOOP
         ai_data = None
-        for attempt in range(3): # Try up to 3 times if JSON fails
+        for attempt in range(3):
             try:
                 client = Groq(api_key=GROQ_API_KEY)
                 completion = client.chat.completions.create(
@@ -64,7 +64,7 @@ def run_news_bot():
                     messages=[
                         {
                             "role": "system", 
-                            "content": "You are a JSON-only strategic analyst. Never provide conversational filler. Always ensure JSON keys are 'feed_summary', 'strategic_analysis', 'impact', and 'confidence'."
+                            "content": "You are a JSON-only strategic analyst. Never provide conversational filler. Your analysis must be detailed and professional."
                         },
                         {
                             "role": "user", 
@@ -72,7 +72,7 @@ def run_news_bot():
                                 f"Analyze this SaaS news: {title}. Context: {latest['description']}. "
                                 "1. feed_summary: 10-word max Executive Hook. "
                                 "2. strategic_analysis: 3 substantial paragraphs on Market Displacement, Technical Strategy, and Moats. "
-                                "CRITICAL: Do NOT repeat the summary in the analysis. "
+                                "CRITICAL: Do NOT repeat the summary in the analysis section. "
                                 "JSON Structure: {\"feed_summary\": \"...\", \"strategic_analysis\": \"...\", \"impact\": \"High\", \"confidence\": 98}"
                             )
                         }
@@ -81,24 +81,31 @@ def run_news_bot():
                 )
                 
                 ai_data = json.loads(completion.choices[0].message.content)
-                break # Success! Exit the retry loop.
+                break 
             
             except Exception as e:
                 print(f"⚠️ Attempt {attempt+1} failed: {e}")
-                time.sleep(1) # Wait a second before retrying
+                time.sleep(1)
         
         if not ai_data:
             print(f"❌ Permanent AI Failure for: {title}")
             continue
 
+        # --- THE CORE FIX: EXTRACTION & CLEANING ---
+        # We extract the STRINGS from the JSON object to avoid saving brackets {} in the DB.
+        clean_summary = str(ai_data.get('feed_summary', '')).strip()
+        clean_analysis = str(ai_data.get('strategic_analysis', '')).strip()
+
+        # Check for failure strings like "EMPTY"
+        if len(clean_analysis) < 50 or clean_analysis.lower() == "empty":
+            clean_analysis = "Strategic briefing is currently being synthesized. Our team is evaluating the competitive implications of this market move."
+
         # 4. Payload Mapping
-        analysis_text = ai_data.get('strategic_analysis', "Strategic briefing pending evaluation.")
-        
         payload = {
             "title": title,
-            "summary": ai_data.get('feed_summary'),
-            "analysis_content": analysis_text, 
-            "confidence_score": ai_data.get('confidence', 95),
+            "summary": clean_summary,
+            "analysis_content": clean_analysis, 
+            "confidence_score": ai_data.get('confidence', random.randint(95, 98)),
             "strategic_impact": ai_data.get('impact', 'High'),
             "image_url": latest.get('urlToImage'),
             "source_url": latest.get('url'),
