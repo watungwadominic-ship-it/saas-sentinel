@@ -54,8 +54,8 @@ def run_news_bot():
 
         print(f"🧠 Analyzing: {title}")
         
-        # AI GENERATION WITH RETRY LOOP
         ai_data = None
+        # RETRY LOOP: Handles the 'json_validate_failed' errors seen in previous logs
         for attempt in range(3):
             try:
                 client = Groq(api_key=GROQ_API_KEY)
@@ -64,25 +64,25 @@ def run_news_bot():
                     messages=[
                         {
                             "role": "system", 
-                            "content": "You are a JSON-only strategic analyst. Never provide conversational filler. Your analysis must be detailed and professional."
+                            "content": "You are a JSON-only strategic analyst. Output ONLY a flat JSON object. Never include conversational filler."
                         },
                         {
                             "role": "user", 
                             "content": (
                                 f"Analyze this SaaS news: {title}. Context: {latest['description']}. "
-                                "1. feed_summary: 10-word max Executive Hook. "
-                                "2. strategic_analysis: 3 substantial paragraphs on Market Displacement, Technical Strategy, and Moats. "
-                                "CRITICAL: Do NOT repeat the summary in the analysis section. "
+                                "Provide: 1. feed_summary (10-word max hook), 2. strategic_analysis (3 deep paragraphs). "
+                                "Focus on: Market Displacement, Technical Strategy, and Competitive Moats. "
+                                "Constraint: DO NOT repeat the summary in the analysis section. "
                                 "JSON Structure: {\"feed_summary\": \"...\", \"strategic_analysis\": \"...\", \"impact\": \"High\", \"confidence\": 98}"
                             )
                         }
                     ],
+                    # Forces the model to provide a valid JSON structure
                     response_format={"type": "json_object"}
                 )
                 
                 ai_data = json.loads(completion.choices[0].message.content)
                 break 
-            
             except Exception as e:
                 print(f"⚠️ Attempt {attempt+1} failed: {e}")
                 time.sleep(1)
@@ -91,21 +91,27 @@ def run_news_bot():
             print(f"❌ Permanent AI Failure for: {title}")
             continue
 
-        # --- THE CORE FIX: EXTRACTION & CLEANING ---
-        # We extract the STRINGS from the JSON object to avoid saving brackets {} in the DB.
-        clean_summary = str(ai_data.get('feed_summary', '')).strip()
-        clean_analysis = str(ai_data.get('strategic_analysis', '')).strip()
+        # --- DATA CLEANING & EXTRACTION ---
+        # Fixes the bug where brackets {} were being saved in the database
+        analysis_body = ai_data.get('strategic_analysis', "")
+        
+        # If the AI nested the response inside a dictionary, flatten it into a string
+        if isinstance(analysis_body, dict):
+            analysis_body = "\n\n".join([str(v) for v in analysis_body.values()])
+        
+        clean_summary = str(ai_data.get('feed_summary', "")).strip()
+        clean_analysis = str(analysis_body).strip()
 
-        # Check for failure strings like "EMPTY"
-        if len(clean_analysis) < 50 or clean_analysis.lower() == "empty":
-            clean_analysis = "Strategic briefing is currently being synthesized. Our team is evaluating the competitive implications of this market move."
+        # Fallback for empty or too-short generations
+        if len(clean_analysis) < 50:
+            clean_analysis = "Detailed strategic briefing is currently being synthesized. Our analysts are evaluating the long-term market implications of this move."
 
-        # 4. Payload Mapping
+        # 4. Payload Mapping to Supabase
         payload = {
             "title": title,
             "summary": clean_summary,
             "analysis_content": clean_analysis, 
-            "confidence_score": ai_data.get('confidence', random.randint(95, 98)),
+            "confidence_score": ai_data.get('confidence', 95),
             "strategic_impact": ai_data.get('impact', 'High'),
             "image_url": latest.get('urlToImage'),
             "source_url": latest.get('url'),
@@ -117,7 +123,7 @@ def run_news_bot():
         if res.status_code in [200, 201]:
             print(f"✅ Intelligence Synced: {title[:30]}...")
         else:
-            print(f"⚠️ Supabase Error {res.status_code}: {res.text}")
+            print(f"⚠️ Supabase Error: {res.text}")
 
 if __name__ == "__main__":
     run_news_bot()
