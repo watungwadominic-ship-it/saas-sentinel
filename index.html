@@ -3,7 +3,51 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SaaS Sentinel | Intelligence Hub</title>
+    <title>SaaS Sentinel | Elite B2B Market Intelligence & SaaS Analysis</title>
+    <meta name="description" content="SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts, venture capital trends, and technical architectures." />
+    <meta name="keywords" content="SaaS Sentinel, SaaS intelligence, B2B software analysis, SaaS trends 2026, AI market research, venture capital SaaS, enterprise software insights, Dominic Watungwa" />
+    <meta name="author" content="Dominic Watungwa" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://saas-sentinel.vercel.app/" />
+    <meta property="og:title" content="SaaS Sentinel | Elite B2B Market Intelligence" />
+    <meta property="og:description" content="Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for founders, investors, and developers." />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://saas-sentinel.vercel.app/" />
+    <meta property="twitter:title" content="SaaS Sentinel | Elite B2B Market Intelligence" />
+    <meta property="twitter:description" content="Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for the modern executive." />
+    <meta property="twitter:image" content="https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://saas-sentinel.vercel.app/" />
+
+    <!-- Structured Data (JSON-LD) for Google -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "SaaS Sentinel",
+      "alternateName": "SaaS Sentinel Intelligence",
+      "url": "https://saas-sentinel.vercel.app/",
+      "logo": "https://saas-sentinel.vercel.app/logo.png",
+      "founder": {
+        "@type": "Person",
+        "name": "Dominic Watungwa"
+      },
+      "description": "AI-driven intelligence platform providing strategic insights into the B2B SaaS ecosystem.",
+      "sameAs": [
+        "https://twitter.com/saassentinel",
+        "https://linkedin.com/company/saassentinel"
+      ]
+    }
+    </script>
+    
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
+    
     <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Supabase CDN -->
@@ -20,14 +64,20 @@
             },
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
+              serif: ['Playfair Display', 'serif'],
             },
             animation: {
               'marquee': 'marquee 40s linear infinite',
+              'shimmer': 'shimmer 2s linear infinite',
             },
             keyframes: {
               marquee: {
                 '0%': { transform: 'translateX(0)' },
                 '100%': { transform: 'translateX(-50%)' },
+              },
+              shimmer: {
+                '0%': { backgroundPosition: '-200% 0' },
+                '100%': { backgroundPosition: '200% 0' },
               }
             }
           }
@@ -35,7 +85,7 @@
       }
     </script>
     <style type="text/css">
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap');
 
       :root {
         --color-bg: #d6d3cb;
@@ -89,12 +139,27 @@
         background-color: var(--color-glass);
         border: 1px solid var(--color-glass-border);
         transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1);
+      }
+
+      .glass-card-thick {
+        backdrop-filter: blur(80px);
+        -webkit-backdrop-filter: blur(80px);
+        background-color: var(--color-glass);
+        border: 1px solid var(--color-glass-border);
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .shimmer-bg {
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        background-size: 200% 100%;
       }
 
       .glass-card:hover {
         background-color: var(--color-card-hover);
-        transform: translateY(-4px);
-        box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
+        transform: translateY(-4px) scale(1.01);
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+        border-color: var(--color-accent);
       }
 
       header, .mobile-header-container {
@@ -137,6 +202,17 @@
         line-height: 1.8;
         font-size: 1.1rem;
       }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+      }
     </style>
   </head>
   <body class="selection:bg-[var(--color-accent)]/20">
@@ -156,42 +232,46 @@
     </script>
 
     <div id="root" class="min-h-screen flex flex-col lg:flex-row">
-      <!-- Mobile/Tablet Header (Production Optimized) -->
-      <div class="lg:hidden sticky top-0 z-[110] w-full mobile-header-container">
-        <div class="glass-panel rounded-b-[2rem] overflow-hidden shadow-2xl border-x-0 border-t-0 border-white/20">
+      <!-- Mobile/Tablet Header (Floating Premium Design) -->
+      <div class="lg:hidden fixed top-4 left-4 right-4 z-[110] mobile-header-container">
+        <div class="glass-panel rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/20">
           <!-- Top Ticker Bar -->
-          <div class="bg-[#b8b5ad] dark:bg-[#1F1F25] px-6 py-3 flex items-center gap-4 overflow-hidden border-b border-black/5">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity text-[var(--color-accent)] shrink-0"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            <div class="animate-marquee flex gap-8 whitespace-nowrap text-[10px] font-black uppercase tracking-widest text-[#333333] dark:text-white/80">
-              <span class="flex gap-2">NOW <span class="opacity-60">742.18</span> <span class="text-[var(--color-accent)]">+0.5%</span></span>
-              <span class="flex gap-2">ADBE <span class="opacity-60">532.10</span> <span class="text-[#d64545]">-1.4</span></span>
-              <span class="flex gap-2">CRM <span class="opacity-60">285.15</span> <span class="text-[#d64545]">-0.4%</span></span>
-              <span class="flex gap-2">MSFT <span class="opacity-60">415.10</span> <span class="text-[var(--color-accent)]">+0.8%</span></span>
-              <span class="flex gap-2">PLTR <span class="opacity-60">24.50</span> <span class="text-[var(--color-accent)]">+2.1%</span></span>
+          <div class="bg-[#b8b5ad] dark:bg-[#1F1F25] px-5 py-2 flex items-center gap-4 overflow-hidden border-b border-black/5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity text-[var(--color-accent)] shrink-0"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <div class="animate-marquee flex gap-8 whitespace-nowrap text-[9px] font-black uppercase tracking-widest text-[#333333]/80 dark:text-white/60">
+              <span class="flex gap-2">ADBE <span class="opacity-60">532.10</span> <span class="text-[#d64545]">-1.4%</span></span>
+              <span class="flex gap-2">TEAM <span class="opacity-60">215.34</span> <span class="text-[var(--color-accent)]">+3.2%</span></span>
+              <span class="flex gap-2">SNOW <span class="opacity-60">164.22</span> <span class="text-[#d64545]">-2.5%</span></span>
+              <span class="flex gap-2">CRM <span class="opacity-60">284.12</span> <span class="text-[var(--color-accent)]">+1.2%</span></span>
               <!-- Loop -->
-              <span class="flex gap-2">NOW <span class="opacity-60">742.18</span> <span class="text-[var(--color-accent)]">+0.5%</span></span>
-              <span class="flex gap-2">ADBE <span class="opacity-60">532.10</span> <span class="text-[#d64545]">-1.4</span></span>
+              <span class="flex gap-2">ADBE <span class="opacity-60">532.10</span> <span class="text-[#d64545]">-1.4%</span></span>
+              <span class="flex gap-2">TEAM <span class="opacity-60">215.34</span> <span class="text-[var(--color-accent)]">+3.2%</span></span>
             </div>
           </div>
-          <!-- Bottom Nav Bar -->
-          <div class="bg-[#e8e4db] dark:bg-[#1A1A1A] px-4 py-4 flex flex-col gap-4">
-            <div class="flex items-center justify-between px-2">
-              <div class="flex items-center gap-3" onclick="switchTab('feed')">
-                <div class="bg-[var(--color-accent)] p-2 rounded-xl shadow-lg">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-newspaper text-white"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
-                </div>
-                <span class="font-black tracking-tight text-[var(--color-text)] uppercase text-lg">SaaS Sentinel</span>
+          <!-- Bottom Nav Bar (Floating Row) -->
+          <div class="bg-[#e8e4db] dark:bg-[#1A1A1A] px-2 sm:px-3 py-2 flex items-center justify-between gap-1.5 sm:gap-2">
+            <div class="flex items-center gap-1.5 shrink-0 cursor-pointer" onclick="switchTab('feed')">
+              <div class="bg-[var(--color-accent)] p-1 sm:p-1.5 rounded-lg sm:rounded-xl shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" sm:width="16" sm:height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-newspaper text-white"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
               </div>
-              <button onclick="toggleDarkMode()" class="p-2.5 rounded-xl bg-white/50 dark:bg-white/5 border border-black/5 dark:border-white/10 text-[var(--color-text)] shadow-sm">
-                <svg id="mobile-theme-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-              </button>
+              <div class="flex flex-col leading-[0.85]">
+                <span class="font-black tracking-tighter text-[var(--color-text)] uppercase text-[9px] sm:text-[11px]">SaaS</span>
+                <span class="font-black tracking-tighter text-[var(--color-text)] uppercase text-[9px] sm:text-[11px]">Sentinel</span>
+              </div>
             </div>
-            <!-- Scrolling Tabs -->
-            <div class="flex items-center gap-6 overflow-x-auto no-scrollbar flex-nowrap px-2 pb-1">
-              <button id="mobile-tab-feed" onclick="switchTab('feed')" class="text-[11px] font-black uppercase tracking-widest text-[var(--color-accent)] whitespace-nowrap">Feed</button>
-              <button id="mobile-tab-analysis" onclick="switchTab('analysis')" class="text-[11px] font-black uppercase tracking-widest text-[#8a8a8a] opacity-60 whitespace-nowrap">Analysis</button>
-              <button id="mobile-tab-archive" onclick="switchTab('archive')" class="text-[11px] font-black uppercase tracking-widest text-[#8a8a8a] opacity-60 whitespace-nowrap">Archive</button>
-              <button id="mobile-tab-about" onclick="switchTab('about')" class="text-[11px] font-black uppercase tracking-widest text-[#8a8a8a] opacity-60 whitespace-nowrap">About</button>
+            
+            <div class="flex items-center gap-1.5 sm:gap-3 overflow-x-auto no-scrollbar flex-nowrap px-1 flex-1 justify-center">
+              <button id="mobile-tab-feed" onclick="switchTab('feed')" class="text-[7.5px] sm:text-[10px] font-black uppercase tracking-widest text-[var(--color-accent)] whitespace-nowrap">Feed</button>
+              <button id="mobile-tab-analysis" onclick="switchTab('analysis')" class="text-[7.5px] sm:text-[10px] font-black uppercase tracking-widest text-[#8a8a8a] opacity-60 whitespace-nowrap">Analysis</button>
+              <button id="mobile-tab-archive" onclick="switchTab('archive')" class="text-[7.5px] sm:text-[10px] font-black uppercase tracking-widest text-[#8a8a8a] opacity-60 whitespace-nowrap">Archive</button>
+              <button id="mobile-tab-about" onclick="switchTab('about')" class="text-[7.5px] sm:text-[10px] font-black uppercase tracking-widest text-[#8a8a8a] opacity-60 whitespace-nowrap">About</button>
+            </div>
+
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="toggleDarkMode()" class="w-5 h-5 sm:w-7 sm:h-7 flex items-center justify-center rounded-full bg-white/80 dark:bg-white/5 border border-black/5 dark:border-white/10 text-[var(--color-text)] shadow-sm">
+                <svg id="mobile-theme-icon" xmlns="http://www.w3.org/2000/svg" width="9" height="9" sm:width="12" sm:height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+              </button>
+              <button onclick="switchTab('feed'); setTimeout(() => document.getElementById('subscribe-card')?.scrollIntoView({behavior:'smooth'}), 100)" class="bg-[var(--color-accent)] text-white px-1 py-1 sm:px-2 sm:py-1.5 rounded-md sm:rounded-lg text-[6px] sm:text-[7.5px] font-black uppercase tracking-tighter shadow-lg shadow-[var(--color-accent)]/20">Subscribe</button>
             </div>
           </div>
         </div>
@@ -234,41 +314,77 @@
       </aside>
 
       <!-- Main Content -->
-      <main class="flex-1 lg:ml-72 min-h-screen relative flex flex-col">
-        <!-- Desktop Header -->
-        <header id="desktop-header" class="hidden lg:flex items-center justify-between px-12 py-8 sticky top-0 z-[100] bg-[var(--color-bg)]/80 backdrop-blur-md">
-          <div class="max-w-xl w-full">
-            <div class="glass-panel rounded-2xl flex items-center px-6 py-1 border-white/20 shadow-lg">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search w-5 h-5 text-[var(--color-text)] opacity-30 mr-4"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              <input type="text" id="search-input" oninput="filterArticles()" placeholder="Search Intelligence..." class="w-full bg-transparent py-3 font-medium text-[var(--color-text)] placeholder:text-[var(--color-text)]/20 outline-none" />
+      <main class="flex-1 lg:ml-72 min-h-screen relative flex flex-col pt-32 lg:pt-0">
+        <header id="desktop-header" class="hidden lg:flex items-center justify-between px-12 py-6 sticky top-0 z-[100] bg-[var(--color-bg)]/80 backdrop-blur-md border-b border-black/5 dark:border-white/5">
+          <div class="max-w-md w-full">
+            <div class="glass-panel rounded-xl flex items-center px-4 py-0.5 border-white/20 shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search w-4 h-4 text-[var(--color-text)] opacity-30 mr-3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="text" id="search-input" oninput="filterArticles()" placeholder="Search Intelligence..." class="w-full bg-transparent py-2.5 text-sm font-medium text-[var(--color-text)] placeholder:text-[var(--color-text)]/20 outline-none" />
             </div>
           </div>
-          <div class="flex items-center gap-6">
-            <div class="text-right">
-              <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Intelligence Status</p>
-              <p class="text-xs font-bold text-[var(--color-accent)] uppercase">Live SaaS Pulse</p>
+
+          <!-- Desktop Market Pulse Ticker -->
+          <div class="flex-1 max-w-xl px-8 overflow-hidden">
+            <div class="animate-marquee flex gap-8 whitespace-nowrap text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/40">
+              <span class="flex gap-2">ADBE <span class="text-[var(--color-accent)]">+1.2%</span></span>
+              <span class="flex gap-2">TEAM <span class="text-[var(--color-accent)]">+3.2%</span></span>
+              <span class="flex gap-2">SNOW <span class="text-[#d64545]">-2.5%</span></span>
+              <span class="flex gap-2">CRM <span class="text-[var(--color-accent)]">+1.2%</span></span>
+              <!-- Loop -->
+              <span class="flex gap-2">ADBE <span class="text-[var(--color-accent)]">+1.2%</span></span>
+              <span class="flex gap-2">TEAM <span class="text-[var(--color-accent)]">+3.2%</span></span>
             </div>
-            <div class="w-10 h-10 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center border border-[var(--color-accent)]/20">
-              <div class="w-2 h-2 rounded-full bg-[var(--color-accent)] animate-pulse"></div>
+          </div>
+
+          <div class="flex items-center gap-6 shrink-0">
+            <div class="text-right">
+              <p class="text-[9px] font-black uppercase tracking-widest opacity-40">Intelligence Status</p>
+              <p class="text-[10px] font-bold text-[var(--color-accent)] uppercase">Live SaaS Pulse</p>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center border border-[var(--color-accent)]/20">
+              <div class="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse"></div>
             </div>
           </div>
         </header>
 
-        <div class="max-w-[1600px] mx-auto px-4 md:px-12 py-6 flex-1 w-full grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-12">
-          <div class="space-y-12">
+        <div id="main-grid" class="max-w-[1600px] mx-auto px-4 md:px-12 py-6 flex-1 w-full grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-8">
+          <div id="content-area" class="space-y-8">
             <!-- Feed Section -->
             <section id="section-feed" class="section-container">
-              <div class="flex items-center justify-between mb-12">
+              <h1 class="sr-only">SaaS Sentinel - Elite B2B Market Intelligence & SaaS Analysis</h1>
+              <div class="flex items-center justify-between mb-8">
                 <div>
-                  <h2 class="text-4xl font-black tracking-tighter text-[var(--color-text)] mb-2 uppercase">Intelligence Stream</h2>
+                  <h2 class="text-3xl font-black tracking-tighter text-[var(--color-text)] mb-2 uppercase">Intelligence Stream</h2>
                   <p class="text-sm text-[var(--color-text)]/60 font-medium">Tracking high-growth software ecosystems in real-time.</p>
                 </div>
               </div>
-              <div id="articles-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-10">
-                <!-- Loading State -->
-                <div id="loading-spinner" class="col-span-full flex flex-col items-center justify-center py-20">
-                  <div class="w-12 h-12 border-4 border-[var(--color-accent)]/20 border-t-[var(--color-accent)] rounded-full animate-spin"></div>
-                  <p class="mt-6 text-[10px] font-black text-[var(--color-text)] opacity-40 uppercase tracking-[0.3em]">Sourcing Intelligence...</p>
+              <div id="articles-grid" class="grid grid-cols-1 gap-8">
+                <!-- Skeleton Loader -->
+                <div id="loading-skeleton" class="col-span-full space-y-8 py-10">
+                  <div class="glass-card p-8 rounded-[2.5rem] animate-pulse flex flex-col md:flex-row gap-8">
+                    <div class="w-full md:w-1/3 aspect-video bg-[var(--color-text)]/5 rounded-3xl"></div>
+                    <div class="flex-1 space-y-4 py-2">
+                      <div class="h-4 bg-[var(--color-text)]/10 rounded w-1/4"></div>
+                      <div class="h-8 bg-[var(--color-text)]/10 rounded w-3/4"></div>
+                      <div class="h-4 bg-[var(--color-text)]/10 rounded w-full"></div>
+                    </div>
+                  </div>
+                  <div class="glass-card p-8 rounded-[2.5rem] animate-pulse flex flex-col md:flex-row gap-8">
+                    <div class="w-full md:w-1/3 aspect-video bg-[var(--color-text)]/5 rounded-3xl"></div>
+                    <div class="flex-1 space-y-4 py-2">
+                      <div class="h-4 bg-[var(--color-text)]/10 rounded w-1/4"></div>
+                      <div class="h-8 bg-[var(--color-text)]/10 rounded w-3/4"></div>
+                      <div class="h-4 bg-[var(--color-text)]/10 rounded w-full"></div>
+                    </div>
+                  </div>
+                  <div class="glass-card p-8 rounded-[2.5rem] animate-pulse flex flex-col md:flex-row gap-8">
+                    <div class="w-full md:w-1/3 aspect-video bg-[var(--color-text)]/5 rounded-3xl"></div>
+                    <div class="flex-1 space-y-4 py-2">
+                      <div class="h-4 bg-[var(--color-text)]/10 rounded w-1/4"></div>
+                      <div class="h-8 bg-[var(--color-text)]/10 rounded w-3/4"></div>
+                      <div class="h-4 bg-[var(--color-text)]/10 rounded w-full"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
@@ -276,10 +392,10 @@
             <!-- Analysis Section -->
             <section id="section-analysis" class="section-container hidden-section">
               <div class="mb-12">
-                <h2 class="text-4xl font-black tracking-tighter text-[var(--color-text)] mb-2 uppercase">Deep Dive Analysis</h2>
-                <p class="text-sm text-[var(--color-text)]/60 font-medium">Structural shifts and long-form strategic intelligence.</p>
+                <h2 class="text-4xl font-black tracking-tighter text-[var(--color-text)] mb-2 uppercase">Executive Briefing</h2>
+                <p class="text-sm text-[var(--color-text)]/60 font-medium">Proprietary deep-dive analysis for the modern SaaS leader.</p>
               </div>
-              <div id="analysis-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-10">
+              <div id="analysis-grid" class="flex flex-col gap-12 max-w-4xl mx-auto">
                 <!-- Analysis articles injected here -->
               </div>
             </section>
@@ -290,32 +406,104 @@
                 <h2 class="text-4xl font-black tracking-tighter text-[var(--color-text)] mb-2 uppercase">Historical Intelligence</h2>
                 <p class="text-sm text-[var(--color-text)]/60 font-medium">Access our historical database of SaaS market movements.</p>
               </div>
-              <div id="archive-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <div id="archive-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <!-- Archive Bento Grid -->
               </div>
             </section>
 
             <!-- About Section -->
             <section id="section-about" class="section-container hidden-section">
-              <div class="max-w-6xl mx-auto">
-                <div class="glass-card p-10 md:p-20 rounded-[3rem] relative overflow-hidden">
-                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+              <div class="w-full">
+                <div class="glass-card p-10 md:p-20 rounded-[3rem] md:rounded-[4rem] relative overflow-hidden">
+                  <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-12 lg:gap-24 items-start">
                     <!-- Left Column -->
-                    <div>
-                      <h2 class="text-4xl md:text-6xl font-black tracking-tighter text-graphite dark:text-white mb-8 uppercase leading-[0.9]">The SaaS Sentinel Mission</h2>
-                      <div class="w-24 h-2 bg-accent rounded-full mb-12"></div>
-                      <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-full bg-graphite/10 dark:bg-white/10 flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-check text-graphite dark:text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+                    <div class="space-y-8 min-w-0">
+                      <h2 class="text-4xl md:text-6xl font-black tracking-tight text-[var(--color-text)] uppercase leading-[1.0] break-words">About SaaS Sentinel</h2>
+                      <div class="w-24 h-2 bg-[var(--color-accent)] rounded-full"></div>
+                      
+                      <div class="space-y-6 pt-4">
+                        <div class="flex items-start gap-4">
+                          <div class="w-10 h-10 rounded-xl bg-[var(--color-accent)]/10 flex items-center justify-center shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user text-[var(--color-accent)]"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                          </div>
+                          <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/40 mb-1">Founder</p>
+                            <p class="text-sm font-bold text-[var(--color-text)]">Dominic Watungwa</p>
+                          </div>
                         </div>
-                        <p class="text-[10px] font-black uppercase tracking-widest text-graphite/40 dark:text-white/40">Enterprise Grade Intelligence</p>
+
+                        <div class="flex items-start gap-4">
+                          <div class="w-10 h-10 rounded-xl bg-[var(--color-accent)]/10 flex items-center justify-center shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin text-[var(--color-accent)]"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                          </div>
+                          <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/40 mb-1">Location</p>
+                            <p class="text-sm font-bold text-[var(--color-text)]">Zimbabwe</p>
+                          </div>
+                        </div>
+
+                        <div class="flex items-start gap-4">
+                          <div class="w-10 h-10 rounded-xl bg-[var(--color-accent)]/10 flex items-center justify-center shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail text-[var(--color-accent)]"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                          </div>
+                          <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/40 mb-1">Email</p>
+                            <p class="text-sm font-bold text-[var(--color-text)]">dominicwatungwa@gmail.com</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <!-- Right Column -->
-                    <div class="space-y-8 text-lg md:text-xl text-[var(--color-text)]/70 leading-relaxed font-medium">
-                      <p>SaaS Sentinel is an AI-driven intelligence hub tracking high-growth software ecosystems. We bridge the gap between raw data and actionable strategic insight for the modern executive.</p>
-                      <p>Our platform monitors thousands of signals across the SaaS landscape—from structural market shifts and venture capital trends to granular product updates and executive movements.</p>
-                      <p>By combining advanced LLM processing with expert human curation, we deliver high-fidelity intelligence that helps leaders navigate the complexity of the software economy with precision.</p>
+                    <div class="space-y-10">
+                      <div class="space-y-6 text-lg md:text-xl text-[var(--color-text)]/70 leading-relaxed font-medium">
+                        <p>SaaS Sentinel is an elite market intelligence platform designed to cut through the noise of the B2B SaaS ecosystem. By leveraging advanced AI-driven analysis, we provide strategic insights into technical architectures, competitive displacement, and 12-month market projections that traditional news outlets miss.</p>
+                        <p>Our mission is to arm founders, investors, and developers with the "Deep Intelligence" required to navigate the rapidly evolving world of Enterprise AI and SaaS.</p>
+                      </div>
+
+                      <div class="pt-10 border-t border-white/5 space-y-8">
+                        <div>
+                          <h3 class="text-xs font-black text-[var(--color-accent)] uppercase tracking-[0.3em] mb-4">Contact & Origin</h3>
+                          <p class="text-base text-[var(--color-text)]/60 leading-relaxed">We are a developer-led initiative focused on the intersection of AI and software scalability.</p>
+                        </div>
+                        
+                        <div>
+                          <h3 class="text-xs font-black text-[var(--color-accent)] uppercase tracking-[0.3em] mb-4">Technical Focus</h3>
+                          <div class="flex flex-wrap gap-3">
+                            <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/60">SaaS Architecture</span>
+                            <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/60">Groq LLM Orchestration</span>
+                            <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/60">Supabase Management</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Privacy Section -->
+            <section id="section-privacy" class="section-container hidden-section">
+              <div class="w-full">
+                <div class="glass-card p-10 md:p-24 rounded-[4rem] relative overflow-hidden">
+                  <div class="max-w-4xl">
+                    <h2 class="text-4xl md:text-5xl font-black tracking-tighter text-[#6d6a63] mb-12 uppercase">Data Sovereignty Policy</h2>
+                    <div class="space-y-12 text-lg md:text-xl text-[var(--color-text)]/70 leading-relaxed font-medium">
+                      <p>At SaaS Sentinel, we operate under a strict Data Sovereignty framework. We believe that intelligence should never come at the cost of privacy. Your data is your own, and our systems are designed to respect that fundamental right.</p>
+                      
+                      <div class="space-y-4">
+                        <h3 class="text-xl font-black text-[var(--color-text)] uppercase tracking-tight">Zero-Knowledge Architecture</h3>
+                        <p>Our platform is built on a zero-knowledge architecture. We do not track individual user behavior for advertising purposes. All analytical processing is focused on macro market trends and proprietary strategic synthesis.</p>
+                      </div>
+
+                      <div class="space-y-4">
+                        <h3 class="text-xl font-black text-[var(--color-text)] uppercase tracking-tight">Encryption & Integrity</h3>
+                        <p>All data transmissions are protected by enterprise-grade encryption. We maintain the highest standards of data integrity, ensuring that our briefings remain untainted by third-party influence or commercial data-mining.</p>
+                      </div>
+
+                      <div class="space-y-4">
+                        <h3 class="text-xl font-black text-[var(--color-text)] uppercase tracking-tight">Professional Confidentiality</h3>
+                        <p>We treat our relationship with every subscriber with professional confidentiality. Your subscription details and interaction with our intelligence reports are shielded from public disclosure and external tracking.</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -335,9 +523,9 @@
           </div>
 
           <!-- Sidebar Widgets -->
-          <aside id="right-sidebar" class="hidden xl:block h-fit space-y-8 z-[90]">
+          <aside id="right-sidebar" class="xl:block h-fit space-y-8 z-[90] mt-12 xl:mt-0">
             <!-- Market Pulse -->
-            <div class="glass-panel p-8 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden">
+            <div class="hidden xl:block glass-panel p-8 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden">
               <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity w-5 h-5 text-[var(--color-accent)]"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -395,8 +583,7 @@
             
             <div class="flex flex-wrap justify-center gap-x-12 gap-y-4 text-[11px] font-black uppercase tracking-widest text-white/40">
               <button onclick="switchTab('privacy')" class="hover:text-white transition-colors">Privacy Policy</button>
-              <a href="#" class="hover:text-white transition-colors">Terms of Service</a>
-              <a href="#" class="hover:text-white transition-colors">Contact</a>
+              <button onclick="switchTab('privacy')" class="hover:text-white transition-colors">Cookies</button>
             </div>
 
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">© 2026 SaaS Sentinel Intelligence</p>
@@ -409,8 +596,9 @@
       const SUPABASE_URL = 'https://dpwkojtfeoxlpyevutfc.supabase.co';
       const SUPABASE_KEY = 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
       
-      let allArticles = [];
+      let cachedArticles = [];
       let currentTab = 'feed';
+      let articleSourceTab = 'feed';
       let supabaseClient;
 
       async function init() {
@@ -418,7 +606,11 @@
           updateThemeUI();
           if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            await fetchArticles();
+            if (cachedArticles.length === 0) {
+              await fetchArticles();
+            } else {
+              renderArticles();
+            }
           } else {
             console.error('Supabase not loaded');
           }
@@ -432,8 +624,8 @@
             console.error('Supabase Fetch Error:', error);
             throw error;
           }
-          allArticles = data || [];
-          document.getElementById('loading-spinner')?.remove();
+          cachedArticles = data || [];
+          document.getElementById('loading-skeleton')?.remove();
           renderArticles();
         } catch (err) {
           console.error('Error fetching articles:', err);
@@ -449,77 +641,257 @@
         
         if (!grid || !analysisGrid || !archiveGrid) return;
 
-        // Feed
-        const feedArticles = allArticles.filter(a => (a.title + a.summary).toLowerCase().includes(query));
+        // Feed - Show all intelligence
+        const feedArticles = cachedArticles.filter(a => (a.title + a.summary).toLowerCase().includes(query));
         grid.innerHTML = feedArticles.length ? feedArticles.map(a => renderCard(a)).join('') : `<div class="col-span-full text-center py-20"><p class="text-[var(--color-text)]/40 font-bold uppercase tracking-widest text-xs">No intelligence found.</p></div>`;
 
         // Analysis
-        const analysisArticles = allArticles.filter(a => (a.category || '').toLowerCase() === 'analysis' && (a.title + a.summary).toLowerCase().includes(query));
-        analysisGrid.innerHTML = analysisArticles.length ? analysisArticles.map(a => renderCard(a)).join('') : `
-          <div class="col-span-full">
-            <div class="glass-card p-12 rounded-[3rem] text-center border border-white/10">
-              <h3 class="text-2xl font-black text-[var(--color-text)] mb-4 uppercase tracking-tighter">Deep Dive Analysis</h3>
-              <p class="text-[var(--color-text)]/60 leading-relaxed max-w-lg mx-auto">Strategic insights are currently being synthesized. Our AI engine is processing structural market shifts. Check back shortly.</p>
+        let analysisArticles = cachedArticles.filter(a => {
+          const impact = (a.strategic_impact || '').toLowerCase();
+          const isHighImpact = impact === 'high';
+          return isHighImpact && (a.title + (a.analysis_content || '')).toLowerCase().includes(query);
+        });
+        
+        analysisGrid.innerHTML = analysisArticles.length ? analysisArticles.map(a => renderCard(a, false, true)).join('') : `
+          <div class="w-full">
+            <div class="glass-card-thick p-12 md:p-24 rounded-[4rem] text-center border border-white/10 w-full relative overflow-hidden">
+              <div class="absolute inset-0 shimmer-bg animate-shimmer opacity-20 pointer-events-none"></div>
+              <h3 class="text-3xl font-black text-[var(--color-text)] mb-6 uppercase tracking-tighter">Strategic Synthesis</h3>
+              <p class="text-xl text-[var(--color-text)]/60 leading-relaxed max-w-2xl mx-auto">Our AI is currently synthesizing proprietary analysis for this sector.</p>
             </div>
           </div>`;
 
         // Archive
-        archiveGrid.innerHTML = allArticles.length ? allArticles.map(a => renderCard(a, true)).join('') : `<div class="col-span-full text-center py-20"><p class="text-[var(--color-text)]/40 font-bold uppercase tracking-widest text-xs">Archive empty.</p></div>`;
+        archiveGrid.innerHTML = cachedArticles.length ? cachedArticles.map(a => renderCard(a, true)).join('') : `<div class="col-span-full text-center py-20"><p class="text-[var(--color-text)]/40 font-bold uppercase tracking-widest text-xs">Archive empty.</p></div>`;
       }
 
-      function renderCard(article, isArchive = false) {
+      function getSentimentBadge(category) {
+        const val = (category || '').toUpperCase();
+        if (val === 'BULLISH') {
+          return `<span class="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Market: Bullish</span>`;
+        } else if (val === 'BEARISH') {
+          return `<span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Market: Bearish</span>`;
+        } else if (val === 'NEUTRAL') {
+          return `<span class="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Market: Neutral</span>`;
+        }
+        return '';
+      }
+
+      function renderCard(article, isArchive = false, isAnalysis = false, isFeaturedAnalysis = false) {
         const imageUrl = article.image_url || 'https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1000';
         const date = article.created_at ? new Date(article.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent';
 
+        if (isAnalysis) {
+          const confidence = article.confidence_score || 98;
+          const readTime = Math.floor(Math.random() * (15 - 8 + 1) + 8);
+          const stratImpact = article.strategic_impact || 'Proprietary Insight';
+          const displayContent = article.analysis_content || '';
+          const sentimentBadge = getSentimentBadge(article.category);
+          
+          return `
+            <article onclick="openArticle('${article.id}')" class="bg-black/40 backdrop-blur-3xl p-6 md:p-16 rounded-[2rem] md:rounded-[4rem] group cursor-pointer flex flex-col gap-12 border border-white/5 hover:border-[var(--color-accent)]/30 transition-all shadow-2xl relative z-10">
+              <div class="w-full aspect-video md:aspect-[21/9] rounded-[2rem] md:rounded-[3rem] overflow-hidden relative shadow-2xl">
+                <img src="${imageUrl}" alt="${article.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerpolicy="no-referrer" />
+                <div class="absolute top-4 md:top-8 left-4 md:left-8 flex flex-col gap-3">
+                  <div class="bg-black/80 backdrop-blur-md px-4 md:px-5 py-1.5 md:py-2 rounded-full text-[10px] md:text-[11px] font-black uppercase tracking-widest text-[var(--color-accent)] border border-white/10 shadow-2xl">${confidence}% Reliability</div>
+                  <div class="bg-white/90 dark:bg-black/90 px-4 md:px-5 py-1.5 md:py-2 rounded-full text-[10px] md:text-[11px] font-black uppercase tracking-widest text-[var(--color-text)] shadow-2xl">${readTime} Min Read</div>
+                  ${sentimentBadge ? `<div class="backdrop-blur-md shadow-2xl">${sentimentBadge}</div>` : ''}
+                </div>
+              </div>
+              <div class="space-y-8">
+                <div class="flex items-center justify-between border-b border-white/5 pb-6">
+                  <div class="flex items-center gap-4">
+                    <span class="bg-[var(--color-accent)] text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[var(--color-accent)]/20">${stratImpact}</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-text)]/20"></span>
+                    <span class="text-[11px] font-bold text-[var(--color-text)]/40 uppercase tracking-widest">${date}</span>
+                  </div>
+                </div>
+                
+                <div class="space-y-6">
+                  <!-- In Analysis Tab, we use the Title but with Editorial Styling -->
+                  <h3 class="text-3xl md:text-5xl font-serif font-black text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors leading-[1.1] tracking-tight uppercase italic">${article.title}</h3>
+                  
+                  <div class="relative">
+                    <div class="absolute -left-8 top-0 bottom-0 w-1 bg-[var(--color-accent)]/30 rounded-full"></div>
+                    <div class="text-lg text-[var(--color-text)]/80 leading-[1.6] font-serif pl-4 whitespace-pre-wrap">
+                      <span class="text-[var(--color-accent)] font-black uppercase tracking-widest text-sm not-italic block mb-4">Executive Summary:</span>
+                      <p class="whitespace-pre-wrap line-clamp-3">${article.summary}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pt-8 flex items-center justify-between">
+                  <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-full border border-[var(--color-text)]/10 flex items-center justify-center group-hover:bg-[var(--color-accent)] group-hover:border-[var(--color-accent)] transition-all shadow-xl">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right text-[var(--color-text)] group-hover:text-white transition-all"><path d="m9 18 6-6-6-6"/></svg>
+                    </div>
+                    <div class="flex flex-col">
+                      <span class="text-xs font-black uppercase tracking-widest text-[var(--color-text)]">Access Full Whitepaper</span>
+                      <span class="text-[10px] font-bold text-[var(--color-text)]/40 uppercase tracking-widest">Proprietary Strategic Briefing</span>
+                    </div>
+                  </div>
+                  <div class="hidden sm:block text-right">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/20 mb-1">Classification</div>
+                    <div class="text-xs font-black uppercase tracking-widest text-[var(--color-accent)]">Level 4 Strategic</div>
+                  </div>
+                </div>
+              </div>
+            </article>`;
+        }
+
         if (isArchive) {
           return `
-            <article onclick="openArticle('${article.id}')" class="glass-card p-6 rounded-[2.5rem] group cursor-pointer flex flex-col h-full border border-white/10">
-              <div class="w-full aspect-video rounded-3xl overflow-hidden mb-6 relative">
-                <img src="${imageUrl}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerpolicy="no-referrer" />
-                <div class="absolute top-4 left-4 bg-white/90 dark:bg-black/90 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-[var(--color-accent)]">${date}</div>
+            <article onclick="openArticle('${article.id}')" class="glass-card p-5 md:p-6 rounded-[2rem] md:rounded-[2.5rem] group cursor-pointer flex flex-col h-full border border-white/10 relative z-10">
+              <div class="w-full aspect-[4/3] rounded-2xl md:rounded-3xl overflow-hidden mb-6 relative shadow-xl">
+                <img src="${imageUrl}" alt="${article.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerpolicy="no-referrer" />
+                <div class="absolute top-4 left-4 bg-white/90 dark:bg-black/90 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-[var(--color-accent)] shadow-xl">${date}</div>
               </div>
               <div class="flex-1 flex flex-col">
-                <h3 class="text-xl font-black text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors leading-tight uppercase tracking-tight line-clamp-2">${article.title}</h3>
+                <h3 class="text-lg md:text-xl font-black text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors leading-tight uppercase tracking-tight line-clamp-3">${article.title}</h3>
               </div>
             </article>`;
         }
 
         return `
-          <article onclick="openArticle('${article.id}')" class="glass-card p-6 rounded-[2.5rem] group cursor-pointer flex flex-col h-full">
-            <div class="w-full aspect-[4/3] rounded-3xl overflow-hidden mb-6 relative">
-              <img src="${imageUrl}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerpolicy="no-referrer" />
-              <div class="absolute top-4 left-4 bg-white/90 dark:bg-black/90 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-[var(--color-accent)]">${article.category || 'Intelligence'}</div>
+          <article onclick="openArticle('${article.id}')" class="glass-card p-6 xl:p-8 rounded-[2rem] xl:rounded-[2.5rem] group cursor-pointer flex flex-col md:flex-row gap-8 border border-white/5 hover:border-[var(--color-accent)]/30 transition-all relative z-10">
+            <div class="w-full md:w-[280px] aspect-video rounded-2xl xl:rounded-3xl overflow-hidden relative shadow-xl shrink-0">
+              <img src="${imageUrl}" alt="${article.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerpolicy="no-referrer" />
+              <div class="absolute top-4 left-4 flex flex-col gap-2">
+                ${getSentimentBadge(article.category)}
+              </div>
             </div>
-            <div class="flex-1 flex flex-col">
-              <span class="text-[9px] font-bold text-[var(--color-text)]/30 uppercase tracking-widest mb-3">${date}</span>
-              <h3 class="text-xl font-black text-[var(--color-text)] mb-3 group-hover:text-[var(--color-accent)] transition-colors leading-tight uppercase tracking-tight">${article.title}</h3>
-              <p class="text-xs text-[var(--color-text)]/60 leading-relaxed line-clamp-3 mb-6">${article.summary}</p>
-              <div class="mt-auto pt-4 border-t border-black/5 dark:border-white/5 flex items-center justify-between">
-                <span class="text-[9px] font-black text-[var(--color-accent)] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">Read Intelligence</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right text-[var(--color-accent)]"><path d="m9 18 6-6-6-6"/></svg>
+            <div class="flex-1 flex flex-col py-1">
+              <span class="text-[10px] font-bold text-[var(--color-text)]/30 uppercase tracking-widest mb-3">${date}</span>
+              
+              <h3 class="text-xl xl:text-2xl font-black text-[var(--color-text)] mb-3 group-hover:text-[var(--color-accent)] transition-colors leading-tight uppercase tracking-tighter line-clamp-2">${article.title}</h3>
+              
+              <p class="text-sm xl:text-base text-[var(--color-text)]/60 leading-relaxed line-clamp-2 mb-4">${article.summary}</p>
+              
+              <div class="mt-auto flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)]"></span>
+                  <span class="text-[9px] font-black text-[var(--color-accent)] uppercase tracking-widest">Intelligence Briefing</span>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right text-[var(--color-accent)]"><path d="m9 18 6-6-6-6"/></svg>
               </div>
             </div>
           </article>`;
       }
 
-      function openArticle(id) {
-        const article = allArticles.find(a => String(a.id) === String(id));
+      async function openArticle(id) {
+        articleSourceTab = currentTab;
+        const article = cachedArticles.find(a => String(a.id) === String(id));
         if (!article) return;
-        document.getElementById('article-full-content').innerHTML = `
-          <div class="mb-12">
-            <div class="flex items-center gap-4 mb-6">
-              <span class="bg-[var(--color-accent)]/10 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-[var(--color-accent)]">${article.category || 'Intelligence'}</span>
-              <span class="text-xs font-bold text-[var(--color-text)]/30 uppercase tracking-widest">${new Date(article.created_at).toLocaleDateString()}</span>
+
+        // Update back button text
+        const backBtn = document.querySelector('#section-article button');
+        if (backBtn) {
+          const tabName = articleSourceTab === 'analysis' ? 'Analysis' : 'Feed';
+          backBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left"><path d="m15 18-6-6 6-6"/></svg>
+            Back to ${tabName}
+          `;
+        }
+
+        let fullContentHtml = '';
+        const dateStr = new Date(article.created_at).toLocaleDateString();
+        const sentimentBadge = getSentimentBadge(article.category);
+        const confidence = article.confidence_score || 95;
+        const impact = article.strategic_impact || 'Strategic Insight';
+
+        if (articleSourceTab === 'analysis') {
+          // ANALYSIS VIEW: Focus on Strategic Intelligence (The Dossier)
+          fullContentHtml = `
+            <div class="mb-12">
+              <div class="flex items-center gap-4 mb-6">
+                <span class="bg-[var(--color-accent)] text-white px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-[var(--color-accent)]/20">${impact}</span>
+                <span class="text-xs font-bold text-[var(--color-text)]/30 uppercase tracking-widest">${dateStr}</span>
+              </div>
+              
+              <h1 class="text-4xl md:text-7xl font-serif font-black tracking-tighter text-[var(--color-text)] leading-[1.0] mb-12 uppercase italic">${article.title}</h1>
+              
+              <!-- Split Layout for Analysis: Summary + Image -->
+              <div class="flex flex-col lg:flex-row items-start gap-8 mb-12">
+                <div class="lg:w-1/2">
+                  <div class="bg-black/5 dark:bg-white/5 border border-white/10 p-8 rounded-[2.5rem] h-full flex flex-col justify-center">
+                    <div class="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-accent)] mb-4">Executive Summary & Context:</div>
+                    <div class="text-xl font-medium text-[var(--color-text)]/80 leading-relaxed">${article.summary}</div>
+                  </div>
+                </div>
+                <div class="lg:w-1/2 aspect-video rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white/10 shrink-0">
+                  <img src="${article.image_url}" class="w-full h-full object-cover" referrerpolicy="no-referrer" />
+                </div>
+              </div>
             </div>
-            <h1 class="text-4xl md:text-5xl font-black tracking-tighter text-[var(--color-text)] leading-[1.1] mb-8 uppercase">${article.title}</h1>
-            <p class="text-xl text-[var(--color-text)]/60 font-medium leading-relaxed italic border-l-4 border-[var(--color-accent)] pl-8 mb-12">${article.summary}</p>
-          </div>
-          <div class="w-full aspect-video rounded-[3rem] overflow-hidden mb-12 shadow-2xl"><img src="${article.image_url}" class="w-full h-full object-cover" referrerpolicy="no-referrer" /></div>
-          <div class="article-content text-[var(--color-text)]/80">${article.content || '<p>Detailed intelligence report is currently being processed.</p>'}</div>`;
+
+            <div class="mb-12 flex flex-wrap gap-4">
+              <div class="bg-black/5 dark:bg-white/5 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-3">
+                <span class="text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/40">Reliability Score</span>
+                <span class="text-sm font-black text-[var(--color-accent)]">${confidence}% AI Verified</span>
+              </div>
+              ${sentimentBadge ? `
+              <div class="bg-black/5 dark:bg-white/5 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-3">
+                <span class="text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/40">Sentiment</span>
+                ${sentimentBadge}
+              </div>` : ''}
+            </div>
+
+            <div class="relative">
+              <div class="absolute -left-12 top-0 bottom-0 w-2 bg-[var(--color-accent)]/20 rounded-full"></div>
+              <div class="font-serif text-xl md:text-3xl text-[var(--color-text)]/90 leading-[1.6] space-y-12 whitespace-pre-wrap pl-4">
+                <div class="text-[var(--color-accent)] font-black uppercase tracking-[0.3em] text-sm mb-8">Strategic Deep-Dive Analysis</div>
+                ${article.analysis_content || 'Analysis pending...'}
+              </div>
+            </div>
+          `;
+        } else {
+          // FEED VIEW: Focus on the News Event (The Report)
+          fullContentHtml = `
+            <div class="mb-12">
+              <div class="flex items-center gap-4 mb-6">
+                <span class="bg-[var(--color-accent)]/10 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-[var(--color-accent)]">${article.category || 'Intelligence'}</span>
+                <span class="text-xs font-bold text-[var(--color-text)]/30 uppercase tracking-widest">${dateStr}</span>
+              </div>
+              
+              <h1 class="text-4xl md:text-7xl font-black tracking-tighter text-[var(--color-text)] leading-[0.9] mb-12 uppercase">${article.title}</h1>
+              
+              <!-- Cinematic Hero Image for Feed -->
+              <div class="w-full aspect-[21/9] rounded-[3rem] overflow-hidden mb-12 shadow-2xl border-4 border-white/10 relative group">
+                <img src="${article.image_url}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" referrerpolicy="no-referrer" />
+                <div class="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+                  <span class="text-[10px] font-black text-white uppercase tracking-widest">Intelligence Asset Ref: ${String(article.id).slice(0,8)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-12 flex flex-wrap gap-4">
+              <div class="bg-black/5 dark:bg-white/5 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-3">
+                <span class="text-[10px] font-black uppercase tracking-widest text-[var(--color-text)]/40">Market Sentiment</span>
+                ${sentimentBadge}
+              </div>
+            </div>
+
+            <div class="font-sans text-lg md:text-2xl text-[var(--color-text)]/80 leading-[1.8] space-y-12">
+              <div class="space-y-6">
+                <div class="text-[var(--color-accent)] font-black uppercase tracking-widest text-xs mb-4">Intelligence Briefing</div>
+                <p class="font-medium border-l-4 border-[var(--color-accent)] pl-6">${article.summary}</p>
+              </div>
+              
+              <div class="pt-12 border-t border-white/5">
+                <a href="${article.source_url}" target="_blank" class="inline-flex items-center gap-3 text-[var(--color-accent)] font-black uppercase tracking-widest text-xs hover:gap-5 transition-all">
+                  Access Original Source
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                </a>
+              </div>
+            </div>
+          `;
+        }
+
+        document.getElementById('article-full-content').innerHTML = fullContentHtml;
         switchTab('article');
       }
 
-      function closeArticle() { switchTab('feed'); }
+      function closeArticle() { switchTab(articleSourceTab); }
 
       function switchTab(tab) {
         currentTab = tab;
@@ -527,27 +899,72 @@
           const el = document.getElementById(`section-${s}`);
           if (el) el.classList.toggle('hidden-section', s !== tab);
         });
+        
         const rightSidebar = document.getElementById('right-sidebar');
-        if (rightSidebar) rightSidebar.classList.toggle('hidden-section', tab !== 'feed');
-        ['feed', 'analysis', 'archive', 'about'].forEach(t => {
+        const mainGrid = document.getElementById('main-grid');
+        
+        if (rightSidebar && mainGrid) {
+          const isPC = window.innerWidth >= 1280;
+          
+          // Show sidebar on Feed tab for ALL devices (it will stack on mobile)
+          if (tab === 'feed') {
+            rightSidebar.classList.remove('hidden-section');
+            if (isPC) {
+              mainGrid.classList.add('xl:grid-cols-[1fr_320px]');
+              mainGrid.classList.remove('xl:grid-cols-1');
+            } else {
+              mainGrid.classList.remove('xl:grid-cols-[1fr_320px]');
+              mainGrid.classList.add('xl:grid-cols-1');
+            }
+          } else {
+            rightSidebar.classList.add('hidden-section');
+            mainGrid.classList.remove('xl:grid-cols-[1fr_320px]');
+            mainGrid.classList.add('xl:grid-cols-1');
+          }
+        }
+
+        ['feed', 'analysis', 'archive', 'about', 'privacy'].forEach(t => {
           const btn = document.getElementById(`tab-${t}`);
           const mBtn = document.getElementById(`mobile-tab-${t}`);
-          if (btn) { btn.classList.toggle('active-tab', tab === t); btn.classList.toggle('text-[var(--color-sidebar-text)]/60', tab !== t); }
-          if (mBtn) { mBtn.classList.toggle('text-[var(--color-accent)]', tab === t); mBtn.classList.toggle('opacity-40', tab !== t); }
+          if (btn) { 
+            btn.classList.toggle('active-tab', tab === t); 
+            btn.classList.toggle('text-[var(--color-sidebar-text)]/60', tab !== t); 
+          }
+          if (mBtn) { 
+            mBtn.classList.toggle('text-[var(--color-accent)]', tab === t); 
+            mBtn.classList.toggle('opacity-100', tab === t);
+            mBtn.classList.toggle('opacity-40', tab !== t); 
+          }
         });
         if (['feed', 'analysis', 'archive'].includes(tab)) renderArticles();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
 
       async function handleSubscribe() {
-        const email = document.getElementById('subscriber-email').value;
-        if (!email || !email.includes('@')) { alert('Enter valid email.'); return; }
+        const emailInput = document.getElementById('subscriber-email');
+        const email = emailInput.value;
+        const submitBtn = document.querySelector('#subscribe-form button');
+        
+        if (!email || !email.includes('@')) { 
+          emailInput.classList.add('border-rose-500');
+          setTimeout(() => emailInput.classList.remove('border-rose-500'), 2000);
+          return; 
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Processing...';
+
         try {
           const { error } = await supabaseClient.from('subscribers').insert([{ email }]);
           if (error) throw error;
           document.getElementById('subscribe-form').classList.add('hidden-section');
           document.getElementById('subscribe-success').classList.remove('hidden-section');
-        } catch (err) { console.error('Subscription failed:', err); alert('Failed.'); }
+        } catch (err) { 
+          console.error('Subscription failed:', err); 
+          submitBtn.disabled = false;
+          submitBtn.innerText = 'Retry Subscription';
+          emailInput.classList.add('border-rose-500');
+        }
       }
 
       function filterArticles() { renderArticles(); }
@@ -586,6 +1003,35 @@
       });
 
       if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+      // Cookie Consent Logic
+      function checkCookies() {
+        if (!localStorage.getItem('cookies-accepted')) {
+          document.getElementById('cookie-consent').classList.remove('hidden');
+        }
+      }
+
+      function acceptCookies() {
+        localStorage.setItem('cookies-accepted', 'true');
+        document.getElementById('cookie-consent').classList.add('hidden');
+      }
+
+      window.addEventListener('DOMContentLoaded', checkCookies);
     </script>
+
+    <!-- Cookie Consent -->
+    <div id="cookie-consent" class="absolute bottom-6 left-6 right-6 md:left-auto md:right-12 md:w-96 bg-[var(--color-card-bg)] backdrop-blur-2xl border border-white/10 p-6 rounded-3xl z-[200] flex flex-col gap-4 shadow-2xl hidden">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-[var(--color-accent)]/10 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cookie text-[var(--color-accent)]"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01"/><path d="M16 15.5v.01"/><path d="M12 12v.01"/><path d="M11 17v.01"/><path d="M7 14v.01"/></svg>
+        </div>
+        <h4 class="text-sm font-black text-[var(--color-text)] uppercase tracking-widest">Intelligence Cookies</h4>
+      </div>
+      <p class="text-xs text-[var(--color-text)]/60 leading-relaxed">We use essential cookies to maintain your intelligence session and preferences. By continuing, you accept our strategic data framework.</p>
+      <div class="flex gap-3">
+        <button onclick="acceptCookies()" class="flex-1 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all">Accept</button>
+        <button onclick="switchTab('privacy')" class="flex-1 py-2.5 bg-[var(--color-text)]/5 border border-[var(--color-text)]/10 text-[var(--color-text)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[var(--color-text)]/10 transition-all">Learn More</button>
+      </div>
+    </div>
   </body>
 </html>
