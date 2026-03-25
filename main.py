@@ -15,38 +15,18 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 # Social Media Credentials
-TWITTER_API_KEY = os.environ.get("TWITTER_API_KEY")
-TWITTER_API_SECRET = os.environ.get("TWITTER_API_SECRET")
-TWITTER_ACCESS_TOKEN = os.environ.get("TWITTER_ACCESS_TOKEN")
-TWITTER_ACCESS_TOKEN_SECRET = os.environ.get("TWITTER_ACCESS_TOKEN_SECRET")
-
 LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
 LINKEDIN_PERSON_URN = os.environ.get("LINKEDIN_PERSON_URN")
-
-def post_to_twitter(text):
-    if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET]):
-        print("⏭️ Skipping Twitter: Credentials missing.")
-        return
-    try:
-        import tweepy
-        client = tweepy.Client(
-            consumer_key=TWITTER_API_KEY,
-            consumer_secret=TWITTER_API_SECRET,
-            access_token=TWITTER_ACCESS_TOKEN,
-            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
-        )
-        client.create_tweet(text=text)
-        print("🐦 Twitter Post Successful")
-    except Exception as e:
-        print(f"❌ Twitter Error: {e}")
 
 def post_to_linkedin(text, title, url):
     if not all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]):
         print("⏭️ Skipping LinkedIn: Credentials missing.")
         return
     try:
+        # Clean token to remove any accidental whitespace/newlines
+        clean_token = str(LINKEDIN_ACCESS_TOKEN).strip()
         headers = {
-            "Authorization": f"Bearer {LINKEDIN_ACCESS_TOKEN}",
+            "Authorization": f"Bearer {clean_token}",
             "Content-Type": "application/json",
             "X-Restli-Protocol-Version": "2.0.0"
         }
@@ -160,18 +140,16 @@ def run_news_bot():
                                 f"News Item: {title}\n"
                                 f"Description: {latest.get('description', 'No description available.')}\n\n"
                                 "TASK:\n"
-                                "1. feed_summary: A high-density, 150-word 'Executive Briefing'. This must be a deep narrative of the news event, providing historical context, technical specifics, and immediate business implications. It must be long, professional, and exhaustive.\n"
-                                "2. strategic_analysis: 3 Detailed Paragraphs of UNIQUE INSIGHT (separated by \\n\\n). Totaling at least 300 words.\n"
-                                "   - Paragraph 1: THE ARCHITECTURAL IMPACT. Deep dive into the technical stack, scalability, and engineering nuances.\n"
-                                "   - Paragraph 2: THE COMPETITIVE CHESSBOARD. Identify specific rivals and explain the disruption to their market share.\n"
-                                "   - Paragraph 3: THE 12-MONTH PROJECTION. Provide a bold, data-backed prediction for this company's trajectory.\n"
-                                "3. impact: Choose one: 'High', 'Medium', or 'Low'.\n"
-                                "4. sentiment: Choose one: 'BULLISH', 'BEARISH', or 'NEUTRAL'.\n\n"
+                                "1. feed_summary: A high-density, 100-word 'Executive Briefing'. Provide technical specifics and business implications.\n"
+                                "2. strategic_analysis: 3 Detailed Paragraphs (separated by \\n\\n).\n"
+                                "   - Paragraph 1: THE ARCHITECTURAL IMPACT. Technical stack and engineering nuances.\n"
+                                "   - Paragraph 2: THE COMPETITIVE CHESSBOARD. Rivals and disruption.\n"
+                                "   - Paragraph 3: THE 12-MONTH PROJECTION. Data-backed prediction.\n"
+                                "3. impact: 'High', 'Medium', or 'Low'.\n"
+                                "4. sentiment: 'BULLISH', 'BEARISH', or 'NEUTRAL'.\n\n"
                                 "CRITICAL RULES:\n"
                                 "- DO NOT repeat the news description.\n"
-                                "- DO NOT repeat the 'feed_summary' inside the 'strategic_analysis'.\n"
-                                "- LENGTH IS ABSOLUTELY MANDATORY: The summary MUST be at least 150 words. The analysis MUST be at least 300 words.\n"
-                                "- If the output is short, superficial, or repetitive, the report is a failure.\n\n"
+                                "- BE CONCISE but deep. Avoid fluff to prevent token limits.\n\n"
                                 "JSON Structure:\n"
                                 "{\n"
                                 "  \"feed_summary\": \"...\",\n"
@@ -205,13 +183,14 @@ def run_news_bot():
 
         # 4. Save to Supabase
         # Mapping the AI fields to the database schema
+        summary_text = str(ai_data.get('feed_summary', ""))
         payload = {
             "title": title,
-            "summary": str(ai_data.get('feed_summary', "")),
+            "summary": summary_text,
             "analysis_content": clean_analysis.strip(), 
             "confidence_score": random.randint(95, 99),
             "strategic_impact": ai_data.get('impact', 'High'),
-            "category": ai_data.get('sentiment', 'BULLISH'), # Using category for sentiment badge
+            "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": latest.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000",
             "source_url": latest.get('url'),
             "published_at": latest.get('publishedAt') or datetime.now().isoformat()
@@ -223,8 +202,10 @@ def run_news_bot():
             print(f"✅ Intelligence Logged: {title[:50]}...")
             
             # 5. Social Media Output
-            social_text = f"📡 SaaS Intelligence: {title}\n\n{ai_data.get('feed_summary', '')[:200]}...\n\nRead more: {latest.get('url')}\n\n#SaaS #AI #MarketIntel"
-            post_to_twitter(social_text)
+            # Ensure summary is a string before slicing
+            display_summary = summary_text[:200] if summary_text else ""
+            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more: {latest.get('url')}\n\n#SaaS #AI #MarketIntel"
+            
             post_to_linkedin(social_text, title, latest.get('url'))
 
             processed_count += 1
