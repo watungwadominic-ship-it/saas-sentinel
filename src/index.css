@@ -1,0 +1,209 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", sans-serif;
+  
+  /* Light Theme (Default) */
+  --color-bg: #d6d3cb;
+  --color-text: #333333;
+  --color-accent: #f08924;
+  --color-ticker-bg: #b8b5ad;
+  --color-nav-bg: #e8e4db;
+  --color-sidebar-bg: #6d6a63;
+  --color-nav-text: #8a8a8a;
+  --color-sidebar-text: #ffffff;
+  --color-glass: rgba(232, 228, 219, 0.85);
+  --color-glass-border: rgba(255, 255, 255, 0.2);
+  --color-glass-pill: rgba(255, 255, 255, 0.3);
+  --color-sunlight: rgba(255, 255, 255, 0.6);
+  --color-card-hover: rgba(255, 255, 255, 0.5);
+}
+
+.dark {
+  --color-bg: #0A0A10;
+  --color-text: #F5F5F5;
+  --color-accent: #E67E22;
+  --color-nav-bg: #1A1A1A;
+  --color-sidebar-bg: #1A1A1A;
+  --color-nav-text: #A0A0A0;
+  --color-sidebar-text: #A0A0A0;
+  --color-ticker-bg: #1F1F25;
+  --color-glass: rgba(20, 20, 25, 0.6);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-glass-pill: rgba(30, 30, 35, 0.5);
+  --color-sunlight: rgba(100, 100, 255, 0.1);
+  --color-card-hover: rgba(40, 40, 50, 0.7);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    @apply selection:bg-accent/20 overflow-x-hidden font-normal transition-colors duration-500;
+    background-attachment: fixed;
+  }
+
+  h1 {
+    color: var(--color-text);
+    font-size: clamp(2rem, 8vw, 4.5rem);
+    @apply font-black tracking-tighter leading-[0.9];
+  }
+
+  h2 {
+    color: var(--color-text);
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+    @apply font-black tracking-tight leading-tight;
+  }
+
+  h3 {
+    color: var(--color-text);
+    font-size: clamp(1.125rem, 3vw, 1.5rem);
+    @apply font-bold;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    backdrop-filter: blur(40px);
+    background-color: var(--color-glass);
+    border: 1px solid var(--color-glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+    @media (max-width: 767px) {
+      backdrop-filter: blur(8px) !important;
+      border-radius: 1.5rem !important;
+    }
+  }
+
+  .glass-pill {
+    backdrop-filter: blur(40px);
+    background-color: var(--color-glass-pill);
+    border: 1px solid var(--color-glass-border);
+    @apply rounded-full px-6 py-3 shadow-sm transition-colors duration-500;
+    @media (max-width: 767px) {
+      backdrop-filter: blur(8px) !important;
+    }
+  }
+
+  .glass-button {
+    backdrop-filter: blur(40px);
+    background-color: var(--color-glass-border);
+    border: 1px solid var(--color-glass-border);
+    color: var(--color-text);
+    @apply px-6 py-2.5 rounded-2xl font-semibold transition-all duration-300 
+           hover:bg-card-hover
+           active:scale-[0.98] flex items-center justify-center gap-2;
+    @media (max-width: 767px) {
+      backdrop-filter: blur(8px) !important;
+      border-radius: 1rem !important;
+    }
+  }
+
+  .glass-card {
+    backdrop-filter: blur(40px);
+    background-color: var(--color-glass);
+    border: 1px solid var(--color-glass-border);
+    @apply p-8 rounded-[2rem] transition-all duration-500 
+           hover:bg-card-hover hover:-translate-y-1 hover:shadow-xl;
+    @media (max-width: 767px) {
+      backdrop-filter: blur(8px) !important;
+      border-radius: 1.5rem !important;
+      padding: 1.5rem !important;
+    }
+  }
+
+  .animated-border-orange {
+    position: relative;
+    border-radius: inherit;
+    background: var(--color-glass);
+  }
+
+  .animated-border-orange::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-accent),
+      transparent,
+      var(--color-accent),
+      transparent
+    );
+    background-size: 200% auto;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: borderRotate 4s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes borderRotate {
+    to { background-position: 200% center; }
+  }
+
+  .btn-accent {
+    @apply bg-accent text-white px-6 py-2.5 rounded-xl font-bold transition-all duration-300
+           hover:bg-accent/90 hover:shadow-lg active:scale-[0.98];
+  }
+
+  .text-gradient-warm {
+    @apply bg-gradient-to-br from-text to-text/70 bg-clip-text text-transparent;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: fit-content;
+  animation: marquee 40s linear infinite;
+}
+
+.bg-sunlight {
+  background: radial-gradient(circle, var(--color-sunlight) 0%, transparent 70%);
+  filter: blur(100px);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 10px;
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}
+
+.out-of-generations-overlay {
+  display: none !important;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
