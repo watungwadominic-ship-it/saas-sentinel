@@ -405,9 +405,17 @@ async function startServer() {
     }
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+    // Serve static files from the dist directory
     app.use(express.static(distPath));
+    
+    // Fallback for SPA routing
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          res.status(500).send("Production build (dist/index.html) not found. Please run 'npm run build' first.");
+        }
+      });
     });
   }
 
@@ -416,4 +424,5 @@ async function startServer() {
   });
 }
 
-startServer();
+// For Vercel compatibility
+export default startServer();
