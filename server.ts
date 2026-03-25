@@ -418,11 +418,15 @@ async function startServer() {
       });
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  
+  return app;
 }
 
-// For Vercel compatibility
-export default startServer();
+// Initialize the app
+const appPromise = startServer();
+
+// For Vercel compatibility, we export a function that handles the request
+export default async (req: any, res: any) => {
+  const app = await appPromise;
+  app(req, res);
+};
