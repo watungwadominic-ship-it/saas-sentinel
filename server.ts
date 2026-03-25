@@ -3,28 +3,10 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
 import { exec } from "child_process";
-import { TwitterApi } from "twitter-api-v2";
 
 dotenv.config();
 
 // Social Media Clients
-const twitterClient = process.env.TWITTER_API_KEY ? new TwitterApi({
-  appKey: process.env.TWITTER_API_KEY,
-  appSecret: process.env.TWITTER_API_SECRET!,
-  accessToken: process.env.TWITTER_ACCESS_TOKEN,
-  accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
-}) : null;
-
-async function postToTwitter(text: string) {
-  if (!twitterClient) return;
-  try {
-    await twitterClient.v2.tweet(text);
-    console.log("🐦 Twitter Post Successful");
-  } catch (e) {
-    console.error("❌ Twitter Error:", e);
-  }
-}
-
 async function postToLinkedIn(text: string, title: string, url: string) {
   const token = process.env.LINKEDIN_ACCESS_TOKEN;
   const personUrn = process.env.LINKEDIN_PERSON_URN;
@@ -90,20 +72,6 @@ async function startServer() {
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", env: process.env.NODE_ENV });
-  });
-
-  // API Route for Twitter Connection Test
-  app.post("/api/test-twitter", async (req, res) => {
-    if (!twitterClient) {
-      return res.status(400).json({ error: "Twitter client not configured. Add your keys to Secrets." });
-    }
-    try {
-      const tweet = await twitterClient.v2.tweet("📡 SaaS Sentinel Test: Intelligence Bot Online. #SaaS #MarketIntel");
-      res.json({ success: true, tweetId: tweet.data.id });
-    } catch (e: any) {
-      console.error("Test Tweet Failed:", e);
-      res.status(500).json({ error: e.message });
-    }
   });
 
   // API Route for LinkedIn Connection Test
