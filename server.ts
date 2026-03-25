@@ -418,7 +418,7 @@ async function startServer() {
 // Initialize the app
 const appPromise = startServer();
 
-// For Vercel compatibility, we export a function that handles the request
+// For Vercel compatibility, we export a function that handles the request 
 export default async (req: any, res: any) => {
   try {
     const app = await appPromise;
