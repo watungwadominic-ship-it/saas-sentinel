@@ -8,10 +8,74 @@ import time
 
 # 1. Configuration
 # Ensure these are set in your environment or .env file
+# GROQ_API_KEY: Get yours at https://console.groq.com/keys
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
+
+# Social Media Credentials
+TWITTER_API_KEY = os.environ.get("TWITTER_API_KEY")
+TWITTER_API_SECRET = os.environ.get("TWITTER_API_SECRET")
+TWITTER_ACCESS_TOKEN = os.environ.get("TWITTER_ACCESS_TOKEN")
+TWITTER_ACCESS_TOKEN_SECRET = os.environ.get("TWITTER_ACCESS_TOKEN_SECRET")
+
+LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
+LINKEDIN_PERSON_URN = os.environ.get("LINKEDIN_PERSON_URN")
+
+def post_to_twitter(text):
+    if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET]):
+        print("⏭️ Skipping Twitter: Credentials missing.")
+        return
+    try:
+        import tweepy
+        client = tweepy.Client(
+            consumer_key=TWITTER_API_KEY,
+            consumer_secret=TWITTER_API_SECRET,
+            access_token=TWITTER_ACCESS_TOKEN,
+            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
+        )
+        client.create_tweet(text=text)
+        print("🐦 Twitter Post Successful")
+    except Exception as e:
+        print(f"❌ Twitter Error: {e}")
+
+def post_to_linkedin(text, title, url):
+    if not all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]):
+        print("⏭️ Skipping LinkedIn: Credentials missing.")
+        return
+    try:
+        headers = {
+            "Authorization": f"Bearer {LINKEDIN_ACCESS_TOKEN}",
+            "Content-Type": "application/json",
+            "X-Restli-Protocol-Version": "2.0.0"
+        }
+        post_data = {
+            "author": LINKEDIN_PERSON_URN,
+            "commentary": text,
+            "visibility": "PUBLIC",
+            "distribution": {
+                "feedDistribution": "MAIN_FEED",
+                "targetEntities": [],
+                "thirdPartyDistributionChannels": []
+            },
+            "content": {
+                "article": {
+                    "source": url,
+                    "title": title,
+                    "description": text[:200]
+                }
+            },
+            "lifecycleState": "PUBLISHED",
+            "isReshareDisabledByAuthor": False
+        }
+        response = requests.post("https://api.linkedin.com/v2/posts", headers=headers, json=post_data)
+        if response.status_code in [200, 201]:
+            print("💼 LinkedIn Post Successful")
+        else:
+            print(f"❌ LinkedIn Error: {response.text}")
+    except Exception as e:
+        print(f"❌ LinkedIn Error: {e}")
 
 def run_news_bot():
     print("🚀 SaaS Sentinel: Initiating Elite Market Intelligence Scan...")
@@ -157,6 +221,12 @@ def run_news_bot():
             save_response = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, json=payload)
             save_response.raise_for_status()
             print(f"✅ Intelligence Logged: {title[:50]}...")
+            
+            # 5. Social Media Output
+            social_text = f"📡 SaaS Intelligence: {title}\n\n{ai_data.get('feed_summary', '')[:200]}...\n\nRead more: {latest.get('url')}\n\n#SaaS #AI #MarketIntel"
+            post_to_twitter(social_text)
+            post_to_linkedin(social_text, title, latest.get('url'))
+
             processed_count += 1
         except Exception as e:
             print(f"❌ Supabase Save Error: {e}")
