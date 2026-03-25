@@ -158,7 +158,6 @@ async function startServer() {
             try {
               const postData = JSON.parse(line.replace('SOCIAL_POST:', '').trim());
               if (postData.socialText) {
-                await postToTwitter(postData.socialText);
                 await postToLinkedIn(postData.socialText, postData.title, "https://ais-dev-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app");
               }
             } catch (e) {
@@ -172,7 +171,7 @@ async function startServer() {
     // 2. Run News Sync (Supabase)
     try {
       const news = await fetchTopSaaSNews();
-      const stories = parseNewsIntoStories(news);
+      const stories = await parseNewsIntoStories(news);
       for (const story of stories) {
         const { data: existing } = await supabase
           .from('news_articles')
@@ -220,9 +219,6 @@ async function startServer() {
           try {
             const data = JSON.parse(line.replace("SOCIAL_POST: ", ""));
             const socialText = `🚀 NEW INTEL: ${data.title}\n\n${data.summary.substring(0, 200)}...\n\nRead more: ${data.url}\n\n#SaaS #EnterpriseAI #MarketIntel`;
-            
-            // Post to Twitter
-            await postToTwitter(socialText.substring(0, 280));
             
             // Post to LinkedIn
             await postToLinkedIn(socialText, data.title, data.url);
@@ -326,9 +322,6 @@ async function startServer() {
             try {
               const data = JSON.parse(line.replace("SOCIAL_POST: ", ""));
               const socialText = `🚀 NEW INTEL: ${data.title}\n\n${data.summary.substring(0, 200)}...\n\nRead more: ${data.url}\n\n#SaaS #EnterpriseAI #MarketIntel`;
-              
-              // Post to Twitter
-              await postToTwitter(socialText.substring(0, 280));
               
               // Post to LinkedIn
               await postToLinkedIn(socialText, data.title, data.url);
