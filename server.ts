@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
 import { exec } from "child_process";
@@ -387,6 +386,7 @@ async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting Vite in middleware mode...");
     try {
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true, hmr: false },
         appType: "spa",
@@ -420,6 +420,15 @@ const appPromise = startServer();
 
 // For Vercel compatibility, we export a function that handles the request
 export default async (req: any, res: any) => {
-  const app = await appPromise;
-  app(req, res);
+  try {
+    const app = await appPromise;
+    app(req, res);
+  } catch (error: any) {
+    console.error("CRITICAL SERVER ERROR:", error);
+    res.status(500).json({ 
+      error: "Internal Server Error", 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
 };
