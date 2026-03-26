@@ -86,7 +86,47 @@ app.use(express.json());
 
 // API Routes
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", mode: "Full-Stack", timestamp: new Date().toISOString() });
+  res.json({ 
+    status: "ok", 
+    mode: "Full-Stack", 
+    timestamp: new Date().toISOString(),
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL: process.env.VERCEL,
+      PWD: process.cwd(),
+      __dirname: __dirname
+    }
+  });
+});
+
+app.get("/api/debug-files", (req, res) => {
+  const listFiles = (dir: string): string[] => {
+    try {
+      if (!fs.existsSync(dir)) return [`Directory not found: ${dir}`];
+      const files = fs.readdirSync(dir);
+      let results: string[] = [];
+      files.forEach(file => {
+        const fullPath = path.join(dir, file);
+        const stats = fs.statSync(fullPath);
+        if (stats.isDirectory()) {
+          results.push(`[DIR] ${file}`);
+          // results = results.concat(listFiles(fullPath).map(f => `${file}/${f}`));
+        } else {
+          results.push(file);
+        }
+      });
+      return results;
+    } catch (e: any) {
+      return [`Error listing ${dir}: ${e.message}`];
+    }
+  };
+
+  res.json({
+    cwd: listFiles(process.cwd()),
+    dist: listFiles(path.join(process.cwd(), "dist")),
+    dirname: listFiles(__dirname),
+    dirname_dist: listFiles(path.join(__dirname, "dist"))
+  });
 });
 
 app.post("/api/test-linkedin", async (req, res) => {
@@ -160,38 +200,55 @@ app.get("/api/cron", async (req, res) => {
 // Production Route Registration
 if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   const distPath = path.resolve(process.cwd(), "dist");
+  console.log(`[DEBUG] distPath: ${distPath} (exists: ${fs.existsSync(distPath)})`);
   
   app.get("/", async (req, res, next) => {
     const articleId = req.query.article as string;
+    console.log(`[DEBUG] GET /?article=${articleId}`);
     if (!articleId) return next();
 
     try {
       const possiblePaths = [
-        path.join(distPath, "index.html"),
-        path.resolve(process.cwd(), "dist/index.html"),
-        path.resolve(process.cwd(), "index.html"),
-        path.join(__dirname, "dist/index.html"),
+        path.join(process.cwd(), "dist", "index.html"),
+        path.join(process.cwd(), "index.html"),
+        path.join(__dirname, "dist", "index.html"),
         path.join(__dirname, "index.html"),
+        "/var/task/dist/index.html",
+        "/var/task/index.html",
       ];
       
       let indexPath = "";
       for (const p of possiblePaths) {
+        console.log(`[DEBUG] Checking path: ${p}`);
         if (fs.existsSync(p)) {
           indexPath = p;
+          console.log(`[DEBUG] ✅ Found index.html at: ${p}`);
           break;
         }
       }
 
-      if (!indexPath) return next();
+      let html = "";
+      if (indexPath) {
+        html = fs.readFileSync(indexPath, "utf-8");
+      } else {
+        console.warn("[DEBUG] ⚠️ index.html not found, using minimal fallback");
+        html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
+      }
 
+      console.log(`[DEBUG] Fetching article: ${articleId}`);
       const article = await Promise.race([
         fetchArticleById(articleId),
         new Promise((_, reject) => setTimeout(() => reject(new Error("DB Timeout")), 8000))
       ]) as any;
       
-      if (!article) return next();
+      if (!article) {
+        console.warn(`[DEBUG] ⚠️ Article ${articleId} not found`);
+        // If article not found, still serve the HTML (maybe it's a deleted article)
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(html);
+      }
 
-      let html = fs.readFileSync(indexPath, "utf-8");
+      console.log(`[DEBUG] Injecting OG tags for: ${article.title}`);
       
       const ogTitle = article.title;
       const ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : "");
@@ -199,22 +256,35 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       const host = req.get('host') || "saas-sentinel-cyan.vercel.app";
       const ogUrl = `https://${host}/?article=${articleId}`;
 
+      // Inject tags
       html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
+      if (!html.includes(`<title>`)) {
+        html = html.replace('<head>', `<head><title>${ogTitle} | SaaS Sentinel</title>`);
+      }
       
       const metaTags = `
         <meta property="og:title" content="${ogTitle}" />
         <meta property="og:description" content="${ogDescription}" />
         <meta property="og:image" content="${ogImage}" />
         <meta property="og:url" content="${ogUrl}" />
+        <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="${ogTitle}" />
+        <meta name="twitter:description" content="${ogDescription}" />
+        <meta name="twitter:image" content="${ogImage}" />
       `;
       
-      html = html.replace('</head>', `${metaTags}\n</head>`);
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', `${metaTags}\n</head>`);
+      } else {
+        html = html.replace('<body>', `<head>${metaTags}</head><body>`);
+      }
       
       res.setHeader('Content-Type', 'text/html');
       return res.send(html);
     } catch (e: any) {
-      console.error("❌ Injection failed:", e);
+      console.error("[DEBUG] ❌ Injection failed:", e);
+      // Fallback to serving the static file without injection if possible
       return next();
     }
   });
