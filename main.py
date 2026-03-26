@@ -216,7 +216,8 @@ def run_news_bot():
             
             # 5. Social Media Output
             # Construct the deep link to your site
-            article_url = f"https://saas-sentinel-cyan.vercel.app/?article={article_id}" if article_id else "https://saas-sentinel-cyan.vercel.app/"
+            app_url = os.getenv("APP_URL", "https://saas-sentinel-cyan.vercel.app")
+            article_url = f"{app_url}/?article={article_id}" if article_id else f"{app_url}/"
             
             display_summary = summary_text[:200] if summary_text else ""
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url}\n\n#SaaS #AI #MarketIntel"
