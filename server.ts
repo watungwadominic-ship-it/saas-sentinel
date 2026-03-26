@@ -162,44 +162,58 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    const indexPath = path.join(distPath, "index.html");
-
+    
     // Handle dynamic OG tags for the root path with article query
     app.get("/", async (req, res, next) => {
       const articleId = req.query.article as string;
       
-      if (articleId && fs.existsSync(indexPath)) {
-        try {
-          const article = await fetchArticleById(articleId);
-          if (article) {
-            let html = fs.readFileSync(indexPath, "utf-8");
-            
-            const ogTitle = article.title;
-            const ogDescription = article.summary;
-            const ogImage = article.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000";
-            const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
-            const ogUrl = `${appUrl}/?article=${articleId}`;
-
-            // Replace meta tags with more robust regex (handling optional spaces)
-            html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
-            html = html.replace(/<meta property="og:title" content=".*?"\s*\/>/g, `<meta property="og:title" content="${ogTitle}" />`);
-            html = html.replace(/<meta property="og:description" content=".*?"\s*\/>/g, `<meta property="og:description" content="${ogDescription}" />`);
-            html = html.replace(/<meta property="og:image" content=".*?"\s*\/>/g, `<meta property="og:image" content="${ogImage}" />`);
-            html = html.replace(/<meta property="og:url" content=".*?"\s*\/>/g, `<meta property="og:url" content="${ogUrl}" />`);
-            
-            // Twitter tags (using property as in index.html)
-            html = html.replace(/<meta property="twitter:title" content=".*?"\s*\/>/g, `<meta property="twitter:title" content="${ogTitle}" />`);
-            html = html.replace(/<meta property="twitter:description" content=".*?"\s*\/>/g, `<meta property="twitter:description" content="${ogDescription}" />`);
-            html = html.replace(/<meta property="twitter:image" content=".*?"\s*\/>/g, `<meta property="twitter:image" content="${ogImage}" />`);
-            html = html.replace(/<meta property="twitter:url" content=".*?"\s*\/>/g, `<meta property="twitter:url" content="${ogUrl}" />`);
-
-            // Canonical
-            html = html.replace(/<link rel="canonical" href=".*?"\s*\/>/g, `<link rel="canonical" href="${ogUrl}" />`);
-            
-            return res.send(html);
+      if (articleId) {
+        // Try to find index.html in common Vercel locations
+        const possiblePaths = [
+          path.join(process.cwd(), "dist", "index.html"),
+          path.join(process.cwd(), "index.html"),
+          path.join(__dirname, "index.html"),
+          path.join(__dirname, "dist", "index.html")
+        ];
+        
+        let indexPath = "";
+        for (const p of possiblePaths) {
+          if (fs.existsSync(p)) {
+            indexPath = p;
+            break;
           }
-        } catch (e) {
-          console.error("Error injecting OG tags:", e);
+        }
+
+        if (indexPath) {
+          try {
+            const article = await fetchArticleById(articleId);
+            if (article) {
+              let html = fs.readFileSync(indexPath, "utf-8");
+              
+              const ogTitle = article.title;
+              const ogDescription = article.summary;
+              const ogImage = article.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000";
+              const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
+              const ogUrl = `${appUrl}/?article=${articleId}`;
+
+              // Robust replacement
+              html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
+              html = html.replace(/<meta property="og:title" content=".*?"\s*\/>/g, `<meta property="og:title" content="${ogTitle}" />`);
+              html = html.replace(/<meta property="og:description" content=".*?"\s*\/>/g, `<meta property="og:description" content="${ogDescription}" />`);
+              html = html.replace(/<meta property="og:image" content=".*?"\s*\/>/g, `<meta property="og:image" content="${ogImage}" />`);
+              html = html.replace(/<meta property="og:url" content=".*?"\s*\/>/g, `<meta property="og:url" content="${ogUrl}" />`);
+              
+              html = html.replace(/<meta property="twitter:title" content=".*?"\s*\/>/g, `<meta property="twitter:title" content="${ogTitle}" />`);
+              html = html.replace(/<meta property="twitter:description" content=".*?"\s*\/>/g, `<meta property="twitter:description" content="${ogDescription}" />`);
+              html = html.replace(/<meta property="twitter:image" content=".*?"\s*\/>/g, `<meta property="twitter:image" content="${ogImage}" />`);
+              
+              html = html.replace(/<link rel="canonical" href=".*?"\s*\/>/g, `<link rel="canonical" href="${ogUrl}" />`);
+              
+              return res.send(html);
+            }
+          } catch (e) {
+            console.error("Error injecting OG tags:", e);
+          }
         }
       }
       next();
@@ -208,7 +222,11 @@ async function startServer() {
     app.use(express.static(distPath));
     
     app.get("*", (req, res) => {
-      res.sendFile(indexPath);
+      // Fallback to root index.html if dist isn't found
+      const fallbackPath = fs.existsSync(path.join(distPath, "index.html")) 
+        ? path.join(distPath, "index.html") 
+        : path.join(process.cwd(), "index.html");
+      res.sendFile(fallbackPath);
     });
   }
 
