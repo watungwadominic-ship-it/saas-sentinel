@@ -216,6 +216,20 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   const rootDistPath = path.resolve(process.cwd(), "dist");
   console.log(`[DEBUG] rootDistPath: ${rootDistPath} (exists: ${fs.existsSync(rootDistPath)})`);
   
+  // Health check for Vercel
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL: process.env.VERCEL,
+        APP_URL: process.env.APP_URL
+      },
+      cwd: process.cwd(),
+      __dirname: __dirname
+    });
+  });
+
   // 1. Handle all non-API paths for OG tag injection
   app.get("*", async (req, res, next) => {
     // Skip API routes and static assets (basic check)
@@ -229,28 +243,39 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     try {
       // Find index.html
       const possiblePaths = [
-        path.join(distPath, "index.html"),
         path.join(process.cwd(), "dist", "index.html"),
         path.join(process.cwd(), "index.html"),
         path.join(__dirname, "dist", "index.html"),
         path.join(__dirname, "index.html"),
+        path.resolve("dist/index.html"),
+        path.resolve("index.html"),
         "/var/task/dist/index.html",
         "/var/task/index.html",
       ];
 
+      console.log(`[DEBUG] Searching for index.html in ${possiblePaths.length} locations...`);
       let indexPath = "";
       for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-          indexPath = p;
-          break;
-        }
+        try {
+          if (fs.existsSync(p)) {
+            indexPath = p;
+            console.log(`[DEBUG] ✅ Found index.html at: ${p}`);
+            break;
+          }
+        } catch (e) {}
       }
 
       let html = "";
       if (indexPath) {
-        html = fs.readFileSync(indexPath, "utf-8");
-      } else {
-        console.warn("[DEBUG] ⚠️ index.html not found. Using minimal fallback.");
+        try {
+          html = fs.readFileSync(indexPath, "utf-8");
+        } catch (e: any) {
+          console.error(`[DEBUG] ❌ Error reading index.html at ${indexPath}:`, e.message);
+        }
+      }
+
+      if (!html) {
+        console.warn("[DEBUG] ⚠️ index.html not found or empty. Using minimal fallback.");
         html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
       }
 
@@ -258,26 +283,36 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
       let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis.";
       let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-      let ogUrl = `${process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app'}${req.originalUrl}`;
+      
+      // Ensure ogUrl is valid
+      let ogUrl = "https://saas-sentinel-cyan.vercel.app";
+      try {
+        const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
+        ogUrl = `${baseUrl.replace(/\/$/, '')}${req.originalUrl}`;
+      } catch (e) {}
 
       // If articleId is present, try to fetch article metadata
-      if (articleId && articleId !== "undefined" && articleId !== "null") {
+      if (articleId && articleId !== "undefined" && articleId !== "null" && articleId.length > 0) {
         console.log(`[DEBUG] Fetching article ${articleId}...`);
-        const article = await Promise.race([
-          fetchArticleById(articleId),
-          new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
-        ]).catch(err => {
-          console.error(`[DEBUG] ❌ Error fetching article ${articleId}:`, err);
-          return null;
-        });
+        try {
+          const article = await Promise.race([
+            fetchArticleById(articleId),
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000))
+          ]).catch(err => {
+            console.error(`[DEBUG] ❌ Error fetching article ${articleId}:`, err.message || err);
+            return null;
+          });
 
-        if (article) {
-          console.log(`[DEBUG] ✅ Article found: ${article.title}`);
-          ogTitle = article.title;
-          ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : ogDescription);
-          if (article.image_url) ogImage = article.image_url;
-        } else {
-          console.warn(`[DEBUG] ⚠️ Article ${articleId} not found or timeout. Using defaults.`);
+          if (article && article.title) {
+            console.log(`[DEBUG] ✅ Article found: ${article.title}`);
+            ogTitle = article.title;
+            ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : ogDescription);
+            if (article.image_url) ogImage = article.image_url;
+          } else {
+            console.warn(`[DEBUG] ⚠️ Article ${articleId} not found or invalid. Using defaults.`);
+          }
+        } catch (e: any) {
+          console.error(`[DEBUG] ❌ Unexpected error in article fetch:`, e.message);
         }
       }
 
@@ -311,17 +346,17 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       }
 
       res.setHeader('Content-Type', 'text/html');
-      return res.send(html);
-    } catch (error) {
-      console.error("[DEBUG] ❌ Critical error in OG handler:", error);
-      // Fallback to serving static index.html if possible
-      try {
-        const fallbackPath = path.join(distPath, "index.html");
-        if (fs.existsSync(fallbackPath)) {
-          return res.sendFile(fallbackPath);
-        }
-      } catch (e) {}
-      res.status(500).send("Internal Server Error");
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      console.log(`[DEBUG] ✅ OG Injection complete. Sending ${html.length} bytes.`);
+      return res.status(200).send(html);
+    } catch (error: any) {
+      console.error("[DEBUG] ❌ Critical error in OG handler:", error.message);
+      console.error(error.stack);
+      
+      // Absolute last resort: minimal HTML to avoid 500
+      const minimalHtml = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title><meta property="og:title" content="SaaS Sentinel" /></head><body><div id="root"></div></body></html>`;
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(minimalHtml);
     }
   });
 
