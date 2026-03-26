@@ -2,9 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
-import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini";
-import { supabase } from "./src/services/supabase";
-import { saveNewsArticle, fetchArticleById } from "./src/services/news_articles";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,75 +10,9 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 console.log("🚀 Server starting...");
-console.log("📍 Current Directory (cwd):", process.cwd());
-console.log("📍 __dirname:", __dirname);
-console.log("📍 NODE_ENV:", process.env.NODE_ENV);
-console.log("📍 VERCEL:", process.env.VERCEL);
-
-// Catch initialization errors
-process.on('uncaughtException', (err) => {
-  console.error('🔥 Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('🔥 Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-// Social Media Clients
-async function postToLinkedIn(text: string, title: string, url: string, imageUrl?: string) {
-  const token = process.env.LINKEDIN_ACCESS_TOKEN;
-  const personUrn = process.env.LINKEDIN_PERSON_URN;
-  if (!token || !personUrn) {
-    console.warn("⚠️ LinkedIn credentials missing, skipping post.");
-    return;
-  }
-
-  const headers = {
-    "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json",
-    "X-Restli-Protocol-Version": "2.0.0"
-  };
-
-  const commentary = `${text}\n\nRead more on SaaS Sentinel: ${url}`;
-
-  const postData = {
-    "author": personUrn,
-    "commentary": commentary,
-    "visibility": "PUBLIC",
-    "distribution": {
-      "feedDistribution": "MAIN_FEED",
-      "targetEntities": [],
-      "thirdPartyDistributionChannels": []
-    },
-    "content": {
-      "article": {
-        "source": url,
-        "title": title,
-        "description": text.substring(0, 200)
-      }
-    },
-    "lifecycleState": "PUBLISHED",
-    "isReshareDisabledByAuthor": false
-  };
-
-  try {
-    const response = await fetch("https://api.linkedin.com/v2/posts", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(postData)
-    });
-    if (!response.ok) {
-      const resultText = await response.text();
-      throw new Error(`LinkedIn API Error: ${resultText}`);
-    }
-    console.log("💼 LinkedIn Post Successful");
-  } catch (e: any) {
-    console.error("❌ LinkedIn Error:", e);
-    throw e;
-  }
-}
 
 const app = express();
+app.use(express.json());
 
 // Immediate Health Check for Vercel
 app.get("/api/health-check", (req, res) => {
@@ -93,114 +24,72 @@ app.get("/api/health-check", (req, res) => {
     cwd: process.cwd()
   });
 });
-app.use(express.json());
 
 // API Routes
-app.get("/api/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    mode: "Full-Stack", 
-    timestamp: new Date().toISOString(),
-    env: {
-      NODE_ENV: process.env.NODE_ENV,
-      VERCEL: process.env.VERCEL,
-      PWD: process.cwd(),
-      __dirname: __dirname
-    }
-  });
-});
-
-app.get("/api/debug-files", (req, res) => {
-  const listFiles = (dir: string): string[] => {
-    try {
-      if (!fs.existsSync(dir)) return [`Directory not found: ${dir}`];
-      const files = fs.readdirSync(dir);
-      let results: string[] = [];
-      files.forEach(file => {
-        const fullPath = path.join(dir, file);
-        const stats = fs.statSync(fullPath);
-        if (stats.isDirectory()) {
-          results.push(`[DIR] ${file}`);
-          // results = results.concat(listFiles(fullPath).map(f => `${file}/${f}`));
-        } else {
-          results.push(file);
-        }
-      });
-      return results;
-    } catch (e: any) {
-      return [`Error listing ${dir}: ${e.message}`];
-    }
-  };
-
-  res.json({
-    cwd: listFiles(process.cwd()),
-    dist: listFiles(path.join(process.cwd(), "dist")),
-    dirname: listFiles(__dirname),
-    dirname_dist: listFiles(path.join(__dirname, "dist"))
-  });
-});
-
-app.post("/api/test-linkedin", async (req, res) => {
+app.get("/api/health", async (req, res) => {
   try {
-    const host = req.get('host') || "saas-sentinel-cyan.vercel.app";
-    const appUrl = `https://${host}`;
-    await postToLinkedIn(
-      "📡 SaaS Sentinel Test: LinkedIn Intelligence Bot Online.", 
-      "Bot Test", 
-      appUrl,
-      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=2426"
-    );
-    res.json({ success: true });
+    const { supabase } = await import("./src/services/supabase");
+    const { data, error } = await supabase.from('news_articles').select('id').limit(1);
+    if (error) throw error;
+    res.status(200).json({ status: "OK", database: "Connected", count: data.length });
+  } catch (err: any) {
+    console.error("[DEBUG] Health check database error:", err.message);
+    res.status(200).json({ status: "OK", database: "Error", message: err.message });
+  }
+});
+
+app.get("/api/news", async (req, res) => {
+  try {
+    const { supabase } = await import("./src/services/supabase");
+    const { data, error } = await supabase
+      .from("news_articles")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(data);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });
 
-app.get("/api/cron", async (req, res) => {
-  console.log("Cron Job Triggered...");
+app.get("/api/news/:id", async (req, res) => {
   try {
-    const news = await fetchTopSaaSNews();
-    const stories = await parseNewsIntoStories(news);
+    const { supabase } = await import("./src/services/supabase");
+    const { data, error } = await supabase
+      .from("news_articles")
+      .select("*")
+      .eq("id", req.params.id)
+      .maybeSingle();
+    if (error) throw error;
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Cron Handlers
+app.all("/api/cron/fetch-news", async (req, res) => {
+  try {
+    console.log("Cron trigger: Fetching news...");
+    const { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } = await import("./src/services/gemini");
+    const { saveNewsArticle } = await import("./src/services/news_articles");
     
-    let storyToProcess = null;
-    for (const story of stories) {
-      const { data: existing } = await (supabase.from('news_articles') as any).select('id').eq('title', story.title).maybeSingle();
-      if (!existing) {
-        storyToProcess = story;
-        break;
-      }
-    }
+    const rawNews = await fetchTopSaaSNews();
+    const stories = await parseNewsIntoStories(rawNews);
+    
+    if (stories && stories.length > 0) {
+      const story = stories[0];
+      const articleData = await generateArticle(story.title, story.snippet);
+      
+      const savedArticle = await saveNewsArticle({
+        ...articleData,
+        source: "SaaS Sentinel Intelligence",
+        readTime: "4 min read"
+      });
 
-    if (!storyToProcess) {
-      return res.json({ success: true, message: "No new stories to process." });
-    }
-
-    console.log(`Processing story: ${storyToProcess.title}`);
-    const result = await generateArticle(storyToProcess.title, storyToProcess.snippet);
-    const savedArticle = await saveNewsArticle({
-      title: result.title || storyToProcess.title,
-      content: result.content || "Analysis pending.",
-      category: result.category || storyToProcess.category || 'Intelligence Feed',
-      summary: storyToProcess.snippet,
-      source: 'SaaS Sentinel AI',
-      breakdown: result.breakdown,
-      sentinel_take: result.sentinel_take,
-      verdict: result.verdict
-    }) as any;
-
-    if (savedArticle && savedArticle[0]) {
-      const host = req.get('host') || "saas-sentinel-cyan.vercel.app";
-      const appUrl = `https://${host}`;
-      const articleUrl = `${appUrl}/?article=${savedArticle[0].id}`;
-      await postToLinkedIn(
-        result.sentinel_take || result.title || savedArticle[0].title, 
-        savedArticle[0].title, 
-        articleUrl,
-        savedArticle[0].image_url
-      );
-      res.json({ success: true, article: savedArticle[0].title });
+      res.json({ success: true, article: savedArticle?.[0]?.title || "Saved" });
     } else {
-      res.json({ success: false, error: "Failed to save article" });
+      res.json({ success: true, message: "No new stories found." });
     }
   } catch (e: any) {
     console.error("Cron Error:", e);
@@ -211,31 +100,13 @@ app.get("/api/cron", async (req, res) => {
 // Production Route Registration
 if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   const distPath = path.resolve(__dirname, "dist");
-  console.log(`[DEBUG] distPath: ${distPath} (exists: ${fs.existsSync(distPath)})`);
   
-  const rootDistPath = path.resolve(process.cwd(), "dist");
-  console.log(`[DEBUG] rootDistPath: ${rootDistPath} (exists: ${fs.existsSync(rootDistPath)})`);
-  
-  // Health check for Vercel
-  app.get("/api/health", async (req, res) => {
-    try {
-      const { data, error } = await supabase.from('news_articles').select('id').limit(1);
-      if (error) throw error;
-      res.status(200).json({ status: "OK", database: "Connected", count: data.length });
-    } catch (err: any) {
-      console.error("[DEBUG] Health check database error:", err.message);
-      res.status(200).json({ status: "OK", database: "Error", message: err.message });
-    }
-  });
-
   // 1. Handle all non-API paths for OG tag injection
   app.get("*", async (req, res, next) => {
-    // Skip API routes and static assets (basic check)
     if (req.path.startsWith("/api/") || req.path.includes(".")) {
       return next();
     }
 
-    // Robust article ID extraction
     const articleQuery = req.query.article;
     let articleId = "";
     if (typeof articleQuery === "string") {
@@ -246,86 +117,59 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       articleId = req.path.split("/").pop() || "";
     }
 
-    console.log(`[DEBUG] OG Injection - Path: ${req.path}, articleId: ${articleId}`);
-
     try {
-      // Find index.html
       const possiblePaths = [
         path.join(process.cwd(), "dist", "index.html"),
         path.join(process.cwd(), "index.html"),
         path.join(__dirname, "dist", "index.html"),
         path.join(__dirname, "index.html"),
-        path.resolve("dist/index.html"),
-        path.resolve("index.html"),
         "/var/task/dist/index.html",
         "/var/task/index.html",
       ];
 
-      console.log(`[DEBUG] Searching for index.html in ${possiblePaths.length} locations...`);
       let indexPath = "";
       for (const p of possiblePaths) {
-        try {
-          if (fs.existsSync(p)) {
-            indexPath = p;
-            console.log(`[DEBUG] ✅ Found index.html at: ${p}`);
-            break;
-          }
-        } catch (e) {}
+        if (fs.existsSync(p)) {
+          indexPath = p;
+          break;
+        }
       }
 
       let html = "";
       if (indexPath) {
-        try {
-          html = fs.readFileSync(indexPath, "utf-8");
-        } catch (e: any) {
-          console.error(`[DEBUG] ❌ Error reading index.html at ${indexPath}:`, e.message);
-        }
+        html = fs.readFileSync(indexPath, "utf-8");
       }
 
       if (!html) {
-        console.warn("[DEBUG] ⚠️ index.html not found or empty. Using minimal fallback.");
         html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
       }
 
-      // Default metadata
       let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
       let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis.";
       let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-      
-      // Ensure ogUrl is valid
       let ogUrl = "https://saas-sentinel-cyan.vercel.app";
+
       try {
         const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
         ogUrl = `${baseUrl.replace(/\/$/, '')}${req.originalUrl}`;
       } catch (e) {}
 
-      // If articleId is present, try to fetch article metadata
-      if (articleId && articleId !== "undefined" && articleId !== "null" && articleId.length > 0) {
-        console.log(`[DEBUG] Fetching article metadata for id: ${articleId}...`);
+      if (articleId && articleId !== "undefined" && articleId !== "null") {
         try {
-          // Use a timeout to prevent hanging the request
+          const { fetchArticleById } = await import("./src/services/news_articles");
           const article = await Promise.race([
             fetchArticleById(articleId),
-            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Supabase Fetch Timeout")), 3000))
-          ]).catch(err => {
-            console.error(`[DEBUG] ❌ Error fetching article ${articleId}:`, err.message || err);
-            return null;
-          });
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
+          ]).catch(() => null);
 
           if (article && article.title) {
-            console.log(`[DEBUG] ✅ Article metadata found: ${article.title}`);
             ogTitle = article.title;
             ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : ogDescription);
             if (article.image_url) ogImage = article.image_url;
-          } else {
-            console.warn(`[DEBUG] ⚠️ Article ${articleId} metadata not found. Using defaults.`);
           }
-        } catch (e: any) {
-          console.error(`[DEBUG] ❌ Unexpected error in article fetch:`, e.message);
-        }
+        } catch (e) {}
       }
 
-      // Remove existing tags to avoid conflicts
       html = html.replace(/<meta\s+property=["']og:.*?["']\s+content=["'].*?["']\s*\/?>/gi, '');
       html = html.replace(/<meta\s+name=["']twitter:.*?["']\s+content=["'].*?["']\s*\/?>/gi, '');
       html = html.replace(/<meta\s+name=["']description["']\s+content=["'].*?["']\s*\/?>/gi, '');
@@ -348,28 +192,19 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 
       if (html.includes('</head>')) {
         html = html.replace('</head>', `${metaTags}\n  </head>`);
-      } else if (html.includes('<head>')) {
-        html = html.replace('<head>', `<head>${metaTags}`);
       } else {
-        html = metaTags + html;
+        html = html.replace('<head>', `<head>${metaTags}`);
       }
 
       res.setHeader('Content-Type', 'text/html');
-      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-      console.log(`[DEBUG] ✅ OG Injection complete for ${articleId || 'root'}. Sending response.`);
       return res.status(200).send(html);
     } catch (error: any) {
-      console.error("[DEBUG] ❌ CRITICAL ERROR in OG handler:", error.message);
-      console.error(error.stack);
-      
-      // Absolute last resort: minimal HTML to avoid 500
-      const minimalHtml = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title><meta property="og:title" content="SaaS Sentinel" /></head><body><div id="root"></div></body></html>`;
+      const minimalHtml = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(minimalHtml);
     }
   });
 
-  // 2. Serve static files (as a fallback, though Vercel handles this via vercel.json)
   app.use(express.static(distPath));
 } else {
   const { createServer: createViteServer } = await import("vite");
@@ -383,10 +218,6 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 // Error Handler
 app.use((err: any, req: any, res: any, next: any) => {
   console.error("🔥 Global Server Error:", err);
-  console.error("🔥 Error Stack:", err.stack);
-  console.error("🔥 Request Path:", req.path);
-  console.error("🔥 Request Query:", req.query);
-  
   if (!res.headersSent) {
     res.status(500).send(`Internal Server Error: ${err.message || "Unknown Error"}`);
   }
