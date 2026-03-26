@@ -58,9 +58,9 @@ async function postToLinkedIn(text: string, title: string, url: string, imageUrl
   }
 }
 
-import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini.js";
-import { supabase } from "./src/services/supabase.js";
-import { saveNewsArticle } from "./src/services/news_articles.js";
+import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini";
+import { supabase } from "./src/services/supabase";
+import { saveNewsArticle } from "./src/services/news_articles";
 
 const app = express();
 app.use(express.json());
@@ -132,7 +132,11 @@ app.get("/api/cron", async (req, res) => {
     }
   } catch (e: any) {
     console.error("Cron Error:", e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ 
+      error: e.message,
+      stack: process.env.NODE_ENV === 'development' ? e.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
