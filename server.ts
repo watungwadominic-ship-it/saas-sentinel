@@ -218,16 +218,7 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   
   // Health check for Vercel
   app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "ok", 
-      env: {
-        NODE_ENV: process.env.NODE_ENV,
-        VERCEL: process.env.VERCEL,
-        APP_URL: process.env.APP_URL
-      },
-      cwd: process.cwd(),
-      __dirname: __dirname
-    });
+    res.status(200).send("OK");
   });
 
   // 1. Handle all non-API paths for OG tag injection
