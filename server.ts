@@ -37,8 +37,7 @@ async function postToLinkedIn(text: string, title: string, url: string, imageUrl
       "article": {
         "source": url,
         "title": title,
-        "description": text.substring(0, 200),
-        "thumbnail": imageUrl
+        "description": text.substring(0, 200)
       }
     },
     "lifecycleState": "PUBLISHED",
