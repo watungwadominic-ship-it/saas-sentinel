@@ -7,10 +7,10 @@ import { supabase } from "./src/services/supabase";
 import { saveNewsArticle, fetchArticleById } from "./src/services/news_articles";
 import { fileURLToPath } from 'url';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config();
 
 console.log("🚀 Server starting...");
 console.log("📍 Current Directory (cwd):", process.cwd());
@@ -210,8 +210,11 @@ app.get("/api/cron", async (req, res) => {
 
 // Production Route Registration
 if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
-  const distPath = path.resolve(process.cwd(), "dist");
+  const distPath = path.resolve(__dirname, "dist");
   console.log(`[DEBUG] distPath: ${distPath} (exists: ${fs.existsSync(distPath)})`);
+  
+  const rootDistPath = path.resolve(process.cwd(), "dist");
+  console.log(`[DEBUG] rootDistPath: ${rootDistPath} (exists: ${fs.existsSync(rootDistPath)})`);
   
   // 1. Handle all non-API paths for OG tag injection
   app.get("*", async (req, res, next) => {
