@@ -45,30 +45,20 @@ export async function generateArticle(headline: string, snippet: string) {
   const model = "gemini-3-flash-preview"; // Faster than Pro
   const prompt = `Act as an Elite Senior SaaS Market Analyst. Analyze this news: ${headline}.
   
-Write a structured analysis for 'SaaS Sentinel'.
-Tone: Elite, Insightful, and Sassy.
-
-Structure:
-1. The Signal (Headline): Create a punchy, professional headline.
-2. The Breakdown: Summarize the core facts into exactly 3 bullet points.
-3. The Sentinel's Take: Write 2 paragraphs explaining why this news matters for B2B SaaS founders.
-4. The Verdict: Provide a bold 1-sentence prediction.
-
-Data Input: Headline: ${headline}, Snippet: ${snippet}`;
-If this news involves funding or acquisitions, set category to 'Market Analysis'.
-If it is a product launch, set category to 'Intelligence Feed'.
-Otherwise, use 'Intelligence Feed'.
-
-Now, write a structured analysis for 'SaaS Sentinel'.
-Tone: Elite, Insightful, and Sassy.
-
-Structure:
-1. The Signal (Headline): Create a punchy, professional headline.
-2. The Breakdown: Summarize the core facts into exactly 3 bullet points.
-3. The Sentinel's Take: Write 2 paragraphs explaining why this news matters for B2B SaaS founders and what their strategy should be.
-4. The Verdict: Provide a bold 1-sentence prediction for the next 6 months.
-
-Data Input: Headline: ${headline}, Snippet: ${snippet}`;
+  If this news involves funding or acquisitions, set category to 'Market Analysis'.
+  If it is a product launch, set category to 'Intelligence Feed'.
+  Otherwise, use 'Intelligence Feed'.
+  
+  Write a structured analysis for 'SaaS Sentinel'.
+  Tone: Elite, Insightful, and Sassy.
+  
+  Structure:
+  1. The Signal (Headline): Create a punchy, professional headline.
+  2. The Breakdown: Summarize the core facts into exactly 3 bullet points.
+  3. The Sentinel's Take: Write 2 paragraphs explaining why this news matters for B2B SaaS founders and what their strategy should be.
+  4. The Verdict: Provide a bold 1-sentence prediction for the next 6 months.
+  
+  Data Input: Headline: ${headline}, Snippet: ${snippet}`;
 
   const response = await ai.models.generateContent({
     model,
