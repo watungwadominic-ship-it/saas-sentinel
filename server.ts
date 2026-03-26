@@ -9,16 +9,32 @@ import { fileURLToPath } from 'url';
 
 dotenv.config();
 
-console.log("🚀 Server starting in mode:", process.env.NODE_ENV);
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+console.log("🚀 Server starting...");
+console.log("📍 Current Directory (cwd):", process.cwd());
+console.log("📍 __dirname:", __dirname);
+console.log("📍 NODE_ENV:", process.env.NODE_ENV);
+console.log("📍 VERCEL:", process.env.VERCEL);
+
+// Catch initialization errors
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 // Social Media Clients
 async function postToLinkedIn(text: string, title: string, url: string, imageUrl?: string) {
   const token = process.env.LINKEDIN_ACCESS_TOKEN;
   const personUrn = process.env.LINKEDIN_PERSON_URN;
-  if (!token || !personUrn) return;
+  if (!token || !personUrn) {
+    console.warn("⚠️ LinkedIn credentials missing, skipping post.");
+    return;
+  }
 
   const headers = {
     "Authorization": `Bearer ${token}`,
@@ -26,7 +42,6 @@ async function postToLinkedIn(text: string, title: string, url: string, imageUrl
     "X-Restli-Protocol-Version": "2.0.0"
   };
 
-  // Append Read More link to the text
   const commentary = `${text}\n\nRead more on SaaS Sentinel: ${url}`;
 
   const postData = {
@@ -71,12 +86,13 @@ app.use(express.json());
 
 // API Routes
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", mode: "Full-Stack" });
+  res.json({ status: "ok", mode: "Full-Stack", timestamp: new Date().toISOString() });
 });
 
 app.post("/api/test-linkedin", async (req, res) => {
   try {
-    const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
+    const host = req.get('host') || "saas-sentinel-cyan.vercel.app";
+    const appUrl = `https://${host}`;
     await postToLinkedIn(
       "📡 SaaS Sentinel Test: LinkedIn Intelligence Bot Online.", 
       "Bot Test", 
@@ -95,7 +111,6 @@ app.get("/api/cron", async (req, res) => {
     const news = await fetchTopSaaSNews();
     const stories = await parseNewsIntoStories(news);
     
-    // Find the first story that hasn't been posted yet
     let storyToProcess = null;
     for (const story of stories) {
       const { data: existing } = await (supabase.from('news_articles') as any).select('id').eq('title', story.title).maybeSingle();
@@ -122,9 +137,9 @@ app.get("/api/cron", async (req, res) => {
       verdict: result.verdict
     }) as any;
 
-    // Post to LinkedIn
     if (savedArticle && savedArticle[0]) {
-      const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
+      const host = req.get('host') || "saas-sentinel-cyan.vercel.app";
+      const appUrl = `https://${host}`;
       const articleUrl = `${appUrl}/?article=${savedArticle[0].id}`;
       await postToLinkedIn(
         result.sentinel_take || result.title || savedArticle[0].title, 
@@ -138,46 +153,17 @@ app.get("/api/cron", async (req, res) => {
     }
   } catch (e: any) {
     console.error("Cron Error:", e);
-    res.status(500).json({ 
-      error: e.message,
-      stack: process.env.NODE_ENV === 'development' ? e.stack : undefined,
-      timestamp: new Date().toISOString()
-    });
+    res.status(500).json({ error: e.message });
   }
 });
 
-app.post("/api/sync-news", async (req, res) => {
-  try {
-    const rawNews = await fetchTopSaaSNews();
-    const stories = await parseNewsIntoStories(rawNews);
-    res.json({ success: true, count: stories.length });
-  } catch (error) {
-    res.status(500).json({ error: "Sync failed" });
-  }
-});
-
-// Production Route Registration (Synchronous)
+// Production Route Registration
 if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
-  // Use a more robust way to find the dist directory on Vercel
   const distPath = path.resolve(process.cwd(), "dist");
-  console.log("📂 Production mode. distPath resolved to:", distPath);
-  
-  // Debug: list files in current directory to help diagnose path issues
-  try {
-    const files = fs.readdirSync(process.cwd());
-    console.log("📁 Files in process.cwd():", files);
-    if (fs.existsSync(distPath)) {
-      console.log("📁 Files in distPath:", fs.readdirSync(distPath));
-    }
-  } catch (e) {
-    console.warn("⚠️ Could not list files for debugging:", e);
-  }
   
   app.get("/", async (req, res, next) => {
     const articleId = req.query.article as string;
     if (!articleId) return next();
-
-    console.log(`🔍 Processing OG injection for article: ${articleId}`);
 
     try {
       const possiblePaths = [
@@ -186,8 +172,6 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
         path.resolve(process.cwd(), "index.html"),
         path.join(__dirname, "dist/index.html"),
         path.join(__dirname, "index.html"),
-        // Vercel specific path
-        path.join(process.cwd(), ".vercel/output/static/index.html")
       ];
       
       let indexPath = "";
@@ -198,27 +182,14 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
         }
       }
 
-      if (!indexPath) {
-        const errorMsg = `❌ Could not find index.html for OG injection. Checked: ${JSON.stringify(possiblePaths)}`;
-        console.error(errorMsg);
-        // Fallback to a basic response instead of 500 if possible, or send a descriptive error
-        return res.status(500).send(`Server Configuration Error: index.html not found. Paths checked: ${possiblePaths.join(', ')}`);
-      }
+      if (!indexPath) return next();
 
-      console.log("📄 Found index.html at:", indexPath);
-
-      // Use a timeout for the DB query to prevent hanging
-      const articlePromise = fetchArticleById(articleId);
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database timeout")), 5000));
+      const article = await Promise.race([
+        fetchArticleById(articleId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("DB Timeout")), 8000))
+      ]) as any;
       
-      const article = await Promise.race([articlePromise, timeoutPromise]) as any;
-      
-      if (!article) {
-        console.log(`ℹ️ Article ${articleId} not found in DB, skipping OG injection`);
-        return next();
-      }
-
-      console.log("📰 Article found:", article.title);
+      if (!article) return next();
 
       let html = fs.readFileSync(indexPath, "utf-8");
       
@@ -226,49 +197,25 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       const ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : "");
       const ogImage = article.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000";
       const host = req.get('host') || "saas-sentinel-cyan.vercel.app";
-      const appUrl = process.env.APP_URL || `https://${host}`;
-      const ogUrl = `${appUrl}/?article=${articleId}`;
-
-      // Robust replacement with fallback for missing tags
-      const replaceOrAppend = (html: string, pattern: RegExp, replacement: string, tag: string) => {
-        if (pattern.test(html)) {
-          return html.replace(pattern, replacement);
-        }
-        if (html.includes('</head>')) {
-          return html.replace('</head>', `${tag}\n</head>`);
-        }
-        return html + tag;
-      };
+      const ogUrl = `https://${host}/?article=${articleId}`;
 
       html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
       
-      html = replaceOrAppend(html, /<meta property="og:title" content=".*?"\s*\/?>/g, `<meta property="og:title" content="${ogTitle}" />`, `<meta property="og:title" content="${ogTitle}" />`);
-      html = replaceOrAppend(html, /<meta property="og:description" content=".*?"\s*\/?>/g, `<meta property="og:description" content="${ogDescription}" />`, `<meta property="og:description" content="${ogDescription}" />`);
-      html = replaceOrAppend(html, /<meta property="og:image" content=".*?"\s*\/?>/g, `<meta property="og:image" content="${ogImage}" />`, `<meta property="og:image" content="${ogImage}" />`);
-      html = replaceOrAppend(html, /<meta property="og:url" content=".*?"\s*\/?>/g, `<meta property="og:url" content="${ogUrl}" />`, `<meta property="og:url" content="${ogUrl}" />`);
+      const metaTags = `
+        <meta property="og:title" content="${ogTitle}" />
+        <meta property="og:description" content="${ogDescription}" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta property="og:url" content="${ogUrl}" />
+        <meta name="twitter:card" content="summary_large_image" />
+      `;
       
-      html = replaceOrAppend(html, /<meta property="twitter:title" content=".*?"\s*\/?>/g, `<meta property="twitter:title" content="${ogTitle}" />`, `<meta property="twitter:title" content="${ogTitle}" />`);
-      html = replaceOrAppend(html, /<meta property="twitter:description" content=".*?"\s*\/?>/g, `<meta property="twitter:description" content="${ogDescription}" />`, `<meta property="twitter:description" content="${ogDescription}" />`);
-      html = replaceOrAppend(html, /<meta property="twitter:image" content=".*?"\s*\/?>/g, `<meta property="twitter:image" content="${ogImage}" />`, `<meta property="twitter:image" content="${ogImage}" />`);
-      
-      html = replaceOrAppend(html, /<link rel="canonical" href=".*?"\s*\/?>/g, `<link rel="canonical" href="${ogUrl}" />`, `<link rel="canonical" href="${ogUrl}" />`);
+      html = html.replace('</head>', `${metaTags}\n</head>`);
       
       res.setHeader('Content-Type', 'text/html');
-      console.log("✅ OG injection successful, sending HTML");
       return res.send(html);
     } catch (e: any) {
-      console.error("❌ Error injecting OG tags:", e);
-      // Fallback to serving the static file if injection fails
-      try {
-        const distPath = path.resolve(process.cwd(), "dist");
-        const indexPath = path.join(distPath, "index.html");
-        if (fs.existsSync(indexPath)) {
-          return res.sendFile(indexPath);
-        }
-      } catch (innerError) {
-        console.error("❌ Fallback failed:", innerError);
-      }
-      return res.status(500).send(`Internal Server Error during OG injection: ${e.message}`);
+      console.error("❌ Injection failed:", e);
+      return next();
     }
   });
 
@@ -278,10 +225,14 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     const fallbackPath = fs.existsSync(path.join(distPath, "index.html")) 
       ? path.join(distPath, "index.html") 
       : path.join(process.cwd(), "index.html");
-    res.sendFile(fallbackPath);
+    
+    if (fs.existsSync(fallbackPath)) {
+      res.sendFile(fallbackPath);
+    } else {
+      res.status(404).send("Not Found");
+    }
   });
 } else {
-  // Dev mode with Vite
   const { createServer: createViteServer } = await import("vite");
   const vite = await createViteServer({
     server: { middlewareMode: true },
@@ -296,7 +247,6 @@ app.use((err: any, req: any, res: any, next: any) => {
   res.status(500).send("Internal Server Error");
 });
 
-// Start listening if not on Vercel
 if (process.env.VERCEL !== "1") {
   const PORT = 3000;
   app.listen(PORT, "0.0.0.0", () => {
