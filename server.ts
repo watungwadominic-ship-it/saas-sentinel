@@ -28,7 +28,7 @@ app.get("/api/health-check", (req, res) => {
 // API Routes
 app.get("/api/health", async (req, res) => {
   try {
-    const { supabase } = await import("./src/services/supabase");
+    const { supabase } = await import("./src/services/supabase.js");
     const { data, error } = await supabase.from('news_articles').select('id').limit(1);
     if (error) throw error;
     res.status(200).json({ status: "OK", database: "Connected", count: data.length });
@@ -40,7 +40,7 @@ app.get("/api/health", async (req, res) => {
 
 app.get("/api/news", async (req, res) => {
   try {
-    const { supabase } = await import("./src/services/supabase");
+    const { supabase } = await import("./src/services/supabase.js");
     const { data, error } = await supabase
       .from("news_articles")
       .select("*")
@@ -54,7 +54,7 @@ app.get("/api/news", async (req, res) => {
 
 app.get("/api/news/:id", async (req, res) => {
   try {
-    const { supabase } = await import("./src/services/supabase");
+    const { supabase } = await import("./src/services/supabase.js");
     const { data, error } = await supabase
       .from("news_articles")
       .select("*")
@@ -71,8 +71,8 @@ app.get("/api/news/:id", async (req, res) => {
 app.all("/api/cron/fetch-news", async (req, res) => {
   try {
     console.log("Cron trigger: Fetching news...");
-    const { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } = await import("./src/services/gemini");
-    const { saveNewsArticle } = await import("./src/services/news_articles");
+    const { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } = await import("./src/services/gemini.js");
+    const { saveNewsArticle } = await import("./src/services/news_articles.js");
     
     const rawNews = await fetchTopSaaSNews();
     const stories = await parseNewsIntoStories(rawNews);
@@ -156,7 +156,7 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 
       if (articleId && articleId !== "undefined" && articleId !== "null") {
         try {
-          const { fetchArticleById } = await import("./src/services/news_articles");
+          const { fetchArticleById } = await import("./src/services/news_articles.js");
           const article = await Promise.race([
             fetchArticleById(articleId),
             new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
