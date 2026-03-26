@@ -18,7 +18,7 @@ NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
 LINKEDIN_PERSON_URN = os.environ.get("LINKEDIN_PERSON_URN")
 
-def post_to_linkedin(text, title, url):
+def post_to_linkedin(text, title, url, image_url=None):
     if not all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]):
         print("⏭️ Skipping LinkedIn: Credentials missing.")
         return
@@ -30,6 +30,16 @@ def post_to_linkedin(text, title, url):
             "Content-Type": "application/json",
             "X-Restli-Protocol-Version": "2.0.0"
         }
+        
+        article_content = {
+            "source": url,
+            "title": title,
+            "description": text[:200]
+        }
+        
+        if image_url:
+            article_content["thumbnail"] = image_url
+
         post_data = {
             "author": LINKEDIN_PERSON_URN,
             "commentary": text,
@@ -40,11 +50,7 @@ def post_to_linkedin(text, title, url):
                 "thirdPartyDistributionChannels": []
             },
             "content": {
-                "article": {
-                    "source": url,
-                    "title": title,
-                    "description": text[:200]
-                }
+                "article": article_content
             },
             "lifecycleState": "PUBLISHED",
             "isReshareDisabledByAuthor": False
@@ -90,13 +96,6 @@ def run_news_bot():
         print(f"❌ NewsAPI Error: {e}")
         return
 
-    headers = {
-        "apikey": SUPABASE_KEY, 
-        "Authorization": f"Bearer {SUPABASE_KEY}", 
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-    }
-
     # Process top 5 articles to find the most relevant ones
     processed_count = 0
     for latest in articles[:10]:
@@ -108,6 +107,12 @@ def run_news_bot():
             continue
             
         # Duplicate Check
+        headers = {
+            "apikey": SUPABASE_KEY, 
+            "Authorization": f"Bearer {SUPABASE_KEY}", 
+            "Content-Type": "application/json"
+        }
+        
         try:
             check = requests.get(f"{SUPABASE_URL}/rest/v1/news_articles?title=eq.{requests.utils.quote(title)}", headers=headers)
             if check.status_code == 200 and check.json():
@@ -165,6 +170,7 @@ def run_news_bot():
                 
                 ai_data = json.loads(completion.choices[0].message.content)
                 break 
+                
             except Exception as e:
                 print(f"⚠️ AI Attempt {attempt+1} failed: {e}")
                 time.sleep(2)
@@ -184,6 +190,7 @@ def run_news_bot():
         # 4. Save to Supabase
         # Mapping the AI fields to the database schema
         summary_text = str(ai_data.get('feed_summary', ""))
+        image_url = latest.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000"
         payload = {
             "title": title,
             "summary": summary_text,
@@ -191,22 +198,30 @@ def run_news_bot():
             "confidence_score": random.randint(95, 99),
             "strategic_impact": ai_data.get('impact', 'High'),
             "category": ai_data.get('sentiment', 'BULLISH'), 
-            "image_url": latest.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000",
+            "image_url": image_url,
             "source_url": latest.get('url'),
             "published_at": latest.get('publishedAt') or datetime.now().isoformat()
         }
         
         try:
-            save_response = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, json=payload)
+            # Change Prefer header to return representation so we get the ID
+            save_headers = headers.copy()
+            save_headers["Prefer"] = "return=representation"
+            save_response = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=save_headers, json=payload)
             save_response.raise_for_status()
+            saved_data = save_response.json()
+            article_id = saved_data[0]['id'] if saved_data else None
+            
             print(f"✅ Intelligence Logged: {title[:50]}...")
             
             # 5. Social Media Output
-            # Ensure summary is a string before slicing
-            display_summary = summary_text[:200] if summary_text else ""
-            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more: {latest.get('url')}\n\n#SaaS #AI #MarketIntel"
+            # Construct the deep link to your site
+            article_url = f"https://saas-sentinel-cyan.vercel.app/?article={article_id}" if article_id else "https://saas-sentinel-cyan.vercel.app/"
             
-            post_to_linkedin(social_text, title, latest.get('url'))
+            display_summary = summary_text[:200] if summary_text else ""
+            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url}\n\n#SaaS #AI #MarketIntel"
+            
+            post_to_linkedin(social_text, title, article_url, image_url)
 
             processed_count += 1
         except Exception as e:
