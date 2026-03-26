@@ -13,6 +13,7 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/server.ts" },
+    { "src": "/(.*)", "has": [{ "type": "query", "key": "article" }], "dest": "/server.ts" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
