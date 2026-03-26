@@ -982,8 +982,8 @@ export default function App() {
       const rawNews = await fetchTopSaaSNews(context);
       // 2. Parse into stories
       const stories = await parseNewsIntoStories(rawNews);
-      // 3. Generate and save top 2 (Reduced from 5 to avoid quota issues)
-      const topStories = stories.slice(0, 2);
+      // 3. Generate and save top 3 to match LinkedIn quantity
+      const topStories = stories.slice(0, 3);
       
       for (const story of topStories) {
         // Add a 30-second delay between articles to respect free tier rate limits (2 RPM for Pro)
@@ -1070,6 +1070,16 @@ export default function App() {
           }
         }
         setArticles(data);
+
+        // Check for article parameter in URL after articles are loaded
+        const params = new URLSearchParams(window.location.search);
+        const articleId = params.get('article');
+        if (articleId) {
+          const found = data.find(a => a.id === articleId);
+          if (found) {
+            setSelectedArticle(found);
+          }
+        }
       } catch (error) {
         console.error("Failed to load articles", error);
       } finally {
