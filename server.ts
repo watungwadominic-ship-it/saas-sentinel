@@ -1,7 +1,11 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
+import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini";
+import { supabase } from "./src/services/supabase";
+import { saveNewsArticle, fetchArticleById } from "./src/services/news_articles";
 
 dotenv.config();
 
@@ -58,10 +62,6 @@ async function postToLinkedIn(text: string, title: string, url: string, imageUrl
   }
 }
 
-import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini";
-import { supabase } from "./src/services/supabase";
-import { saveNewsArticle } from "./src/services/news_articles";
-
 const app = express();
 app.use(express.json());
 
@@ -72,10 +72,11 @@ app.get("/api/health", (req, res) => {
 
 app.post("/api/test-linkedin", async (req, res) => {
   try {
+    const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
     await postToLinkedIn(
       "📡 SaaS Sentinel Test: LinkedIn Intelligence Bot Online.", 
       "Bot Test", 
-      "https://saas-sentinel-cyan.vercel.app/",
+      appUrl,
       "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=2426"
     );
     res.json({ success: true });
@@ -119,7 +120,8 @@ app.get("/api/cron", async (req, res) => {
 
     // Post to LinkedIn
     if (savedArticle && savedArticle[0]) {
-      const articleUrl = `https://saas-sentinel-cyan.vercel.app/?article=${savedArticle[0].id}`;
+      const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
+      const articleUrl = `${appUrl}/?article=${savedArticle[0].id}`;
       await postToLinkedIn(
         result.sentinel_take || result.title || savedArticle[0].title, 
         savedArticle[0].title, 
@@ -162,8 +164,47 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    
+    app.get("*", async (req, res) => {
+      const articleId = req.query.article as string;
+      const indexPath = path.join(distPath, "index.html");
+      
+      if (articleId && fs.existsSync(indexPath)) {
+        try {
+          const article = await fetchArticleById(articleId);
+          if (article) {
+            let html = fs.readFileSync(indexPath, "utf-8");
+            
+            const ogTitle = article.title;
+            const ogDescription = article.summary;
+            const ogImage = article.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000";
+            const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
+            const ogUrl = `${appUrl}/?article=${articleId}`;
+
+            // Replace meta tags
+            html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
+            html = html.replace(/<meta property="og:title" content=".*?" \/>/g, `<meta property="og:title" content="${ogTitle}" />`);
+            html = html.replace(/<meta property="og:description" content=".*?" \/>/g, `<meta property="og:description" content="${ogDescription}" />`);
+            html = html.replace(/<meta property="og:image" content=".*?" \/>/g, `<meta property="og:image" content="${ogImage}" />`);
+            html = html.replace(/<meta property="og:url" content=".*?" \/>/g, `<meta property="og:url" content="${ogUrl}" />`);
+            
+            // Twitter tags (using property as in index.html)
+            html = html.replace(/<meta property="twitter:title" content=".*?" \/>/g, `<meta property="twitter:title" content="${ogTitle}" />`);
+            html = html.replace(/<meta property="twitter:description" content=".*?" \/>/g, `<meta property="twitter:description" content="${ogDescription}" />`);
+            html = html.replace(/<meta property="twitter:image" content=".*?" \/>/g, `<meta property="twitter:image" content="${ogImage}" />`);
+            html = html.replace(/<meta property="twitter:url" content=".*?" \/>/g, `<meta property="twitter:url" content="${ogUrl}" />`);
+
+            // Canonical
+            html = html.replace(/<link rel="canonical" href=".*?" \/>/g, `<link rel="canonical" href="${ogUrl}" />`);
+            
+            return res.send(html);
+          }
+        } catch (e) {
+          console.error("Error injecting OG tags:", e);
+        }
+      }
+      
+      res.sendFile(indexPath);
     });
   }
 
