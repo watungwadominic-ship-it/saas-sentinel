@@ -2,8 +2,8 @@ import { supabase } from './supabase';
 import { Article } from '../types';
 
 export async function fetchNewsArticles(categories?: string[]): Promise<Article[]> {
-  let query = supabase
-    .from('news_articles')
+  let query = (supabase
+    .from('news_articles') as any)
     .select('*');
   
   if (categories && categories.length > 0) {
@@ -35,8 +35,8 @@ export async function fetchNewsArticles(categories?: string[]): Promise<Article[
 
 export async function saveNewsArticle(article: Partial<Article>) {
   // Check if article with same title already exists
-  const { data: existing, error: checkError } = await supabase
-    .from('news_articles')
+  const { data: existing, error: checkError } = await (supabase
+    .from('news_articles') as any)
     .select('id')
     .eq('title', article.title)
     .maybeSingle();
@@ -48,11 +48,11 @@ export async function saveNewsArticle(article: Partial<Article>) {
 
   if (existing) {
     console.log(`Article with title "${article.title}" already exists. Skipping.`);
-    return existing;
+    return [existing]; // Return as array for consistency
   }
 
-  const { data, error } = await supabase
-    .from('news_articles')
+  const { data, error } = await (supabase
+    .from('news_articles') as any)
     .insert([
       {
         title: article.title,
@@ -78,8 +78,8 @@ export async function saveNewsArticle(article: Partial<Article>) {
 }
 
 export async function fetchArticleById(id: string): Promise<Article | null> {
-  const { data, error } = await supabase
-    .from('news_articles')
+  const { data, error } = await (supabase
+    .from('news_articles') as any)
     .select('*')
     .eq('id', id)
     .maybeSingle();
@@ -89,18 +89,19 @@ export async function fetchArticleById(id: string): Promise<Article | null> {
     return null;
   }
 
+  const row = data as any;
   return {
-    id: data.id,
-    title: data.title,
-    content: data.content,
-    summary: data.summary || data.content.substring(0, 150) + '...',
-    category: data.category,
-    date: data.created_at,
-    readTime: data.read_time || '5 min read',
-    source: data.source || 'SaaS Sentinel',
-    image_url: data.image_url,
-    breakdown: data.breakdown,
-    sentinel_take: data.sentinel_take,
-    verdict: data.verdict
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    summary: row.summary || row.content.substring(0, 150) + '...',
+    category: row.category,
+    date: row.created_at,
+    readTime: row.read_time || '5 min read',
+    source: row.source || 'SaaS Sentinel',
+    image_url: row.image_url,
+    breakdown: row.breakdown,
+    sentinel_take: row.sentinel_take,
+    verdict: row.verdict
   };
 }
