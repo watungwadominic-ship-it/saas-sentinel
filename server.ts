@@ -213,15 +213,15 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   const distPath = path.resolve(process.cwd(), "dist");
   console.log(`[DEBUG] distPath: ${distPath} (exists: ${fs.existsSync(distPath)})`);
   
-  // 1. Handle the root path for OG tag injection
-  app.get("/", async (req, res, next) => {
-    const articleId = req.query.article as string;
-    console.log(`[DEBUG] GET / - articleId: ${articleId}`);
-
-    if (!articleId) {
-      console.log(`[DEBUG] No articleId, falling through to static files`);
+  // 1. Handle all non-API paths for OG tag injection
+  app.get("*", async (req, res, next) => {
+    // Skip API routes and static assets (basic check)
+    if (req.path.startsWith("/api/") || req.path.includes(".")) {
       return next();
     }
+
+    const articleId = (req.query.article as string) || (req.path.startsWith("/article/") ? req.path.split("/").pop() : "");
+    console.log(`[DEBUG] OG Injection - Path: ${req.path}, articleId: ${articleId}`);
 
     try {
       // Find index.html
@@ -237,10 +237,8 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 
       let indexPath = "";
       for (const p of possiblePaths) {
-        console.log(`[DEBUG] Checking path: ${p}`);
         if (fs.existsSync(p)) {
           indexPath = p;
-          console.log(`[DEBUG] Found index.html at: ${p}`);
           break;
         }
       }
@@ -249,41 +247,47 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       if (indexPath) {
         html = fs.readFileSync(indexPath, "utf-8");
       } else {
-        console.warn("[DEBUG] ⚠️ index.html not found in any expected location. Using minimal fallback.");
+        console.warn("[DEBUG] ⚠️ index.html not found. Using minimal fallback.");
         html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
       }
 
-      console.log(`[DEBUG] Fetching article ${articleId}...`);
-      const article = await Promise.race([
-        fetchArticleById(articleId),
-        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
-      ]).catch(err => {
-        console.error(`[DEBUG] ❌ Error fetching article:`, err);
-        return null;
-      });
+      // Default metadata
+      let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
+      let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis.";
+      let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
+      let ogUrl = `${process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app'}${req.originalUrl}`;
 
-      if (!article) {
-        console.warn(`[DEBUG] ⚠️ Article ${articleId} not found or timeout`);
-        res.setHeader('Content-Type', 'text/html');
-        return res.send(html);
+      // If articleId is present, try to fetch article metadata
+      if (articleId && articleId !== "undefined" && articleId !== "null") {
+        console.log(`[DEBUG] Fetching article ${articleId}...`);
+        const article = await Promise.race([
+          fetchArticleById(articleId),
+          new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
+        ]).catch(err => {
+          console.error(`[DEBUG] ❌ Error fetching article ${articleId}:`, err);
+          return null;
+        });
+
+        if (article) {
+          console.log(`[DEBUG] ✅ Article found: ${article.title}`);
+          ogTitle = article.title;
+          ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : ogDescription);
+          if (article.image_url) ogImage = article.image_url;
+        } else {
+          console.warn(`[DEBUG] ⚠️ Article ${articleId} not found or timeout. Using defaults.`);
+        }
       }
 
-      console.log(`[DEBUG] ✅ Article found: ${article.title}. Injecting tags...`);
-      
-      const ogTitle = article.title;
-      const ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : "");
-      const ogImage = article.image_url || "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-      const ogUrl = `${process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app'}/?article=${articleId}`;
-
-      // Remove existing OG and Twitter tags to avoid conflicts
+      // Remove existing tags to avoid conflicts
       html = html.replace(/<meta\s+property=["']og:.*?["']\s+content=["'].*?["']\s*\/?>/gi, '');
       html = html.replace(/<meta\s+name=["']twitter:.*?["']\s+content=["'].*?["']\s*\/?>/gi, '');
+      html = html.replace(/<meta\s+name=["']description["']\s+content=["'].*?["']\s*\/?>/gi, '');
       html = html.replace(/<title>.*?<\/title>/gi, '');
 
       const metaTags = `
-    <title>${ogTitle} | SaaS Sentinel</title>
+    <title>${ogTitle}</title>
     <meta name="description" content="${ogDescription}" />
-    <meta property="og:type" content="article" />
+    <meta property="og:type" content="website" />
     <meta property="og:url" content="${ogUrl}" />
     <meta property="og:title" content="${ogTitle}" />
     <meta property="og:description" content="${ogDescription}" />
@@ -303,35 +307,23 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
         html = metaTags + html;
       }
 
-      console.log(`[DEBUG] 🚀 Sending injected HTML (${html.length} bytes)`);
       res.setHeader('Content-Type', 'text/html');
       return res.send(html);
     } catch (error) {
-      console.error("[DEBUG] ❌ Critical error in root handler:", error);
-      return next();
+      console.error("[DEBUG] ❌ Critical error in OG handler:", error);
+      // Fallback to serving static index.html if possible
+      try {
+        const fallbackPath = path.join(distPath, "index.html");
+        if (fs.existsSync(fallbackPath)) {
+          return res.sendFile(fallbackPath);
+        }
+      } catch (e) {}
+      res.status(500).send("Internal Server Error");
     }
   });
 
-  // 2. Serve static files
+  // 2. Serve static files (as a fallback, though Vercel handles this via vercel.json)
   app.use(express.static(distPath));
-  
-  // 3. Fallback for SPA routing
-  app.get("*", (req, res) => {
-    console.log(`[DEBUG] GET * - path: ${req.path}`);
-    const possiblePaths = [
-      path.join(distPath, "index.html"),
-      path.join(process.cwd(), "dist", "index.html"),
-      "/var/task/dist/index.html",
-    ];
-    
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        return res.sendFile(p);
-      }
-    }
-    
-    res.status(404).send("Not Found");
-  });
 } else {
   const { createServer: createViteServer } = await import("vite");
   const vite = await createViteServer({
@@ -344,7 +336,13 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 // Error Handler
 app.use((err: any, req: any, res: any, next: any) => {
   console.error("🔥 Global Server Error:", err);
-  res.status(500).send("Internal Server Error");
+  console.error("🔥 Error Stack:", err.stack);
+  console.error("🔥 Request Path:", req.path);
+  console.error("🔥 Request Query:", req.query);
+  
+  if (!res.headersSent) {
+    res.status(500).send(`Internal Server Error: ${err.message || "Unknown Error"}`);
+  }
 });
 
 if (process.env.VERCEL !== "1") {
