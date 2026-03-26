@@ -98,7 +98,7 @@ app.get("/api/cron", async (req, res) => {
     // Find the first story that hasn't been posted yet
     let storyToProcess = null;
     for (const story of stories) {
-      const { data: existing } = await supabase.from('news_articles').select('id').eq('title', story.title).maybeSingle();
+      const { data: existing } = await (supabase.from('news_articles') as any).select('id').eq('title', story.title).maybeSingle();
       if (!existing) {
         storyToProcess = story;
         break;
@@ -120,7 +120,7 @@ app.get("/api/cron", async (req, res) => {
       breakdown: result.breakdown,
       sentinel_take: result.sentinel_take,
       verdict: result.verdict
-    });
+    }) as any;
 
     // Post to LinkedIn
     if (savedArticle && savedArticle[0]) {
@@ -157,9 +157,21 @@ app.post("/api/sync-news", async (req, res) => {
 });
 
 // Production Route Registration (Synchronous)
-if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(process.cwd(), "dist");
-  console.log("📂 Production distPath:", distPath);
+if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
+  // Use a more robust way to find the dist directory on Vercel
+  const distPath = path.resolve(process.cwd(), "dist");
+  console.log("📂 Production mode. distPath resolved to:", distPath);
+  
+  // Debug: list files in current directory to help diagnose path issues
+  try {
+    const files = fs.readdirSync(process.cwd());
+    console.log("📁 Files in process.cwd():", files);
+    if (fs.existsSync(distPath)) {
+      console.log("📁 Files in distPath:", fs.readdirSync(distPath));
+    }
+  } catch (e) {
+    console.warn("⚠️ Could not list files for debugging:", e);
+  }
   
   app.get("/", async (req, res, next) => {
     const articleId = req.query.article as string;
@@ -169,10 +181,13 @@ if (process.env.NODE_ENV === "production") {
 
     try {
       const possiblePaths = [
-        path.join(process.cwd(), "dist", "index.html"),
-        path.join(process.cwd(), "index.html"),
+        path.join(distPath, "index.html"),
+        path.resolve(process.cwd(), "dist/index.html"),
+        path.resolve(process.cwd(), "index.html"),
+        path.join(__dirname, "dist/index.html"),
         path.join(__dirname, "index.html"),
-        path.join(__dirname, "dist", "index.html")
+        // Vercel specific path
+        path.join(process.cwd(), ".vercel/output/static/index.html")
       ];
       
       let indexPath = "";
@@ -184,13 +199,20 @@ if (process.env.NODE_ENV === "production") {
       }
 
       if (!indexPath) {
-        console.error("❌ Could not find index.html for OG injection. Checked:", possiblePaths);
-        return next();
+        const errorMsg = `❌ Could not find index.html for OG injection. Checked: ${JSON.stringify(possiblePaths)}`;
+        console.error(errorMsg);
+        // Fallback to a basic response instead of 500 if possible, or send a descriptive error
+        return res.status(500).send(`Server Configuration Error: index.html not found. Paths checked: ${possiblePaths.join(', ')}`);
       }
 
       console.log("📄 Found index.html at:", indexPath);
 
-      const article = await fetchArticleById(articleId);
+      // Use a timeout for the DB query to prevent hanging
+      const articlePromise = fetchArticleById(articleId);
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database timeout")), 5000));
+      
+      const article = await Promise.race([articlePromise, timeoutPromise]) as any;
+      
       if (!article) {
         console.log(`ℹ️ Article ${articleId} not found in DB, skipping OG injection`);
         return next();
@@ -201,30 +223,52 @@ if (process.env.NODE_ENV === "production") {
       let html = fs.readFileSync(indexPath, "utf-8");
       
       const ogTitle = article.title;
-      const ogDescription = article.summary;
+      const ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : "");
       const ogImage = article.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000";
-      const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
+      const host = req.get('host') || "saas-sentinel-cyan.vercel.app";
+      const appUrl = process.env.APP_URL || `https://${host}`;
       const ogUrl = `${appUrl}/?article=${articleId}`;
 
-      // Robust replacement
+      // Robust replacement with fallback for missing tags
+      const replaceOrAppend = (html: string, pattern: RegExp, replacement: string, tag: string) => {
+        if (pattern.test(html)) {
+          return html.replace(pattern, replacement);
+        }
+        if (html.includes('</head>')) {
+          return html.replace('</head>', `${tag}\n</head>`);
+        }
+        return html + tag;
+      };
+
       html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
-      html = html.replace(/<meta property="og:title" content=".*?"\s*\/>/g, `<meta property="og:title" content="${ogTitle}" />`);
-      html = html.replace(/<meta property="og:description" content=".*?"\s*\/>/g, `<meta property="og:description" content="${ogDescription}" />`);
-      html = html.replace(/<meta property="og:image" content=".*?"\s*\/>/g, `<meta property="og:image" content="${ogImage}" />`);
-      html = html.replace(/<meta property="og:url" content=".*?"\s*\/>/g, `<meta property="og:url" content="${ogUrl}" />`);
       
-      html = html.replace(/<meta property="twitter:title" content=".*?"\s*\/>/g, `<meta property="twitter:title" content="${ogTitle}" />`);
-      html = html.replace(/<meta property="twitter:description" content=".*?"\s*\/>/g, `<meta property="twitter:description" content="${ogDescription}" />`);
-      html = html.replace(/<meta property="twitter:image" content=".*?"\s*\/>/g, `<meta property="twitter:image" content="${ogImage}" />`);
+      html = replaceOrAppend(html, /<meta property="og:title" content=".*?"\s*\/?>/g, `<meta property="og:title" content="${ogTitle}" />`, `<meta property="og:title" content="${ogTitle}" />`);
+      html = replaceOrAppend(html, /<meta property="og:description" content=".*?"\s*\/?>/g, `<meta property="og:description" content="${ogDescription}" />`, `<meta property="og:description" content="${ogDescription}" />`);
+      html = replaceOrAppend(html, /<meta property="og:image" content=".*?"\s*\/?>/g, `<meta property="og:image" content="${ogImage}" />`, `<meta property="og:image" content="${ogImage}" />`);
+      html = replaceOrAppend(html, /<meta property="og:url" content=".*?"\s*\/?>/g, `<meta property="og:url" content="${ogUrl}" />`, `<meta property="og:url" content="${ogUrl}" />`);
       
-      html = html.replace(/<link rel="canonical" href=".*?"\s*\/>/g, `<link rel="canonical" href="${ogUrl}" />`);
+      html = replaceOrAppend(html, /<meta property="twitter:title" content=".*?"\s*\/?>/g, `<meta property="twitter:title" content="${ogTitle}" />`, `<meta property="twitter:title" content="${ogTitle}" />`);
+      html = replaceOrAppend(html, /<meta property="twitter:description" content=".*?"\s*\/?>/g, `<meta property="twitter:description" content="${ogDescription}" />`, `<meta property="twitter:description" content="${ogDescription}" />`);
+      html = replaceOrAppend(html, /<meta property="twitter:image" content=".*?"\s*\/?>/g, `<meta property="twitter:image" content="${ogImage}" />`, `<meta property="twitter:image" content="${ogImage}" />`);
+      
+      html = replaceOrAppend(html, /<link rel="canonical" href=".*?"\s*\/?>/g, `<link rel="canonical" href="${ogUrl}" />`, `<link rel="canonical" href="${ogUrl}" />`);
       
       res.setHeader('Content-Type', 'text/html');
       console.log("✅ OG injection successful, sending HTML");
       return res.send(html);
-    } catch (e) {
+    } catch (e: any) {
       console.error("❌ Error injecting OG tags:", e);
-      next();
+      // Fallback to serving the static file if injection fails
+      try {
+        const distPath = path.resolve(process.cwd(), "dist");
+        const indexPath = path.join(distPath, "index.html");
+        if (fs.existsSync(indexPath)) {
+          return res.sendFile(indexPath);
+        }
+      } catch (innerError) {
+        console.error("❌ Fallback failed:", innerError);
+      }
+      return res.status(500).send(`Internal Server Error during OG injection: ${e.message}`);
     }
   });
 
