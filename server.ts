@@ -217,8 +217,15 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   console.log(`[DEBUG] rootDistPath: ${rootDistPath} (exists: ${fs.existsSync(rootDistPath)})`);
   
   // Health check for Vercel
-  app.get("/api/health", (req, res) => {
-    res.status(200).send("OK");
+  app.get("/api/health", async (req, res) => {
+    try {
+      const { data, error } = await supabase.from('news_articles').select('id').limit(1);
+      if (error) throw error;
+      res.status(200).json({ status: "OK", database: "Connected", count: data.length });
+    } catch (err: any) {
+      console.error("[DEBUG] Health check database error:", err.message);
+      res.status(200).json({ status: "OK", database: "Error", message: err.message });
+    }
   });
 
   // 1. Handle all non-API paths for OG tag injection
@@ -228,7 +235,17 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       return next();
     }
 
-    const articleId = (req.query.article as string) || (req.path.startsWith("/article/") ? req.path.split("/").pop() : "");
+    // Robust article ID extraction
+    const articleQuery = req.query.article;
+    let articleId = "";
+    if (typeof articleQuery === "string") {
+      articleId = articleQuery;
+    } else if (Array.isArray(articleQuery)) {
+      articleId = String(articleQuery[0]);
+    } else if (req.path.startsWith("/article/")) {
+      articleId = req.path.split("/").pop() || "";
+    }
+
     console.log(`[DEBUG] OG Injection - Path: ${req.path}, articleId: ${articleId}`);
 
     try {
@@ -284,23 +301,24 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 
       // If articleId is present, try to fetch article metadata
       if (articleId && articleId !== "undefined" && articleId !== "null" && articleId.length > 0) {
-        console.log(`[DEBUG] Fetching article ${articleId}...`);
+        console.log(`[DEBUG] Fetching article metadata for id: ${articleId}...`);
         try {
+          // Use a timeout to prevent hanging the request
           const article = await Promise.race([
             fetchArticleById(articleId),
-            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000))
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Supabase Fetch Timeout")), 3000))
           ]).catch(err => {
             console.error(`[DEBUG] ❌ Error fetching article ${articleId}:`, err.message || err);
             return null;
           });
 
           if (article && article.title) {
-            console.log(`[DEBUG] ✅ Article found: ${article.title}`);
+            console.log(`[DEBUG] ✅ Article metadata found: ${article.title}`);
             ogTitle = article.title;
             ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : ogDescription);
             if (article.image_url) ogImage = article.image_url;
           } else {
-            console.warn(`[DEBUG] ⚠️ Article ${articleId} not found or invalid. Using defaults.`);
+            console.warn(`[DEBUG] ⚠️ Article ${articleId} metadata not found. Using defaults.`);
           }
         } catch (e: any) {
           console.error(`[DEBUG] ❌ Unexpected error in article fetch:`, e.message);
@@ -338,10 +356,10 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 
       res.setHeader('Content-Type', 'text/html');
       res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-      console.log(`[DEBUG] ✅ OG Injection complete. Sending ${html.length} bytes.`);
+      console.log(`[DEBUG] ✅ OG Injection complete for ${articleId || 'root'}. Sending response.`);
       return res.status(200).send(html);
     } catch (error: any) {
-      console.error("[DEBUG] ❌ Critical error in OG handler:", error.message);
+      console.error("[DEBUG] ❌ CRITICAL ERROR in OG handler:", error.message);
       console.error(error.stack);
       
       // Absolute last resort: minimal HTML to avoid 500
