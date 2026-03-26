@@ -78,30 +78,46 @@ export async function saveNewsArticle(article: Partial<Article>) {
 }
 
 export async function fetchArticleById(id: string): Promise<Article | null> {
-  const { data, error } = await (supabase
-    .from('news_articles') as any)
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  console.log(`[DEBUG] fetchArticleById called with id: ${id}`);
+  try {
+    if (!supabase) {
+      console.error('[DEBUG] Supabase client is not initialized');
+      return null;
+    }
+    
+    const { data, error } = await (supabase
+      .from('news_articles') as any)
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
 
-  if (error || !data) {
-    if (error) console.error('Error fetching article by id:', error);
+    if (error) {
+      console.error(`[DEBUG] Supabase error in fetchArticleById for id ${id}:`, error);
+      return null;
+    }
+
+    if (!data) {
+      console.log(`[DEBUG] No article found in Supabase for id: ${id}`);
+      return null;
+    }
+
+    const row = data as any;
+    return {
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      summary: row.summary || (row.content ? row.content.substring(0, 150) + '...' : 'No content available.'),
+      category: row.category,
+      date: row.created_at,
+      readTime: row.read_time || '5 min read',
+      source: row.source || 'SaaS Sentinel',
+      image_url: row.image_url,
+      breakdown: row.breakdown,
+      sentinel_take: row.sentinel_take,
+      verdict: row.verdict
+    };
+  } catch (err: any) {
+    console.error(`[DEBUG] Unexpected error in fetchArticleById for id ${id}:`, err.message || err);
     return null;
   }
-
-  const row = data as any;
-  return {
-    id: row.id,
-    title: row.title,
-    content: row.content,
-    summary: row.summary || (row.content ? row.content.substring(0, 150) + '...' : 'No content available.'),
-    category: row.category,
-    date: row.created_at,
-    readTime: row.read_time || '5 min read',
-    source: row.source || 'SaaS Sentinel',
-    image_url: row.image_url,
-    breakdown: row.breakdown,
-    sentinel_take: row.sentinel_take,
-    verdict: row.verdict
-  };
 }
