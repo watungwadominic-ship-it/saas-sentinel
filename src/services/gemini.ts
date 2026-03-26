@@ -1,23 +1,33 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 const getApiKey = () => {
-  // Check Vite environment variables first (browser)
+  // Check Node environment variables (server)
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.VITE_USER_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  }
+  // Check Vite environment variables (browser)
   // @ts-ignore
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_USER_GEMINI_API_KEY) {
     // @ts-ignore
     return import.meta.env.VITE_USER_GEMINI_API_KEY;
   }
-  // Check Node environment variables (server)
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env.VITE_USER_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-  }
   return '';
 };
 
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!aiInstance) {
+    const key = getApiKey();
+    if (!key) return null;
+    aiInstance = new GoogleGenAI({ apiKey: key });
+  }
+  return aiInstance;
+};
 
 export async function fetchTopSaaSNews(topArticlesContext?: string) {
   try {
+    const ai = getAI();
+    if (!ai) throw new Error("Gemini API key missing");
     const model = "gemini-3-flash-preview";
     const query = "(SaaS OR 'Enterprise AI' OR 'Cloud Computing') AND (Launch OR Funding OR Update)";
     
@@ -42,6 +52,8 @@ export async function fetchTopSaaSNews(topArticlesContext?: string) {
 }
 
 export async function generateArticle(headline: string, snippet: string) {
+  const ai = getAI();
+  if (!ai) throw new Error("Gemini API key missing");
   const model = "gemini-3-flash-preview"; // Faster than Pro
   const prompt = `Act as an Elite Senior SaaS Market Analyst. Analyze this news: ${headline}.
   
@@ -100,6 +112,8 @@ export async function generateArticle(headline: string, snippet: string) {
 }
 
 export async function parseNewsIntoStories(rawNews: string) {
+  const ai = getAI();
+  if (!ai) throw new Error("Gemini API key missing");
   const model = "gemini-3-flash-preview";
   const prompt = `Extract news stories from the following text. Return them as a JSON array of objects with 'title', 'snippet', and 'category' fields.
   If the text is a single summary of a trending topic or structural shift, return it as a single object in the array.
