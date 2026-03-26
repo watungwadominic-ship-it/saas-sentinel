@@ -36,9 +36,6 @@ def post_to_linkedin(text, title, url, image_url=None):
             "title": title,
             "description": text[:200]
         }
-        
-        if image_url:
-            article_content["thumbnail"] = image_url
 
         post_data = {
             "author": LINKEDIN_PERSON_URN,
@@ -144,17 +141,11 @@ def run_news_bot():
                             "content": (
                                 f"News Item: {title}\n"
                                 f"Description: {latest.get('description', 'No description available.')}\n\n"
-                                "TASK:\n"
-                                "1. feed_summary: A high-density, 100-word 'Executive Briefing'. Provide technical specifics and business implications.\n"
-                                "2. strategic_analysis: 3 Detailed Paragraphs (separated by \\n\\n).\n"
-                                "   - Paragraph 1: THE ARCHITECTURAL IMPACT. Technical stack and engineering nuances.\n"
-                                "   - Paragraph 2: THE COMPETITIVE CHESSBOARD. Rivals and disruption.\n"
-                                "   - Paragraph 3: THE 12-MONTH PROJECTION. Data-backed prediction.\n"
+                                "TASK: Provide a strategic analysis in JSON format.\n"
+                                "1. feed_summary: A 100-word 'Executive Briefing'.\n"
+                                "2. strategic_analysis: 3 Detailed Paragraphs (separated by \\n\\n) covering Architectural Impact, Competitive Chessboard, and 12-Month Projection.\n"
                                 "3. impact: 'High', 'Medium', or 'Low'.\n"
                                 "4. sentiment: 'BULLISH', 'BEARISH', or 'NEUTRAL'.\n\n"
-                                "CRITICAL RULES:\n"
-                                "- DO NOT repeat the news description.\n"
-                                "- BE CONCISE but deep. Avoid fluff to prevent token limits.\n\n"
                                 "JSON Structure:\n"
                                 "{\n"
                                 "  \"feed_summary\": \"...\",\n"
