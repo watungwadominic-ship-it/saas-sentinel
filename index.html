@@ -668,6 +668,14 @@
             } else {
               renderArticles();
             }
+            
+            // Handle direct article links
+            const urlParams = new URLSearchParams(window.location.search);
+            const articleId = urlParams.get('article');
+            if (articleId) {
+              // Wait a bit for articles to be rendered/cached
+              setTimeout(() => openArticle(articleId), 500);
+            }
           } else {
             console.error('Supabase not loaded');
           }
@@ -837,8 +845,44 @@
 
       async function openArticle(id) {
         articleSourceTab = currentTab;
-        const article = cachedArticles.find(a => String(a.id) === String(id));
-        if (!article) return;
+        let article = cachedArticles.find(a => String(a.id) === String(id));
+        
+        const content = document.getElementById('article-content');
+        const view = document.getElementById('section-article');
+        
+        if (!article) {
+          // Show loading state
+          if (content) content.innerHTML = '<div class="flex items-center justify-center py-40"><div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--color-accent)]"></div></div>';
+          switchTab('article');
+          
+          // Try to fetch directly if not in cache
+          try {
+            const { data, error } = await supabaseClient
+              .from('news_articles')
+              .select('*')
+              .eq('id', id)
+              .maybeSingle();
+            if (data) {
+              article = data;
+            } else {
+              if (content) content.innerHTML = '<div class="text-center py-40"><p class="text-2xl font-bold opacity-40">Intelligence report not found.</p></div>';
+              return;
+            }
+          } catch (e) { 
+            console.error('Direct fetch failed:', e);
+            if (content) content.innerHTML = '<div class="text-center py-40"><p class="text-2xl font-bold opacity-40">Failed to load intelligence report.</p></div>';
+            return;
+          }
+        } else {
+          switchTab('article');
+        }
+
+        // Update URL
+        const url = new URL(window.location);
+        if (url.searchParams.get('article') !== String(id)) {
+          url.searchParams.set('article', id);
+          window.history.pushState({}, '', url);
+        }
 
         // Update back button text
         const backBtn = document.querySelector('#section-article button');
@@ -948,10 +992,27 @@
         switchTab('article');
       }
 
-      function closeArticle() { switchTab(articleSourceTab); }
+      function closeArticle() { 
+        // Clear article from URL
+        const url = new URL(window.location);
+        url.searchParams.delete('article');
+        window.history.pushState({}, '', url);
+        
+        switchTab(articleSourceTab); 
+      }
 
       function switchTab(tab) {
         currentTab = tab;
+        
+        // Clear article from URL if switching to other tabs
+        if (tab !== 'article') {
+          const url = new URL(window.location);
+          if (url.searchParams.has('article')) {
+            url.searchParams.delete('article');
+            window.history.pushState({}, '', url);
+          }
+        }
+
         ['feed', 'analysis', 'archive', 'about', 'privacy', 'article'].forEach(s => {
           const el = document.getElementById(`section-${s}`);
           if (el) el.classList.toggle('hidden-section', s !== tab);
