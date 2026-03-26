@@ -19,30 +19,12 @@ const ai = new GoogleGenAI({ apiKey: getApiKey() });
 export async function fetchTopSaaSNews(topArticlesContext?: string) {
   try {
     const model = "gemini-3-flash-preview";
-    const query = "(SaaS OR 'Enterprise AI' OR 'Cloud Computing' OR 'B2B Tech') AND (Launch OR Funding OR Update OR Acquisition)";
-    
-    const day = new Date().getDay();
-    const isWeekend = day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
-    const timeframe = isWeekend ? "72 hours" : "24 hours";
-
-    if (isWeekend) {
-      console.log(`Weekend Mode Active: Fetching news from the last 72 hours...`);
-    }
+    const query = "(SaaS OR 'Enterprise AI' OR 'Cloud Computing') AND (Launch OR Funding OR Update)";
     
     console.log(`Searching for SaaS intelligence... ${query}`);
 
-    const prompt = `Search for the top 5 most significant, high-quality news stories using this exact query: "${query}". 
-    Focus on the last ${timeframe}. 
-    
-    FALLBACK: If no relevant news is found for the last ${timeframe}, expand your search to the last 72 hours. 
-    
-    PREVENTION: If the search returns zero results for the last 72 hours, do not say "No relevant news found". 
-    Instead, re-analyze the following top articles from the last week and generate a "Weekly Sentiment" post summarizing the overall market mood and key shifts.
-    
-    Top Articles Context:
-    ${topArticlesContext || "No previous articles provided. Summarize the single most important trending SaaS topic from the current week instead."}
-    
-    For each story (or the sentiment post), provide a headline and a brief summary of the raw facts.`;
+    const prompt = `Search for the top 3 most significant SaaS news stories from the last 24 hours using this query: "${query}". 
+    For each story, provide a headline and a brief summary of the raw facts.`;
 
     const response = await ai.models.generateContent({
       model,
@@ -60,8 +42,19 @@ export async function fetchTopSaaSNews(topArticlesContext?: string) {
 }
 
 export async function generateArticle(headline: string, snippet: string) {
-  const model = "gemini-3.1-pro-preview";
+  const model = "gemini-3-flash-preview"; // Faster than Pro
   const prompt = `Act as an Elite Senior SaaS Market Analyst. Analyze this news: ${headline}.
+  
+Write a structured analysis for 'SaaS Sentinel'.
+Tone: Elite, Insightful, and Sassy.
+
+Structure:
+1. The Signal (Headline): Create a punchy, professional headline.
+2. The Breakdown: Summarize the core facts into exactly 3 bullet points.
+3. The Sentinel's Take: Write 2 paragraphs explaining why this news matters for B2B SaaS founders.
+4. The Verdict: Provide a bold 1-sentence prediction.
+
+Data Input: Headline: ${headline}, Snippet: ${snippet}`;
 If this news involves funding or acquisitions, set category to 'Market Analysis'.
 If it is a product launch, set category to 'Intelligence Feed'.
 Otherwise, use 'Intelligence Feed'.
