@@ -2,12 +2,17 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
 import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini";
 import { supabase } from "./src/services/supabase";
 import { saveNewsArticle, fetchArticleById } from "./src/services/news_articles";
+import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+console.log("🚀 Server starting in mode:", process.env.NODE_ENV);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Social Media Clients
 async function postToLinkedIn(text: string, title: string, url: string, imageUrl?: string) {
@@ -151,93 +156,108 @@ app.post("/api/sync-news", async (req, res) => {
   }
 });
 
-async function startServer() {
-  const PORT = 3000;
+// Production Route Registration (Synchronous)
+if (process.env.NODE_ENV === "production") {
+  const distPath = path.join(process.cwd(), "dist");
+  console.log("📂 Production distPath:", distPath);
+  
+  app.get("/", async (req, res, next) => {
+    const articleId = req.query.article as string;
+    if (!articleId) return next();
 
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    
-    // Handle dynamic OG tags for the root path with article query
-    app.get("/", async (req, res, next) => {
-      const articleId = req.query.article as string;
+    console.log(`🔍 Processing OG injection for article: ${articleId}`);
+
+    try {
+      const possiblePaths = [
+        path.join(process.cwd(), "dist", "index.html"),
+        path.join(process.cwd(), "index.html"),
+        path.join(__dirname, "index.html"),
+        path.join(__dirname, "dist", "index.html")
+      ];
       
-      if (articleId) {
-        // Try to find index.html in common Vercel locations
-        const possiblePaths = [
-          path.join(process.cwd(), "dist", "index.html"),
-          path.join(process.cwd(), "index.html"),
-          path.join(__dirname, "index.html"),
-          path.join(__dirname, "dist", "index.html")
-        ];
-        
-        let indexPath = "";
-        for (const p of possiblePaths) {
-          if (fs.existsSync(p)) {
-            indexPath = p;
-            break;
-          }
-        }
-
-        if (indexPath) {
-          try {
-            const article = await fetchArticleById(articleId);
-            if (article) {
-              let html = fs.readFileSync(indexPath, "utf-8");
-              
-              const ogTitle = article.title;
-              const ogDescription = article.summary;
-              const ogImage = article.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000";
-              const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
-              const ogUrl = `${appUrl}/?article=${articleId}`;
-
-              // Robust replacement
-              html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
-              html = html.replace(/<meta property="og:title" content=".*?"\s*\/>/g, `<meta property="og:title" content="${ogTitle}" />`);
-              html = html.replace(/<meta property="og:description" content=".*?"\s*\/>/g, `<meta property="og:description" content="${ogDescription}" />`);
-              html = html.replace(/<meta property="og:image" content=".*?"\s*\/>/g, `<meta property="og:image" content="${ogImage}" />`);
-              html = html.replace(/<meta property="og:url" content=".*?"\s*\/>/g, `<meta property="og:url" content="${ogUrl}" />`);
-              
-              html = html.replace(/<meta property="twitter:title" content=".*?"\s*\/>/g, `<meta property="twitter:title" content="${ogTitle}" />`);
-              html = html.replace(/<meta property="twitter:description" content=".*?"\s*\/>/g, `<meta property="twitter:description" content="${ogDescription}" />`);
-              html = html.replace(/<meta property="twitter:image" content=".*?"\s*\/>/g, `<meta property="twitter:image" content="${ogImage}" />`);
-              
-              html = html.replace(/<link rel="canonical" href=".*?"\s*\/>/g, `<link rel="canonical" href="${ogUrl}" />`);
-              
-              return res.send(html);
-            }
-          } catch (e) {
-            console.error("Error injecting OG tags:", e);
-          }
+      let indexPath = "";
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          indexPath = p;
+          break;
         }
       }
+
+      if (!indexPath) {
+        console.error("❌ Could not find index.html for OG injection. Checked:", possiblePaths);
+        return next();
+      }
+
+      console.log("📄 Found index.html at:", indexPath);
+
+      const article = await fetchArticleById(articleId);
+      if (!article) {
+        console.log(`ℹ️ Article ${articleId} not found in DB, skipping OG injection`);
+        return next();
+      }
+
+      console.log("📰 Article found:", article.title);
+
+      let html = fs.readFileSync(indexPath, "utf-8");
+      
+      const ogTitle = article.title;
+      const ogDescription = article.summary;
+      const ogImage = article.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000";
+      const appUrl = process.env.APP_URL || "https://saas-sentinel-cyan.vercel.app";
+      const ogUrl = `${appUrl}/?article=${articleId}`;
+
+      // Robust replacement
+      html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
+      html = html.replace(/<meta property="og:title" content=".*?"\s*\/>/g, `<meta property="og:title" content="${ogTitle}" />`);
+      html = html.replace(/<meta property="og:description" content=".*?"\s*\/>/g, `<meta property="og:description" content="${ogDescription}" />`);
+      html = html.replace(/<meta property="og:image" content=".*?"\s*\/>/g, `<meta property="og:image" content="${ogImage}" />`);
+      html = html.replace(/<meta property="og:url" content=".*?"\s*\/>/g, `<meta property="og:url" content="${ogUrl}" />`);
+      
+      html = html.replace(/<meta property="twitter:title" content=".*?"\s*\/>/g, `<meta property="twitter:title" content="${ogTitle}" />`);
+      html = html.replace(/<meta property="twitter:description" content=".*?"\s*\/>/g, `<meta property="twitter:description" content="${ogDescription}" />`);
+      html = html.replace(/<meta property="twitter:image" content=".*?"\s*\/>/g, `<meta property="twitter:image" content="${ogImage}" />`);
+      
+      html = html.replace(/<link rel="canonical" href=".*?"\s*\/>/g, `<link rel="canonical" href="${ogUrl}" />`);
+      
+      res.setHeader('Content-Type', 'text/html');
+      console.log("✅ OG injection successful, sending HTML");
+      return res.send(html);
+    } catch (e) {
+      console.error("❌ Error injecting OG tags:", e);
       next();
-    });
+    }
+  });
 
-    app.use(express.static(distPath));
-    
-    app.get("*", (req, res) => {
-      // Fallback to root index.html if dist isn't found
-      const fallbackPath = fs.existsSync(path.join(distPath, "index.html")) 
-        ? path.join(distPath, "index.html") 
-        : path.join(process.cwd(), "index.html");
-      res.sendFile(fallbackPath);
-    });
-  }
+  app.use(express.static(distPath));
+  
+  app.get("*", (req, res) => {
+    const fallbackPath = fs.existsSync(path.join(distPath, "index.html")) 
+      ? path.join(distPath, "index.html") 
+      : path.join(process.cwd(), "index.html");
+    res.sendFile(fallbackPath);
+  });
+} else {
+  // Dev mode with Vite
+  const { createServer: createViteServer } = await import("vite");
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: "spa",
+  });
+  app.use(vite.middlewares);
+}
 
+// Error Handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("🔥 Global Server Error:", err);
+  res.status(500).send("Internal Server Error");
+});
+
+// Start listening if not on Vercel
+if (process.env.VERCEL !== "1") {
+  const PORT = 3000;
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
-}
-
-// Only start the server if we're not on Vercel
-if (process.env.VERCEL !== "1") {
-  startServer();
 }
 
 export default app;
