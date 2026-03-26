@@ -202,13 +202,20 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   const distPath = path.resolve(process.cwd(), "dist");
   console.log(`[DEBUG] distPath: ${distPath} (exists: ${fs.existsSync(distPath)})`);
   
+  // 1. Handle the root path for OG tag injection
   app.get("/", async (req, res, next) => {
     const articleId = req.query.article as string;
-    console.log(`[DEBUG] GET /?article=${articleId}`);
-    if (!articleId) return next();
+    console.log(`[DEBUG] GET / - articleId: ${articleId}`);
+
+    if (!articleId) {
+      console.log(`[DEBUG] No articleId, falling through to static files`);
+      return next();
+    }
 
     try {
+      // Find index.html
       const possiblePaths = [
+        path.join(distPath, "index.html"),
         path.join(process.cwd(), "dist", "index.html"),
         path.join(process.cwd(), "index.html"),
         path.join(__dirname, "dist", "index.html"),
@@ -216,13 +223,13 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
         "/var/task/dist/index.html",
         "/var/task/index.html",
       ];
-      
+
       let indexPath = "";
       for (const p of possiblePaths) {
         console.log(`[DEBUG] Checking path: ${p}`);
         if (fs.existsSync(p)) {
           indexPath = p;
-          console.log(`[DEBUG] ✅ Found index.html at: ${p}`);
+          console.log(`[DEBUG] Found index.html at: ${p}`);
           break;
         }
       }
@@ -231,76 +238,88 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       if (indexPath) {
         html = fs.readFileSync(indexPath, "utf-8");
       } else {
-        console.warn("[DEBUG] ⚠️ index.html not found, using minimal fallback");
+        console.warn("[DEBUG] ⚠️ index.html not found in any expected location. Using minimal fallback.");
         html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
       }
 
-      console.log(`[DEBUG] Fetching article: ${articleId}`);
+      console.log(`[DEBUG] Fetching article ${articleId}...`);
       const article = await Promise.race([
         fetchArticleById(articleId),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("DB Timeout")), 8000))
-      ]) as any;
-      
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
+      ]).catch(err => {
+        console.error(`[DEBUG] ❌ Error fetching article:`, err);
+        return null;
+      });
+
       if (!article) {
-        console.warn(`[DEBUG] ⚠️ Article ${articleId} not found`);
-        // If article not found, still serve the HTML (maybe it's a deleted article)
+        console.warn(`[DEBUG] ⚠️ Article ${articleId} not found or timeout`);
         res.setHeader('Content-Type', 'text/html');
         return res.send(html);
       }
 
-      console.log(`[DEBUG] Injecting OG tags for: ${article.title}`);
+      console.log(`[DEBUG] ✅ Article found: ${article.title}. Injecting tags...`);
       
       const ogTitle = article.title;
       const ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : "");
-      const ogImage = article.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000";
-      const host = req.get('host') || "saas-sentinel-cyan.vercel.app";
-      const ogUrl = `https://${host}/?article=${articleId}`;
+      const ogImage = article.image_url || "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
+      const ogUrl = `${process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app'}/?article=${articleId}`;
 
-      // Inject tags
-      html = html.replace(/<title>.*?<\/title>/, `<title>${ogTitle} | SaaS Sentinel</title>`);
-      if (!html.includes(`<title>`)) {
-        html = html.replace('<head>', `<head><title>${ogTitle} | SaaS Sentinel</title>`);
-      }
-      
+      // Remove existing OG and Twitter tags to avoid conflicts
+      html = html.replace(/<meta\s+property=["']og:.*?["']\s+content=["'].*?["']\s*\/?>/gi, '');
+      html = html.replace(/<meta\s+name=["']twitter:.*?["']\s+content=["'].*?["']\s*\/?>/gi, '');
+      html = html.replace(/<title>.*?<\/title>/gi, '');
+
       const metaTags = `
-        <meta property="og:title" content="${ogTitle}" />
-        <meta property="og:description" content="${ogDescription}" />
-        <meta property="og:image" content="${ogImage}" />
-        <meta property="og:url" content="${ogUrl}" />
-        <meta property="og:type" content="article" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="${ogTitle}" />
-        <meta name="twitter:description" content="${ogDescription}" />
-        <meta name="twitter:image" content="${ogImage}" />
-      `;
-      
+    <title>${ogTitle} | SaaS Sentinel</title>
+    <meta name="description" content="${ogDescription}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="${ogUrl}" />
+    <meta property="og:title" content="${ogTitle}" />
+    <meta property="og:description" content="${ogDescription}" />
+    <meta property="og:image" content="${ogImage}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="${ogUrl}" />
+    <meta name="twitter:title" content="${ogTitle}" />
+    <meta name="twitter:description" content="${ogDescription}" />
+    <meta name="twitter:image" content="${ogImage}" />
+`;
+
       if (html.includes('</head>')) {
-        html = html.replace('</head>', `${metaTags}\n</head>`);
+        html = html.replace('</head>', `${metaTags}\n  </head>`);
+      } else if (html.includes('<head>')) {
+        html = html.replace('<head>', `<head>${metaTags}`);
       } else {
-        html = html.replace('<body>', `<head>${metaTags}</head><body>`);
+        html = metaTags + html;
       }
-      
+
+      console.log(`[DEBUG] 🚀 Sending injected HTML (${html.length} bytes)`);
       res.setHeader('Content-Type', 'text/html');
       return res.send(html);
-    } catch (e: any) {
-      console.error("[DEBUG] ❌ Injection failed:", e);
-      // Fallback to serving the static file without injection if possible
+    } catch (error) {
+      console.error("[DEBUG] ❌ Critical error in root handler:", error);
       return next();
     }
   });
 
+  // 2. Serve static files
   app.use(express.static(distPath));
   
+  // 3. Fallback for SPA routing
   app.get("*", (req, res) => {
-    const fallbackPath = fs.existsSync(path.join(distPath, "index.html")) 
-      ? path.join(distPath, "index.html") 
-      : path.join(process.cwd(), "index.html");
+    console.log(`[DEBUG] GET * - path: ${req.path}`);
+    const possiblePaths = [
+      path.join(distPath, "index.html"),
+      path.join(process.cwd(), "dist", "index.html"),
+      "/var/task/dist/index.html",
+    ];
     
-    if (fs.existsSync(fallbackPath)) {
-      res.sendFile(fallbackPath);
-    } else {
-      res.status(404).send("Not Found");
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return res.sendFile(p);
+      }
     }
+    
+    res.status(404).send("Not Found");
   });
 } else {
   const { createServer: createViteServer } = await import("vite");
