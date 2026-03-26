@@ -1,5 +1,5 @@
-import { supabase } from './supabase.js';
-import { Article } from '../types.js';
+import { supabase } from './supabase';
+import { Article } from '../types';
 
 export async function fetchNewsArticles(categories?: string[]): Promise<Article[]> {
   let query = supabase
