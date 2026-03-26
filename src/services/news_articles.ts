@@ -76,3 +76,31 @@ export async function saveNewsArticle(article: Partial<Article>) {
 
   return data;
 }
+
+export async function fetchArticleById(id: string): Promise<Article | null> {
+  const { data, error } = await supabase
+    .from('news_articles')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) console.error('Error fetching article by id:', error);
+    return null;
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    content: data.content,
+    summary: data.summary || data.content.substring(0, 150) + '...',
+    category: data.category,
+    date: data.created_at,
+    readTime: data.read_time || '5 min read',
+    source: data.source || 'SaaS Sentinel',
+    image_url: data.image_url,
+    breakdown: data.breakdown,
+    sentinel_take: data.sentinel_take,
+    verdict: data.verdict
+  };
+}
