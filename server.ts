@@ -82,6 +82,17 @@ async function postToLinkedIn(text: string, title: string, url: string, imageUrl
 }
 
 const app = express();
+
+// Immediate Health Check for Vercel
+app.get("/api/health-check", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV,
+    vercel: process.env.VERCEL,
+    cwd: process.cwd()
+  });
+});
 app.use(express.json());
 
 // API Routes
