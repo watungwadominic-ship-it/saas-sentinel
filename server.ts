@@ -98,23 +98,34 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 });
 
 // OG Tag Injection Middleware
-app.get("*", async (req, res, next) => {
-  const userAgent = req.headers["user-agent"] || "";
-  const accept = req.headers.accept || "";
-  const isBot = /bot|googlebot|linkedinbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot/i.test(userAgent);
-  
-  console.log(`[DEBUG] [${new Date().toISOString()}] Request: ${req.method} ${req.originalUrl}`);
-  console.log(`[DEBUG] User-Agent: ${userAgent}`);
-  console.log(`[DEBUG] Accept: ${accept}`);
-  console.log(`[DEBUG] IsBot: ${isBot}`);
-
-  // Skip API routes and static assets (requests with extensions)
-  if (req.path.startsWith("/api/") || (req.path.includes(".") && !isBot)) {
+app.use(async (req, res, next) => {
+  // Only handle GET and HEAD requests for HTML/OG tags
+  if (req.method !== "GET" && req.method !== "HEAD") {
     return next();
   }
 
-  // Handle HTML requests, bot requests, or the root path
-  const isHtmlRequest = accept.includes("text/html") || req.path === "/" || isBot;
+  const userAgent = req.headers["user-agent"] || "";
+  const accept = req.headers.accept || "";
+  // More inclusive bot detection
+  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider/i.test(userAgent);
+  
+  console.log(`[DEBUG] [${new Date().toISOString()}] Request: ${req.method} ${req.originalUrl}`);
+  console.log(`[DEBUG] User-Agent: ${userAgent}`);
+  console.log(`[DEBUG] IsBot: ${isBot}`);
+
+  // Skip API routes
+  if (req.path.startsWith("/api/")) {
+    return next();
+  }
+
+  // Skip static assets (requests with extensions) UNLESS it's a bot
+  // Bots should get the HTML even if they hit a weird URL
+  if (req.path.includes(".") && !isBot) {
+    return next();
+  }
+
+  // Handle HTML requests, bot requests, or any path without an extension
+  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot;
   const articleQuery = req.query.article;
   const pathParts = req.path.split("/").filter(Boolean);
   let articleId = "";
@@ -152,7 +163,11 @@ app.get("*", async (req, res, next) => {
 
     let html = "";
     if (indexPath) {
-      html = fs.readFileSync(indexPath, "utf-8");
+      try {
+        html = fs.readFileSync(indexPath, "utf-8");
+      } catch (e) {
+        console.error(`[DEBUG] Failed to read index.html at ${indexPath}:`, e);
+      }
     }
 
     if (!html) {
@@ -168,15 +183,20 @@ app.get("*", async (req, res, next) => {
     let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis. SaaS Sentinel provides elite B2B market intelligence for founders and investors.";
     let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
     let ogUrl = `${baseUrl}${req.path}`;
-    if (articleId) ogUrl += `?article=${articleId}`;
+    if (articleId) {
+      // Ensure the URL in OG tags matches the shared URL structure
+      if (!ogUrl.includes('article=')) {
+        const sep = ogUrl.includes('?') ? '&' : '?';
+        ogUrl += `${sep}article=${articleId}`;
+      }
+    }
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
       try {
         const { fetchArticleById } = await import("./src/services/news_articles.js");
-        // Increased timeout to 10s to handle cold starts better
         const article = await Promise.race([
           fetchArticleById(articleId),
-          new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000))
+          new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
         ]).catch((err) => {
           console.error(`[DEBUG] Article fetch failed or timed out for ID ${articleId}:`, err);
           return null;
@@ -185,7 +205,6 @@ app.get("*", async (req, res, next) => {
         if (article && article.title) {
           ogTitle = article.title;
           const summary = article.summary || (article.content ? article.content.substring(0, 200) : "");
-          // LinkedIn prefers descriptions > 100 chars
           ogDescription = (summary.length > 100 ? summary : (summary + " " + ogDescription)).substring(0, 200);
           
           if (article.image_url) {
@@ -196,7 +215,7 @@ app.get("*", async (req, res, next) => {
               ogImage = `${cleanBase}${cleanImage}`;
             }
           }
-          console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}", URL="${ogUrl}"`);
+          console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
         }
       } catch (e) {
         console.error("[DEBUG] Error fetching article for OG tags:", e);
@@ -227,14 +246,14 @@ app.get("*", async (req, res, next) => {
   <meta itemprop="image" content="${ogImage}" />
 `;
 
-    // Extremely aggressive removal of existing meta/title/canonical tags
+    // Aggressive removal of existing tags
     html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
     html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
     html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
     html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
     html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
 
-    // Inject meta tags. We use a more robust replacement that handles attributes on <head>
+    // Inject meta tags
     if (/<head[^>]*>/i.test(html)) {
       html = html.replace(/(<head[^>]*>)/i, `$1${metaTags}`);
     } else if (/<html[^>]*>/i.test(html)) {
@@ -243,36 +262,38 @@ app.get("*", async (req, res, next) => {
       html = `<head>${metaTags}</head>${html}`;
     }
     
-    // Ensure the html tag has the OG prefix for better compatibility
     if (!html.includes('prefix="og:')) {
       html = html.replace(/<html/i, '<html prefix="og: http://ogp.me/ns#"');
     }
 
     res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.setHeader('Cache-Control', 'public, max-age=3600');
     return res.status(200).send(html);
   } catch (error: any) {
-    console.error("[DEBUG] Error in OG tag injection:", error);
-    const minimalHtml = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
-    res.setHeader('Content-Type', 'text/html');
-    return res.status(200).send(minimalHtml);
+    console.error("[DEBUG] Error in OG tag injection middleware:", error);
+    return next(); // Fall through to static/Vite if something goes wrong
   }
 });
 
 // Production Route Registration
-if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
-  const distPath = path.resolve(__dirname, "dist");
-  if (fs.existsSync(distPath)) {
+// We check for dist folder existence to determine production mode more reliably
+const distPath = path.resolve(__dirname, "dist");
+const hasDist = fs.existsSync(distPath);
+
+if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || hasDist) {
+  if (hasDist) {
     app.use(express.static(distPath));
   }
   
-  // Catch-all for SPA in production if dist exists or not
+  // Catch-all for SPA in production
   app.get("*", (req, res) => {
-    const indexPath = fs.existsSync(path.join(__dirname, "dist", "index.html"))
-      ? path.join(__dirname, "dist", "index.html")
-      : path.join(__dirname, "index.html");
+    const indexPath = fs.existsSync(path.join(distPath, "index.html"))
+      ? path.join(distPath, "index.html")
+      : fs.existsSync(path.join(__dirname, "index.html"))
+        ? path.join(__dirname, "index.html")
+        : null;
     
-    if (fs.existsSync(indexPath)) {
+    if (indexPath) {
       res.sendFile(indexPath);
     } else {
       res.status(200).send(`<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`);
