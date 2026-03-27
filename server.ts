@@ -1,95 +1,190 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+dotenv.config();
 
-  // API routes FIRST
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+console.log("🚀 Server starting...");
+
+const app = express();
+app.use(express.json());
+
+// Immediate Health Check for Vercel
+app.get("/api/health-check", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV,
+    vercel: process.env.VERCEL,
+    cwd: process.cwd()
   });
+});
 
-  // Proxy for Python Bot (if running locally or on same host)
-  app.post("/api/run-python-bot", async (req, res) => {
-    try {
-      // This assumes the python script is triggered via a shell command or another service
-      // For this environment, we'll simulate a successful trigger
-      res.json({ success: true, message: "Intelligence scan initiated." });
-    } catch (error) {
-      res.status(500).json({ success: false, error: String(error) });
-    }
-  });
+// API Routes
+app.get("/api/health", async (req, res) => {
+  try {
+    const { supabase } = await import("./src/services/supabase.js");
+    const { data, error } = await supabase.from('news_articles').select('id').limit(1);
+    if (error) throw error;
+    res.status(200).json({ status: "OK", database: "Connected", count: data.length });
+  } catch (err: any) {
+    console.error("[DEBUG] Health check database error:", err.message);
+    res.status(200).json({ status: "OK", database: "Error", message: err.message });
+  }
+});
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
+app.get("/api/news", async (req, res) => {
+  try {
+    const { supabase } = await import("./src/services/supabase.js");
+    const { data, error } = await supabase
+      .from("news_articles")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/news/:id", async (req, res) => {
+  try {
+    const { supabase } = await import("./src/services/supabase.js");
+    const { data, error } = await supabase
+      .from("news_articles")
+      .select("*")
+      .eq("id", req.params.id)
+      .maybeSingle();
+    if (error) throw error;
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Cron Handlers
+app.all("/api/cron/fetch-news", async (req, res) => {
+  try {
+    console.log("Cron trigger: Fetching news...");
+    const { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } = await import("./src/services/gemini.js");
+    const { saveNewsArticle } = await import("./src/services/news_articles.js");
     
-    // Custom middleware to inject OG tags into the HTML
-    app.use(async (req, res, next) => {
-      if (req.method !== 'GET' || req.path.includes('.') || req.path.startsWith('/api')) {
-        return next();
+    const rawNews = await fetchTopSaaSNews();
+    const stories = await parseNewsIntoStories(rawNews);
+    
+    if (stories && stories.length > 0) {
+      const story = stories[0];
+      const articleData = await generateArticle(story.title, story.snippet);
+      
+      const savedArticle = await saveNewsArticle({
+        ...articleData,
+        source: "SaaS Sentinel Intelligence",
+        readTime: "4 min read"
+      });
+
+      res.json({ success: true, article: savedArticle?.[0]?.title || "Saved" });
+    } else {
+      res.json({ success: true, message: "No new stories found." });
+    }
+  } catch (e: any) {
+    console.error("Cron Error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Production Route Registration
+if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
+  const distPath = path.resolve(__dirname, "dist");
+  
+  // 1. Handle all non-API paths for OG tag injection
+  app.get("*", async (req, res, next) => {
+    if (req.path.startsWith("/api/") || req.path.includes(".")) {
+      return next();
+    }
+
+    const articleQuery = req.query.article;
+    let articleId = "";
+    if (typeof articleQuery === "string") {
+      articleId = articleQuery;
+    } else if (Array.isArray(articleQuery)) {
+      articleId = String(articleQuery[0]);
+    } else if (req.path.startsWith("/article/")) {
+      articleId = req.path.split("/").pop() || "";
+    }
+
+    try {
+      const possiblePaths = [
+        path.join(process.cwd(), "dist", "index.html"),
+        path.join(process.cwd(), "index.html"),
+        path.join(__dirname, "dist", "index.html"),
+        path.join(__dirname, "index.html"),
+        "/var/task/dist/index.html",
+        "/var/task/index.html",
+      ];
+
+      let indexPath = "";
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          indexPath = p;
+          break;
+        }
       }
 
+      let html = "";
+      if (indexPath) {
+        html = fs.readFileSync(indexPath, "utf-8");
+      }
+
+      if (!html) {
+        html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
+      }
+
+      let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
+      let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis. SaaS Sentinel provides elite B2B market intelligence for founders and investors.";
+      let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
+      let ogUrl = "https://saas-sentinel-cyan.vercel.app";
+
       try {
-        let html = fs.readFileSync(path.resolve(__dirname, "index.html"), "utf-8");
-        html = await vite.transformIndexHtml(req.url, html);
+        const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
+        ogUrl = `${baseUrl.replace(/\/$/, '')}${req.originalUrl}`;
+      } catch (e) {}
 
-        const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
-        const articleId = urlParams.get('article');
-
-        let ogTitle = "SaaS Sentinel | Elite B2B Market Intelligence";
-        let ogDescription = "Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for founders, investors, and developers.";
-        let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-        let ogUrl = "https://saas-sentinel-cyan.vercel.app";
-
+      if (articleId && articleId !== "undefined" && articleId !== "null") {
         try {
-          const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
-          ogUrl = `${baseUrl.replace(/\/$/, '')}${req.originalUrl}`;
-        } catch (e) {}
+          const { fetchArticleById } = await import("./src/services/news_articles.js");
+          const article = await Promise.race([
+            fetchArticleById(articleId),
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
+          ]).catch(() => null);
 
-        if (articleId && articleId !== "undefined" && articleId !== "null") {
-          try {
-            const { fetchArticleById } = await import("./src/services/news_articles.js");
-            const article = await Promise.race([
-              fetchArticleById(articleId),
-              new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
-            ]).catch(() => null);
-
-            if (article && article.title) {
-              ogTitle = article.title;
-              ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : ogDescription);
-              if (article.image_url) {
-                ogImage = article.image_url;
-                // Ensure absolute URL
-                if (ogImage.startsWith('/')) {
-                  const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
-                  ogImage = `${baseUrl.replace(/\/$/, '')}${ogImage}`;
-                }
+          if (article && article.title) {
+            ogTitle = article.title;
+            ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : ogDescription);
+            if (article.image_url) {
+              ogImage = article.image_url;
+              // Ensure absolute URL
+              if (ogImage.startsWith('/')) {
+                const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
+                ogImage = `${baseUrl.replace(/\/$/, '')}${ogImage}`;
               }
             }
-          } catch (e) {
-            console.error("[DEBUG] Error fetching article for OG tags:", e);
           }
-        }
+        } catch (e) {}
+      }
 
-        // Remove existing tags to avoid conflicts (more robust regex)
-        html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
-        html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
-        html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
-        html = html.replace(/<title>[^<]*<\/title>/gi, '');
-        html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
+      // Remove existing tags to avoid conflicts (more robust regex)
+      html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
+      html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
+      html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
+      html = html.replace(/<title>[^<]*<\/title>/gi, '');
+      html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
 
-        const metaTags = `
+      const metaTags = `
     <title>${ogTitle}</title>
     <meta name="description" content="${ogDescription}" />
     <link rel="canonical" href="${ogUrl}" />
@@ -110,34 +205,47 @@ async function startServer() {
     <meta name="twitter:image" content="${ogImage}" />
 `;
 
-        if (html.includes('<head>')) {
-          html = html.replace('<head>', `<head>${metaTags}`);
-        } else {
-          html = html.replace('<html>', `<html><head>${metaTags}</head>`);
-        }
-        
-        // Add OG prefix to html tag for better compatibility
-        html = html.replace('<html', '<html prefix="og: http://ogp.me/ns#"');
-
-        res.status(200).set({ "Content-Type": "text/html" }).end(html);
-      } catch (e) {
-        vite.ssrFixStacktrace(e as Error);
-        next(e);
+      if (html.includes('<head>')) {
+        html = html.replace('<head>', `<head>${metaTags}`);
+      } else {
+        html = html.replace('<html>', `<html><head>${metaTags}</head>`);
       }
-    });
+      
+      // Add OG prefix to html tag for better compatibility
+      html = html.replace('<html', '<html prefix="og: http://ogp.me/ns#"');
 
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(html);
+    } catch (error: any) {
+      const minimalHtml = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(minimalHtml);
+    }
+  });
+
+  app.use(express.static(distPath));
+} else {
+  const { createServer: createViteServer } = await import("vite");
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: "spa",
+  });
+  app.use(vite.middlewares);
+}
+
+// Error Handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("🔥 Global Server Error:", err);
+  if (!res.headersSent) {
+    res.status(500).send(`Internal Server Error: ${err.message || "Unknown Error"}`);
   }
+});
 
+if (process.env.VERCEL !== "1") {
+  const PORT = 3000;
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 
-startServer();
+export default app;
