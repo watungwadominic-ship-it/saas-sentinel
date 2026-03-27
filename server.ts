@@ -153,15 +153,16 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
       let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis. SaaS Sentinel provides elite B2B market intelligence for founders and investors.";
       let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-      let ogUrl = `${baseUrl}${req.originalUrl}`;
+      let ogUrl = `${baseUrl}${req.path}`;
+      if (articleId) ogUrl += `?article=${articleId}`;
 
       if (articleId && articleId !== "undefined" && articleId !== "null") {
         try {
           const { fetchArticleById } = await import("./src/services/news_articles.js");
-          // Increased timeout to 8s to handle cold starts better
+          // Increased timeout to 10s to handle cold starts better
           const article = await Promise.race([
             fetchArticleById(articleId),
-            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000))
           ]).catch((err) => {
             console.error(`[DEBUG] Article fetch failed or timed out for ID ${articleId}:`, err);
             return null;
@@ -196,6 +197,7 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     <meta property="og:description" content="${ogDescription}" />
     <meta property="og:image" content="${ogImage}" />
     <meta property="og:image:secure_url" content="${ogImage}" />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="${ogTitle}" />
@@ -206,6 +208,9 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     <meta name="twitter:title" content="${ogTitle}" />
     <meta name="twitter:description" content="${ogDescription}" />
     <meta name="twitter:image" content="${ogImage}" />
+    <meta itemprop="name" content="${ogTitle}" />
+    <meta itemprop="description" content="${ogDescription}" />
+    <meta itemprop="image" content="${ogImage}" />
 `;
 
       // Extremely aggressive removal of existing meta/title/canonical tags
