@@ -111,11 +111,13 @@ app.use(async (req, res, next) => {
   // Log all requests to help debug bot traffic and redirects
   const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
-  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget/i.test(userAgent) || 
+  // Added LinkedInBot explicitly and made it more comprehensive
+  const isBot = /bot|googlebot|linkedin|linkedinbot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget/i.test(userAgent) || 
                 req.headers['x-linkedin-id'] !== undefined;
+  const isCookieCheck = req.path.includes("_cookie_check");
 
-  if (isBot || req.path.includes("_cookie_check")) {
-    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Agent: ${userAgent} | Accept: ${accept}`);
+  if (isBot || isCookieCheck) {
+    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | CookieCheck: ${isCookieCheck} | Agent: ${userAgent}`);
   }
 
   // Only handle GET and HEAD requests for HTML/OG tags
@@ -128,14 +130,14 @@ app.use(async (req, res, next) => {
     return next();
   }
 
-  // Skip static assets (requests with extensions) UNLESS it's a bot
-  // Bots should get the HTML even if they hit a weird URL
-  if (req.path.includes(".") && !isBot) {
+  // Skip static assets (requests with extensions) UNLESS it's a bot OR a cookie check
+  // Bots and cookie checks should get the HTML even if they hit a weird URL
+  if (req.path.includes(".") && !isBot && !isCookieCheck) {
     return next();
   }
 
   // Handle HTML requests, bot requests, or any path without an extension
-  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot || req.path.includes("_cookie_check");
+  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot || isCookieCheck;
   const articleQuery = req.query.article;
   const returnUrl = req.query.return_url;
   const pathParts = req.path.split("/").filter(Boolean);
@@ -147,11 +149,13 @@ app.use(async (req, res, next) => {
     articleId = String(articleQuery[0]);
   } else if (req.path.startsWith("/article/") && pathParts.length > 0) {
     articleId = pathParts[pathParts.length - 1];
-  } else if (typeof returnUrl === "string" && returnUrl.includes("article=")) {
+  } else if (typeof returnUrl === "string" && (returnUrl.includes("article=") || returnUrl.includes("article%3D"))) {
     // Extract article ID from return_url (happens during infrastructure cookie checks)
-    const match = returnUrl.match(/[?&]article=([^&]+)/);
+    // Handle both decoded and encoded versions
+    const decodedReturnUrl = decodeURIComponent(returnUrl);
+    const match = decodedReturnUrl.match(/[?&]article=([^&]+)/);
     if (match) {
-      articleId = match[1];
+      articleId = match[1].split(/[?#\s\\]/)[0]; // Clean up any trailing junk
       console.log(`[DEBUG] Extracted articleId ${articleId} from return_url`);
     }
   }
@@ -208,8 +212,16 @@ app.use(async (req, res, next) => {
     // Use the full URL including query parameters for og:url
     // If we're in a cookie check, reconstruct the original intended URL
     let ogUrl = `${finalBaseUrl}${req.originalUrl}`;
-    if (req.path.includes("_cookie_check") && typeof returnUrl === "string") {
-      ogUrl = returnUrl;
+    if (isCookieCheck && typeof returnUrl === "string") {
+      try {
+        ogUrl = decodeURIComponent(returnUrl).split(/[\s\\]/)[0];
+        // Ensure it's an absolute URL
+        if (ogUrl.startsWith('/')) {
+          ogUrl = `${finalBaseUrl}${ogUrl}`;
+        }
+      } catch (e) {
+        ogUrl = returnUrl;
+      }
     }
 
     if (isBot) {
