@@ -38,6 +38,8 @@ def post_to_linkedin(text, title, url, summary=None):
         cache_buster = int(datetime.now().timestamp())
         final_url = f"{url}&t={cache_buster}"
         
+        print(f"🔗 Sharing URL: {final_url}")
+        
         # We explicitly include the 'content' block with 'article' source. 
         # This is the most reliable way to trigger a link preview with an image.
         post_data = {
@@ -203,7 +205,7 @@ def run_news_bot():
             
             # 5. Social Media Output
             # Construct the deep link to your site
-            app_url = os.getenv("APP_URL", "https://saas-sentinel-cyan.vercel.app")
+            app_url = os.getenv("APP_URL", "https://ais-dev-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app")
             article_url = f"{app_url}/?article={article_id}" if article_id else f"{app_url}/"
             
             display_summary = summary_text[:200] if summary_text else ""
