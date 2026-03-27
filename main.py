@@ -13,7 +13,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN")
 LINKEDIN_PERSON_URN = os.getenv("LINKEDIN_PERSON_URN")
 
-def post_to_linkedin(text, title, url, image_url=None):
+def post_to_linkedin(text, title, url, summary):
     if not all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]):
         print("⏭️ Skipping LinkedIn: Credentials missing.")
         return
@@ -25,6 +25,8 @@ def post_to_linkedin(text, title, url, image_url=None):
             "X-Restli-Protocol-Version": "2.0.0"
         }
         
+        # Using the 'content' block with an 'article' source is the most reliable 
+        # way to trigger a link preview with an image.
         post_data = {
             "author": LINKEDIN_PERSON_URN,
             "commentary": text,
@@ -33,6 +35,13 @@ def post_to_linkedin(text, title, url, image_url=None):
                 "feedDistribution": "MAIN_FEED",
                 "targetEntities": [],
                 "thirdPartyDistributionChannels": []
+            },
+            "content": {
+                "article": {
+                    "source": url,
+                    "title": title,
+                    "description": summary[:200]
+                }
             },
             "lifecycleState": "PUBLISHED",
             "isReshareDisabledByAuthor": False
@@ -45,6 +54,20 @@ def post_to_linkedin(text, title, url, image_url=None):
     except Exception as e:
         print(f"❌ LinkedIn Error: {e}")
 
+def is_relevant_saas_news(client, title, description):
+    """Uses AI to filter out non-SaaS/B2B news."""
+    try:
+        prompt = f"Is the following news story specifically about B2B SaaS, Enterprise Software, or Cloud Infrastructure? Answer with ONLY 'YES' or 'NO'.\n\nTitle: {title}\nDescription: {description}"
+        completion = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        answer = completion.choices[0].message.content.strip().upper()
+        return "YES" in answer
+    except:
+        return True # Default to true if AI check fails
+
 def run_news_bot():
     print("🚀 SaaS Sentinel: Initiating Elite Market Intelligence Scan...")
     
@@ -54,23 +77,33 @@ def run_news_bot():
         
     client = Groq(api_key=GROQ_API_KEY)
 
-    # 1. Fetch News
-    news_url = f"https://newsapi.org/v2/everything?q=SaaS+OR+B2B+Software+OR+Venture+Capital&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
+    # 1. Fetch News - Refined query to be more specific
+    search_query = '("B2B SaaS" OR "Enterprise AI" OR "Cloud Infrastructure" OR "SaaS Funding")'
+    news_url = f"https://newsapi.org/v2/everything?q={search_query}&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
+    
     try:
         news_response = requests.get(news_url)
         news_data = news_response.json()
-        articles = news_data.get("articles", [])[:5] 
+        articles = news_data.get("articles", [])[:10] 
     except Exception as e:
         print(f"❌ NewsAPI Error: {e}")
         return
 
     processed_count = 0
     for latest in articles:
+        if processed_count >= 3: break # Limit to 3 high-quality posts
+
         title = latest.get("title")
         url = latest.get("url")
+        description = latest.get("description", "")
         image_url = latest.get("urlToImage")
         
         if not title or not url or "[Removed]" in title: continue
+
+        # RELEVANCE FILTER
+        if not is_relevant_saas_news(client, title, description):
+            print(f"⏭️ Skipping (Irrelevant): {title[:40]}...")
+            continue
 
         headers = {
             "apikey": SUPABASE_KEY,
@@ -93,22 +126,18 @@ def run_news_bot():
             try:
                 completion = client.chat.completions.create(
                     model="llama-3.1-8b-instant",
-                    temperature=0.5, # Lower temperature for better JSON compliance
+                    temperature=0.5,
                     messages=[
                         {
                             "role": "system", 
-                            "content": "You are a SaaS Market Analyst. You MUST return a flat JSON object. Do NOT use nested objects or lists for values. All values must be strings."
+                            "content": "You are a SaaS Market Analyst. Return a flat JSON object with string values only."
                         },
                         {
                             "role": "user", 
                             "content": (
                                 f"News: {title}\n"
-                                f"Context: {latest.get('description', '')}\n\n"
-                                "Return JSON with these exact keys: \n"
-                                "1. 'feed_summary': A string (100 words).\n"
-                                "2. 'strategic_analysis': A single string containing 3 paragraphs.\n"
-                                "3. 'impact': 'High', 'Medium', or 'Low'.\n"
-                                "4. 'sentiment': 'BULLISH', 'BEARISH', or 'NEUTRAL'."
+                                f"Context: {description}\n\n"
+                                "Return JSON: {'feed_summary': '...', 'strategic_analysis': '...', 'impact': 'High/Medium/Low', 'sentiment': 'BULLISH/BEARISH/NEUTRAL'}"
                             )
                         }
                     ],
@@ -121,13 +150,7 @@ def run_news_bot():
 
         if not ai_data: continue
 
-        # Safety check: If AI returned a dictionary for analysis, flatten it
-        analysis_raw = ai_data.get('strategic_analysis', "")
-        if isinstance(analysis_raw, dict):
-            analysis_text = " ".join([str(v) for v in analysis_raw.values()])
-        else:
-            analysis_text = str(analysis_raw)
-
+        analysis_text = str(ai_data.get('strategic_analysis', ""))
         summary_text = str(ai_data.get('feed_summary', ""))
         
         payload = {
@@ -156,10 +179,9 @@ def run_news_bot():
             app_url = os.getenv("APP_URL", "https://saas-sentinel-cyan.vercel.app")
             article_url = f"{app_url}/?article={article_id}" if article_id else f"{app_url}/"
             
-            display_summary = summary_text[:150] if summary_text else ""
-            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more: {article_url}\n\n#SaaS #AI #MarketIntel"
+            social_text = f"📡 SaaS Intelligence: {title}\n\n{summary_text[:150]}...\n\nRead the full analysis: {article_url}\n\n#SaaS #B2B #MarketIntelligence"
             
-            post_to_linkedin(social_text, title, article_url, image_url)
+            post_to_linkedin(social_text, title, article_url, summary_text)
             processed_count += 1
         except Exception as e:
             print(f"❌ Supabase Save Error: {e}")
