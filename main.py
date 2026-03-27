@@ -205,7 +205,8 @@ def run_news_bot():
             
             # 5. Social Media Output
             # Construct the deep link to your site
-            app_url = os.getenv("APP_URL", "https://ais-dev-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app")
+            # Use the Shared App URL (ais-pre) for social sharing to bypass dev-environment cookie checks
+            app_url = os.getenv("APP_URL", "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app")
             article_url = f"{app_url}/?article={article_id}" if article_id else f"{app_url}/"
             
             display_summary = summary_text[:200] if summary_text else ""
