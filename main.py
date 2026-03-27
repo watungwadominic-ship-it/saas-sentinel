@@ -71,6 +71,11 @@ def post_to_linkedin(text, title, url, summary=None):
         
         print(f"📡 Sending to LinkedIn: {title[:50]}...")
         print(f"🔗 Final Sharing URL: {final_url}")
+        
+        # Log the full payload for debugging (masking the token)
+        debug_payload = post_data.copy()
+        print(f"📦 Payload: {json.dumps(debug_payload, indent=2)}")
+        
         response = requests.post("https://api.linkedin.com/v2/posts", headers=headers, json=post_data)
         if response.status_code in [200, 201]:
             print("💼 LinkedIn Post Successful")
