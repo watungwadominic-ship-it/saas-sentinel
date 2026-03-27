@@ -43,6 +43,7 @@ def post_to_linkedin(text, title, url, summary=None):
         
         # We explicitly include the 'content' block with 'article' source. 
         # This is the most reliable way to trigger a link preview with an image.
+        # We also add 'thumbnail' which some versions of the API use as a hint.
         post_data = {
             "author": LINKEDIN_PERSON_URN,
             "commentary": text.replace(url, final_url),
@@ -56,7 +57,8 @@ def post_to_linkedin(text, title, url, summary=None):
                 "article": {
                     "source": final_url,
                     "title": title,
-                    "description": (summary or title)[:250].ljust(100)
+                    "description": (summary or title)[:250].ljust(100),
+                    "thumbnail": (summary or title)[:250] # Some API versions use this
                 }
             },
             "lifecycleState": "PUBLISHED",
@@ -64,14 +66,17 @@ def post_to_linkedin(text, title, url, summary=None):
         }
         
         # Small delay to ensure Supabase is fully synced and server is ready
-        # Increased to 8s to handle Vercel cold starts and database sync better
-        time.sleep(8)
+        # Increased to 15s to handle Vercel cold starts and database sync better
+        print(f"⏳ Waiting 15s for database sync and server readiness...")
+        time.sleep(15)
         
+        print(f"📡 Sending to LinkedIn: {title[:50]}...")
+        print(f"🔗 Final Sharing URL: {final_url}")
         response = requests.post("https://api.linkedin.com/v2/posts", headers=headers, json=post_data)
         if response.status_code in [200, 201]:
             print("💼 LinkedIn Post Successful")
         else:
-            print(f"❌ LinkedIn Error: {response.text}")
+            print(f"❌ LinkedIn Error {response.status_code}: {response.text}")
     except Exception as e:
         print(f"❌ LinkedIn Error: {e}")
 
@@ -180,7 +185,12 @@ def run_news_bot():
         # 4. Save to Supabase
         # Mapping the AI fields to the database schema
         summary_text = str(ai_data.get('feed_summary', ""))
-        image_url = latest.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000"
+        image_url = latest.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200"
+        
+        # Fix protocol-relative URLs
+        if image_url and image_url.startswith('//'):
+            image_url = f"https:{image_url}"
+            
         payload = {
             "title": title,
             "summary": summary_text,
