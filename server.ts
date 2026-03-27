@@ -157,10 +157,14 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
       if (articleId && articleId !== "undefined" && articleId !== "null") {
         try {
           const { fetchArticleById } = await import("./src/services/news_articles.js");
+          // Increased timeout to 8s to handle cold starts better
           const article = await Promise.race([
             fetchArticleById(articleId),
-            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
-          ]).catch(() => null);
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
+          ]).catch((err) => {
+            console.error(`[DEBUG] Article fetch failed or timed out for ID ${articleId}:`, err);
+            return null;
+          });
 
           if (article && article.title) {
             ogTitle = article.title;
@@ -181,13 +185,6 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
         }
       }
 
-      // Extremely aggressive removal of existing meta/title/canonical tags
-      html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
-      html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
-      html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
-      html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
-      html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
-
       const metaTags = `
     <title>${ogTitle}</title>
     <meta name="description" content="${ogDescription}" />
@@ -196,9 +193,7 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     <meta property="og:description" content="${ogDescription}" />
     <meta property="og:image" content="${ogImage}" />
     <meta property="og:image:secure_url" content="${ogImage}" />
-    <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${ogTitle}" />
     <meta property="og:url" content="${ogUrl}" />
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="SaaS Sentinel" />
@@ -208,22 +203,29 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     <meta name="twitter:image" content="${ogImage}" />
 `;
 
-      if (html.includes('<head>')) {
-        // Inject at the very beginning of <head> for fastest scraper discovery
-        html = html.replace('<head>', `<head>${metaTags}`);
+      // Extremely aggressive removal of existing meta/title/canonical tags
+      html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
+      html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
+      html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
+      html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
+      html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
+
+      // Inject meta tags. We use a more robust replacement that handles attributes on <head>
+      if (/<head[^>]*>/i.test(html)) {
+        html = html.replace(/(<head[^>]*>)/i, `$1${metaTags}`);
+      } else if (/<html[^>]*>/i.test(html)) {
+        html = html.replace(/(<html[^>]*>)/i, `$1<head>${metaTags}</head>`);
       } else {
-        html = html.replace('<html', `<html prefix="og: http://ogp.me/ns#"><head>${metaTags}</head>`);
+        html = `<head>${metaTags}</head>${html}`;
       }
       
-      // Ensure the html tag has the OG prefix
+      // Ensure the html tag has the OG prefix for better compatibility
       if (!html.includes('prefix="og:')) {
-        html = html.replace('<html', '<html prefix="og: http://ogp.me/ns#"');
+        html = html.replace(/<html/i, '<html prefix="og: http://ogp.me/ns#"');
       }
-      
-      // Add OG prefix to html tag for better compatibility
-      html = html.replace('<html', '<html prefix="og: http://ogp.me/ns#"');
 
       res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
       return res.status(200).send(html);
     } catch (error: any) {
       const minimalHtml = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
