@@ -57,8 +57,7 @@ def post_to_linkedin(text, title, url, summary=None):
                 "article": {
                     "source": final_url,
                     "title": title,
-                    "description": (summary or title)[:250].ljust(100),
-                    "thumbnail": (summary or title)[:250] # Some API versions use this
+                    "description": (summary or title)[:250].ljust(100)
                 }
             },
             "lifecycleState": "PUBLISHED",
