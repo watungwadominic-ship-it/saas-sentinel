@@ -99,28 +99,37 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 
 // OG Tag Injection Middleware
 app.get("*", async (req, res, next) => {
-  console.log(`[DEBUG] Handling request for ${req.path} with query ${JSON.stringify(req.query)}`);
-  // Skip API routes and static assets
-  if (req.path.startsWith("/api/") || req.path.includes(".")) {
-    return next();
-  }
-
-  // Only handle HTML requests (or requests without an extension)
+  const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
-  if (!accept.includes("text/html") && req.path !== "/") {
-    // If it's not a browser/scraper request, let it pass to static/vite
+  const isBot = /bot|googlebot|linkedinbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot/i.test(userAgent);
+  
+  console.log(`[DEBUG] [${new Date().toISOString()}] Request: ${req.method} ${req.originalUrl}`);
+  console.log(`[DEBUG] User-Agent: ${userAgent}`);
+  console.log(`[DEBUG] Accept: ${accept}`);
+  console.log(`[DEBUG] IsBot: ${isBot}`);
+
+  // Skip API routes and static assets (requests with extensions)
+  if (req.path.startsWith("/api/") || (req.path.includes(".") && !isBot)) {
     return next();
   }
 
+  // Handle HTML requests, bot requests, or the root path
+  const isHtmlRequest = accept.includes("text/html") || req.path === "/" || isBot;
   const articleQuery = req.query.article;
   const pathParts = req.path.split("/").filter(Boolean);
   let articleId = "";
+  
   if (typeof articleQuery === "string") {
     articleId = articleQuery;
   } else if (Array.isArray(articleQuery)) {
     articleId = String(articleQuery[0]);
   } else if (req.path.startsWith("/article/") && pathParts.length > 0) {
     articleId = pathParts[pathParts.length - 1];
+  }
+
+  // If it's not an HTML/bot request and not an article request, let it pass
+  if (!isHtmlRequest && !articleId) {
+    return next();
   }
 
   try {
@@ -253,7 +262,22 @@ app.get("*", async (req, res, next) => {
 // Production Route Registration
 if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   const distPath = path.resolve(__dirname, "dist");
-  app.use(express.static(distPath));
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+  }
+  
+  // Catch-all for SPA in production if dist exists or not
+  app.get("*", (req, res) => {
+    const indexPath = fs.existsSync(path.join(__dirname, "dist", "index.html"))
+      ? path.join(__dirname, "dist", "index.html")
+      : path.join(__dirname, "index.html");
+    
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(200).send(`<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`);
+    }
+  });
 } else {
   const { createServer: createViteServer } = await import("vite");
   const vite = await createViteServer({
