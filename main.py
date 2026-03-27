@@ -227,7 +227,8 @@ def run_news_bot():
             article_url = f"{app_url}/?article={article_id}" if article_id else f"{app_url}/"
             
             display_summary = summary_text[:200] if summary_text else ""
-            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url}\n\n#SaaS #AI #MarketIntel"
+            # Ensure there is a space after the URL to prevent social media scrapers from including trailing characters
+            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url} \n\n#SaaS #AI #MarketIntel"
             
             post_to_linkedin(social_text, title, article_url, summary_text)
 
