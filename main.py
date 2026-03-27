@@ -1,22 +1,17 @@
 import os
-import json
 import requests
-from groq import Groq
-from datetime import datetime, timedelta
+import json
 import random
-import time
+from datetime import datetime
+from groq import Groq
 
-# 1. Configuration
-# Ensure these are set in your environment or .env file
-# GROQ_API_KEY: Get yours at https://console.groq.com/keys
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
-
-# Social Media Credentials
-LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
-LINKEDIN_PERSON_URN = os.environ.get("LINKEDIN_PERSON_URN")
+# Configuration from Environment Variables
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN")
+LINKEDIN_PERSON_URN = os.getenv("LINKEDIN_PERSON_URN")
 
 def post_to_linkedin(text, title, url, image_url=None):
     if not all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]):
@@ -31,12 +26,6 @@ def post_to_linkedin(text, title, url, image_url=None):
             "X-Restli-Protocol-Version": "2.0.0"
         }
         
-        article_content = {
-            "source": url,
-            "title": title,
-            "description": text[:200]
-        }
-
         post_data = {
             "author": LINKEDIN_PERSON_URN,
             "commentary": text,
@@ -47,7 +36,12 @@ def post_to_linkedin(text, title, url, image_url=None):
                 "thirdPartyDistributionChannels": []
             },
             "content": {
-                "article": article_content
+                "article": {
+                    "source": url,
+                    "title": title,
+                    "description": text[:200],
+                    "thumbnail": image_url if image_url else "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop"
+                }
             },
             "lifecycleState": "PUBLISHED",
             "isReshareDisabledByAuthor": False
@@ -67,45 +61,30 @@ def run_news_bot():
     if not GROQ_API_KEY:
         print("❌ Error: GROQ_API_KEY is not set.")
         return
+        
     client = Groq(api_key=GROQ_API_KEY)
 
-    now = datetime.now()
-    # Fetch news from the last 2 days
-    start_date = (now - timedelta(days=2)).strftime('%Y-%m-%d')
-
-    # 2. Fetch News
-    # Broad query for SaaS and Enterprise AI
-    search_query = 'B2B SaaS OR "Enterprise AI" OR "SaaS Architecture" OR "Cloud Infrastructure"'
-    params = {
-        "q": search_query, 
-        "from": start_date, 
-        "language": "en", 
-        "sortBy": "relevancy", 
-        "apiKey": NEWS_API_KEY
-    }
-    
+    # 1. Fetch News
+    news_url = f"https://newsapi.org/v2/everything?q=SaaS+OR+B2B+Software+OR+Venture+Capital&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
     try:
-        response = requests.get("https://newsapi.org/v2/everything", params=params)
-        response.raise_for_status()
-        articles = response.json().get('articles', [])
-        print(f"📡 Found {len(articles)} potential intelligence sources.")
+        news_response = requests.get(news_url)
+        news_data = news_response.json()
+        articles = news_data.get("articles", [])[:5] # Process top 5
     except Exception as e:
         print(f"❌ NewsAPI Error: {e}")
         return
 
-    # Process top 5 articles to find the most relevant ones
     processed_count = 0
-    for latest in articles[:10]:
-        if processed_count >= 3: # Limit to 3 fresh insights per run
-            break
+    for latest in articles:
+        title = latest.get("title")
+        url = latest.get("url")
+        image_url = latest.get("urlToImage")
+        
+        if not title or not url: continue
 
-        title = latest['title']
-        if not title or "[Removed]" in title:
-            continue
-            
-        # Duplicate Check
+        # 2. Check for Duplicates in Supabase
         headers = {
-            "apikey": SUPABASE_KEY, 
+            "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}", 
             "Content-Type": "application/json"
         }
@@ -158,34 +137,22 @@ def run_news_bot():
                     ],
                     response_format={"type": "json_object"}
                 )
-                
                 ai_data = json.loads(completion.choices[0].message.content)
-                break 
-                
+                break
             except Exception as e:
-                print(f"⚠️ AI Attempt {attempt+1} failed: {e}")
-                time.sleep(2)
-        
-        if not ai_data:
-            print(f"❌ Failed to generate AI analysis for: {title}")
-            continue
+                print(f"🔄 AI Attempt {attempt+1} failed: {e}")
 
-        # Clean and format the analysis content
-        raw_analysis = ai_data.get('strategic_analysis', "")
-        if isinstance(raw_analysis, dict):
-            # If the AI returns a dict instead of a string, join the values
-            clean_analysis = "\n\n".join([str(v) for v in raw_analysis.values()])
-        else:
-            clean_analysis = str(raw_analysis)
+        if not ai_data: continue
 
         # 4. Save to Supabase
-        # Mapping the AI fields to the database schema
-        summary_text = str(ai_data.get('feed_summary', ""))
-        image_url = latest.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000"
+        summary_text = ai_data.get('feed_summary')
+        analysis_text = ai_data.get('strategic_analysis')
+        
         payload = {
             "title": title,
             "summary": summary_text,
-            "analysis_content": clean_analysis.strip(), 
+            "content": analysis_text,
+            "analysis_content": analysis_text,
             "confidence_score": random.randint(95, 99),
             "strategic_impact": ai_data.get('impact', 'High'),
             "category": ai_data.get('sentiment', 'BULLISH'), 
