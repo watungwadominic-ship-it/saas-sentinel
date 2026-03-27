@@ -108,19 +108,19 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 
 // OG Tag Injection Middleware
 app.use(async (req, res, next) => {
+  // Log all requests to help debug bot traffic and redirects
+  const userAgent = req.headers["user-agent"] || "";
+  const accept = req.headers.accept || "";
+  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget/i.test(userAgent) || 
+                req.headers['x-linkedin-id'] !== undefined;
+
+  if (isBot || req.path.includes("_cookie_check")) {
+    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Agent: ${userAgent} | Accept: ${accept}`);
+  }
+
   // Only handle GET and HEAD requests for HTML/OG tags
   if (req.method !== "GET" && req.method !== "HEAD") {
     return next();
-  }
-
-  const userAgent = req.headers["user-agent"] || "";
-  const accept = req.headers.accept || "";
-  // More inclusive bot detection
-  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget/i.test(userAgent) || 
-                req.headers['x-linkedin-id'] !== undefined;
-  
-  if (isBot) {
-    console.log(`[BOT-DETECTED] [${new Date().toISOString()}] Agent: ${userAgent} | Path: ${req.originalUrl}`);
   }
 
   // Skip API routes
@@ -203,7 +203,7 @@ app.use(async (req, res, next) => {
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
     const sharedAppUrl = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
-    const finalBaseUrl = sharedAppUrl || baseUrl;
+    const finalBaseUrl = sharedAppUrl;
     
     // Use the full URL including query parameters for og:url
     // If we're in a cookie check, reconstruct the original intended URL
@@ -213,7 +213,7 @@ app.use(async (req, res, next) => {
     }
 
     if (isBot) {
-      console.log(`[BOT-OG] BaseURL: ${finalBaseUrl} | OgURL: ${ogUrl} | ArticleID: ${articleId}`);
+      console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | OgURL: ${ogUrl} | ArticleID: ${articleId}`);
     }
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
@@ -234,15 +234,16 @@ app.use(async (req, res, next) => {
           ogDescription = (summary.length > 100 ? summary : (summary + " " + ogDescription)).substring(0, 200);
           
           if (article.image_url) {
-            let img = article.image_url;
+            let img = article.image_url.trim();
             if (img.startsWith('//')) {
               ogImage = `https:${img}`;
-            } else if (!img.startsWith('http')) {
+            } else if (img.startsWith('http')) {
+              ogImage = img;
+            } else {
+              // Handle relative paths
               const cleanBase = finalBaseUrl.replace(/\/$/, '');
               const cleanImage = img.startsWith('/') ? img : `/${img}`;
               ogImage = `${cleanBase}${cleanImage}`;
-            } else {
-              ogImage = img;
             }
           }
           console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
@@ -266,7 +267,7 @@ app.use(async (req, res, next) => {
   <meta property="og:image:secure_url" content="${ogImage}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:alt" content="${ogTitle}" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="SaaS Sentinel" />
