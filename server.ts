@@ -164,33 +164,34 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 
           if (article && article.title) {
             ogTitle = article.title;
-            ogDescription = article.summary || (article.content ? article.content.substring(0, 160) : ogDescription);
+            const summary = article.summary || (article.content ? article.content.substring(0, 200) : "");
+            // LinkedIn prefers descriptions > 100 chars
+            ogDescription = summary.length > 100 ? summary : (summary + " " + ogDescription).substring(0, 200);
+            
             if (article.image_url) {
               ogImage = article.image_url;
-              // Ensure absolute URL
               if (ogImage.startsWith('/')) {
                 const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
                 ogImage = `${baseUrl.replace(/\/$/, '')}${ogImage}`;
               }
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error("[DEBUG] Error fetching article for OG tags:", e);
+        }
       }
 
-      // Remove existing tags to avoid conflicts (more robust regex)
+      // Extremely aggressive removal of existing meta/title/canonical tags
+      html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
       html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
       html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
       html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
-      html = html.replace(/<title>[^<]*<\/title>/gi, '');
       html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
 
       const metaTags = `
     <title>${ogTitle}</title>
     <meta name="description" content="${ogDescription}" />
     <link rel="canonical" href="${ogUrl}" />
-    <meta property="og:type" content="article" />
-    <meta property="og:site_name" content="SaaS Sentinel" />
-    <meta property="og:url" content="${ogUrl}" />
     <meta property="og:title" content="${ogTitle}" />
     <meta property="og:description" content="${ogDescription}" />
     <meta property="og:image" content="${ogImage}" />
@@ -198,7 +199,9 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="${ogTitle}" />
+    <meta property="og:url" content="${ogUrl}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="SaaS Sentinel" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${ogTitle}" />
     <meta name="twitter:description" content="${ogDescription}" />
@@ -206,9 +209,15 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
 `;
 
       if (html.includes('<head>')) {
+        // Inject at the very beginning of <head> for fastest scraper discovery
         html = html.replace('<head>', `<head>${metaTags}`);
       } else {
-        html = html.replace('<html>', `<html><head>${metaTags}</head>`);
+        html = html.replace('<html', `<html prefix="og: http://ogp.me/ns#"><head>${metaTags}</head>`);
+      }
+      
+      // Ensure the html tag has the OG prefix
+      if (!html.includes('prefix="og:')) {
+        html = html.replace('<html', '<html prefix="og: http://ogp.me/ns#"');
       }
       
       // Add OG prefix to html tag for better compatibility
