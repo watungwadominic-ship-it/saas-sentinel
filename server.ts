@@ -97,153 +97,162 @@ app.all("/api/cron/fetch-news", async (req, res) => {
   }
 });
 
+// OG Tag Injection Middleware
+app.get("*", async (req, res, next) => {
+  console.log(`[DEBUG] Handling request for ${req.path} with query ${JSON.stringify(req.query)}`);
+  // Skip API routes and static assets
+  if (req.path.startsWith("/api/") || req.path.includes(".")) {
+    return next();
+  }
+
+  // Only handle HTML requests (or requests without an extension)
+  const accept = req.headers.accept || "";
+  if (!accept.includes("text/html") && req.path !== "/") {
+    // If it's not a browser/scraper request, let it pass to static/vite
+    return next();
+  }
+
+  const articleQuery = req.query.article;
+  const pathParts = req.path.split("/").filter(Boolean);
+  let articleId = "";
+  if (typeof articleQuery === "string") {
+    articleId = articleQuery;
+  } else if (Array.isArray(articleQuery)) {
+    articleId = String(articleQuery[0]);
+  } else if (req.path.startsWith("/article/") && pathParts.length > 0) {
+    articleId = pathParts[pathParts.length - 1];
+  }
+
+  try {
+    const possiblePaths = [
+      path.join(process.cwd(), "dist", "index.html"),
+      path.join(process.cwd(), "index.html"),
+      path.join(__dirname, "dist", "index.html"),
+      path.join(__dirname, "index.html"),
+      "/var/task/dist/index.html",
+      "/var/task/index.html",
+    ];
+
+    let indexPath = "";
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        indexPath = p;
+        break;
+      }
+    }
+
+    let html = "";
+    if (indexPath) {
+      html = fs.readFileSync(indexPath, "utf-8");
+    }
+
+    if (!html) {
+      html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
+    }
+
+    // Determine the base URL dynamically from the request
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+    
+    let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
+    let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis. SaaS Sentinel provides elite B2B market intelligence for founders and investors.";
+    let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
+    let ogUrl = `${baseUrl}${req.path}`;
+    if (articleId) ogUrl += `?article=${articleId}`;
+
+    if (articleId && articleId !== "undefined" && articleId !== "null") {
+      try {
+        const { fetchArticleById } = await import("./src/services/news_articles.js");
+        // Increased timeout to 10s to handle cold starts better
+        const article = await Promise.race([
+          fetchArticleById(articleId),
+          new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000))
+        ]).catch((err) => {
+          console.error(`[DEBUG] Article fetch failed or timed out for ID ${articleId}:`, err);
+          return null;
+        });
+
+        if (article && article.title) {
+          ogTitle = article.title;
+          const summary = article.summary || (article.content ? article.content.substring(0, 200) : "");
+          // LinkedIn prefers descriptions > 100 chars
+          ogDescription = (summary.length > 100 ? summary : (summary + " " + ogDescription)).substring(0, 200);
+          
+          if (article.image_url) {
+            ogImage = article.image_url;
+            if (!ogImage.startsWith('http')) {
+              const cleanBase = baseUrl.replace(/\/$/, '');
+              const cleanImage = ogImage.startsWith('/') ? ogImage : `/${ogImage}`;
+              ogImage = `${cleanBase}${cleanImage}`;
+            }
+          }
+          console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}", URL="${ogUrl}"`);
+        }
+      } catch (e) {
+        console.error("[DEBUG] Error fetching article for OG tags:", e);
+      }
+    }
+
+    const metaTags = `
+  <title>${ogTitle}</title>
+  <meta name="description" content="${ogDescription}" />
+  <link rel="canonical" href="${ogUrl}" />
+  <meta property="og:title" content="${ogTitle}" />
+  <meta property="og:description" content="${ogDescription}" />
+  <meta property="og:image" content="${ogImage}" />
+  <meta property="og:image:secure_url" content="${ogImage}" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="${ogTitle}" />
+  <meta property="og:url" content="${ogUrl}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="SaaS Sentinel" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${ogTitle}" />
+  <meta name="twitter:description" content="${ogDescription}" />
+  <meta name="twitter:image" content="${ogImage}" />
+  <meta itemprop="name" content="${ogTitle}" />
+  <meta itemprop="description" content="${ogDescription}" />
+  <meta itemprop="image" content="${ogImage}" />
+`;
+
+    // Extremely aggressive removal of existing meta/title/canonical tags
+    html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
+    html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
+    html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
+    html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
+    html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
+
+    // Inject meta tags. We use a more robust replacement that handles attributes on <head>
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/(<head[^>]*>)/i, `$1${metaTags}`);
+    } else if (/<html[^>]*>/i.test(html)) {
+      html = html.replace(/(<html[^>]*>)/i, `$1<head>${metaTags}</head>`);
+    } else {
+      html = `<head>${metaTags}</head>${html}`;
+    }
+    
+    // Ensure the html tag has the OG prefix for better compatibility
+    if (!html.includes('prefix="og:')) {
+      html = html.replace(/<html/i, '<html prefix="og: http://ogp.me/ns#"');
+    }
+
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    return res.status(200).send(html);
+  } catch (error: any) {
+    console.error("[DEBUG] Error in OG tag injection:", error);
+    const minimalHtml = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
+    res.setHeader('Content-Type', 'text/html');
+    return res.status(200).send(minimalHtml);
+  }
+});
+
 // Production Route Registration
 if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
   const distPath = path.resolve(__dirname, "dist");
-  
-  // 1. Handle all non-API paths for OG tag injection
-  app.get("*", async (req, res, next) => {
-    if (req.path.startsWith("/api/") || req.path.includes(".")) {
-      return next();
-    }
-
-    const articleQuery = req.query.article;
-    const pathParts = req.path.split("/").filter(Boolean);
-    let articleId = "";
-    if (typeof articleQuery === "string") {
-      articleId = articleQuery;
-    } else if (Array.isArray(articleQuery)) {
-      articleId = String(articleQuery[0]);
-    } else if (req.path.startsWith("/article/") && pathParts.length > 0) {
-      articleId = pathParts[pathParts.length - 1];
-    }
-
-    try {
-      const possiblePaths = [
-        path.join(process.cwd(), "dist", "index.html"),
-        path.join(process.cwd(), "index.html"),
-        path.join(__dirname, "dist", "index.html"),
-        path.join(__dirname, "index.html"),
-        "/var/task/dist/index.html",
-        "/var/task/index.html",
-      ];
-
-      let indexPath = "";
-      for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-          indexPath = p;
-          break;
-        }
-      }
-
-      let html = "";
-      if (indexPath) {
-        html = fs.readFileSync(indexPath, "utf-8");
-      }
-
-      if (!html) {
-        html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
-      }
-
-      // Determine the base URL dynamically from the request
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-      const host = req.get('host');
-      const baseUrl = `${protocol}://${host}`;
-      
-      let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
-      let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis. SaaS Sentinel provides elite B2B market intelligence for founders and investors.";
-      let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-      let ogUrl = `${baseUrl}${req.path}`;
-      if (articleId) ogUrl += `?article=${articleId}`;
-
-      if (articleId && articleId !== "undefined" && articleId !== "null") {
-        try {
-          const { fetchArticleById } = await import("./src/services/news_articles.js");
-          // Increased timeout to 10s to handle cold starts better
-          const article = await Promise.race([
-            fetchArticleById(articleId),
-            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000))
-          ]).catch((err) => {
-            console.error(`[DEBUG] Article fetch failed or timed out for ID ${articleId}:`, err);
-            return null;
-          });
-
-          if (article && article.title) {
-            ogTitle = article.title;
-            const summary = article.summary || (article.content ? article.content.substring(0, 200) : "");
-            // LinkedIn prefers descriptions > 100 chars
-            ogDescription = (summary.length > 100 ? summary : (summary + " " + ogDescription)).substring(0, 200);
-            
-            if (article.image_url) {
-              ogImage = article.image_url;
-              if (!ogImage.startsWith('http')) {
-                const cleanBase = baseUrl.replace(/\/$/, '');
-                const cleanImage = ogImage.startsWith('/') ? ogImage : `/${ogImage}`;
-                ogImage = `${cleanBase}${cleanImage}`;
-              }
-            }
-            console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}", URL="${ogUrl}"`);
-          }
-        } catch (e) {
-          console.error("[DEBUG] Error fetching article for OG tags:", e);
-        }
-      }
-
-      const metaTags = `
-    <title>${ogTitle}</title>
-    <meta name="description" content="${ogDescription}" />
-    <link rel="canonical" href="${ogUrl}" />
-    <meta property="og:title" content="${ogTitle}" />
-    <meta property="og:description" content="${ogDescription}" />
-    <meta property="og:image" content="${ogImage}" />
-    <meta property="og:image:secure_url" content="${ogImage}" />
-    <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="${ogTitle}" />
-    <meta property="og:url" content="${ogUrl}" />
-    <meta property="og:type" content="article" />
-    <meta property="og:site_name" content="SaaS Sentinel" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${ogTitle}" />
-    <meta name="twitter:description" content="${ogDescription}" />
-    <meta name="twitter:image" content="${ogImage}" />
-    <meta itemprop="name" content="${ogTitle}" />
-    <meta itemprop="description" content="${ogDescription}" />
-    <meta itemprop="image" content="${ogImage}" />
-`;
-
-      // Extremely aggressive removal of existing meta/title/canonical tags
-      html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
-      html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
-      html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
-      html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
-      html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
-
-      // Inject meta tags. We use a more robust replacement that handles attributes on <head>
-      if (/<head[^>]*>/i.test(html)) {
-        html = html.replace(/(<head[^>]*>)/i, `$1${metaTags}`);
-      } else if (/<html[^>]*>/i.test(html)) {
-        html = html.replace(/(<html[^>]*>)/i, `$1<head>${metaTags}</head>`);
-      } else {
-        html = `<head>${metaTags}</head>${html}`;
-      }
-      
-      // Ensure the html tag has the OG prefix for better compatibility
-      if (!html.includes('prefix="og:')) {
-        html = html.replace(/<html/i, '<html prefix="og: http://ogp.me/ns#"');
-      }
-
-      res.setHeader('Content-Type', 'text/html');
-      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-      return res.status(200).send(html);
-    } catch (error: any) {
-      const minimalHtml = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
-      res.setHeader('Content-Type', 'text/html');
-      return res.status(200).send(minimalHtml);
-    }
-  });
-
   app.use(express.static(distPath));
 } else {
   const { createServer: createViteServer } = await import("vite");
