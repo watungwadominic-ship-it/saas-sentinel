@@ -14,14 +14,23 @@ console.log("🚀 Server starting...");
 const app = express();
 app.use(express.json());
 
-// Immediate Health Check for Vercel
+// Health Check for Vercel and AIS
 app.get("/api/health-check", (req, res) => {
+  const distPath = path.resolve(__dirname, "dist");
+  const rootDistPath = path.join(process.cwd(), "dist");
+  
   res.json({ 
     status: "ok", 
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV,
     vercel: process.env.VERCEL,
-    cwd: process.cwd()
+    cwd: process.cwd(),
+    dirname: __dirname,
+    distExists: fs.existsSync(distPath),
+    rootDistExists: fs.existsSync(rootDistPath),
+    indexInDist: fs.existsSync(path.join(distPath, "index.html")),
+    indexInRootDist: fs.existsSync(path.join(rootDistPath, "index.html")),
+    nodeVersion: process.version
   });
 });
 
@@ -95,19 +104,6 @@ app.all("/api/cron/fetch-news", async (req, res) => {
     console.error("Cron Error:", e);
     res.status(500).json({ error: e.message });
   }
-});
-
-// Health check route
-app.get("/api/health-check", (req, res) => {
-  const distPath = path.resolve(__dirname, "dist");
-  res.json({
-    status: "ok",
-    env: process.env.NODE_ENV,
-    cwd: process.cwd(),
-    distExists: fs.existsSync(distPath),
-    indexExists: fs.existsSync(path.join(distPath, "index.html")),
-    time: new Date().toISOString()
-  });
 });
 
 // OG Tag Injection Middleware
@@ -206,7 +202,8 @@ app.use(async (req, res, next) => {
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
       try {
-        const { fetchArticleById } = await import("./src/services/news_articles.ts");
+        // Use .js extension for compatibility with ESM and Node's TS stripping
+        const { fetchArticleById } = await import("./src/services/news_articles.js");
         const article = await Promise.race([
           fetchArticleById(articleId),
           new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
@@ -317,14 +314,16 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || hasDi
   app.get("*", (req, res) => {
     const indexPath = fs.existsSync(path.join(distPath, "index.html"))
       ? path.join(distPath, "index.html")
-      : fs.existsSync(path.join(__dirname, "index.html"))
-        ? path.join(__dirname, "index.html")
-        : null;
+      : fs.existsSync(path.join(process.cwd(), "dist", "index.html"))
+        ? path.join(process.cwd(), "dist", "index.html")
+        : fs.existsSync(path.join(__dirname, "index.html"))
+          ? path.join(__dirname, "index.html")
+          : null;
     
     if (indexPath) {
       res.sendFile(indexPath);
     } else {
-      res.status(200).send(`<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`);
+      res.status(200).send(`<!DOCTYPE html><html><head><title>SaaS Sentinel</title><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root">Fallback UI: index.html not found.</div></body></html>`);
     }
   });
 } else {
@@ -336,12 +335,26 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || hasDi
   app.use(vite.middlewares);
 }
 
+// Final 404 Handler
+app.use((req, res) => {
+  console.log(`[404-FINAL] ${req.method} ${req.url}`);
+  res.status(404).send(`SaaS Sentinel 404: The path ${req.url} was not found on this server. (Env: ${process.env.NODE_ENV})`);
+});
+
 // Error Handler
 app.use((err: any, req: any, res: any, next: any) => {
   console.error("🔥 Global Server Error:", err);
   if (!res.headersSent) {
-    res.status(500).send(`Internal Server Error: ${err.message || "Unknown Error"}`);
+    res.status(500).send(`SaaS Sentinel Server Error: ${err.message || "Unknown Error"}`);
   }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
 });
 
 if (process.env.VERCEL !== "1") {
