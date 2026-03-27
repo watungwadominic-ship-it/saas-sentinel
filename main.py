@@ -1,29 +1,23 @@
 import os
-import json
 import requests
-from groq import Groq
-from datetime import datetime, timedelta
+import json
 import random
-import time
+from datetime import datetime
+from groq import Groq
 
-# 1. Configuration
-# Ensure these are set in your environment or .env file
-# GROQ_API_KEY: Get yours at https://console.groq.com/keys
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
-
-# Social Media Credentials
-LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
-LINKEDIN_PERSON_URN = os.environ.get("LINKEDIN_PERSON_URN")
+# Configuration from Environment Variables
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN")
+LINKEDIN_PERSON_URN = os.getenv("LINKEDIN_PERSON_URN")
 
 def post_to_linkedin(text, title, url, image_url=None):
     if not all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]):
         print("⏭️ Skipping LinkedIn: Credentials missing.")
         return
     try:
-        # Clean token to remove any accidental whitespace/newlines
         clean_token = str(LINKEDIN_ACCESS_TOKEN).strip()
         headers = {
             "Authorization": f"Bearer {clean_token}",
@@ -31,9 +25,6 @@ def post_to_linkedin(text, title, url, image_url=None):
             "X-Restli-Protocol-Version": "2.0.0"
         }
         
-        # We remove the 'content' block entirely. 
-        # Since the website's OG tags are now fixed, LinkedIn will automatically
-        # scrape the image and title from the URL provided in the 'commentary'.
         post_data = {
             "author": LINKEDIN_PERSON_URN,
             "commentary": text,
@@ -57,49 +48,32 @@ def post_to_linkedin(text, title, url, image_url=None):
 def run_news_bot():
     print("🚀 SaaS Sentinel: Initiating Elite Market Intelligence Scan...")
     
-    # Initialize Groq Client once
     if not GROQ_API_KEY:
         print("❌ Error: GROQ_API_KEY is not set.")
         return
+        
     client = Groq(api_key=GROQ_API_KEY)
 
-    now = datetime.now()
-    # Fetch news from the last 2 days
-    start_date = (now - timedelta(days=2)).strftime('%Y-%m-%d')
-
-    # 2. Fetch News
-    # Broad query for SaaS and Enterprise AI
-    search_query = 'B2B SaaS OR "Enterprise AI" OR "SaaS Architecture" OR "Cloud Infrastructure"'
-    params = {
-        "q": search_query, 
-        "from": start_date, 
-        "language": "en", 
-        "sortBy": "relevancy", 
-        "apiKey": NEWS_API_KEY
-    }
-    
+    # 1. Fetch News
+    news_url = f"https://newsapi.org/v2/everything?q=SaaS+OR+B2B+Software+OR+Venture+Capital&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
     try:
-        response = requests.get("https://newsapi.org/v2/everything", params=params)
-        response.raise_for_status()
-        articles = response.json().get('articles', [])
-        print(f"📡 Found {len(articles)} potential intelligence sources.")
+        news_response = requests.get(news_url)
+        news_data = news_response.json()
+        articles = news_data.get("articles", [])[:5] 
     except Exception as e:
         print(f"❌ NewsAPI Error: {e}")
         return
 
-    # Process top 5 articles to find the most relevant ones
     processed_count = 0
-    for latest in articles[:10]:
-        if processed_count >= 3: # Limit to 3 fresh insights per run
-            break
+    for latest in articles:
+        title = latest.get("title")
+        url = latest.get("url")
+        image_url = latest.get("urlToImage")
+        
+        if not title or not url or "[Removed]" in title: continue
 
-        title = latest['title']
-        if not title or "[Removed]" in title:
-            continue
-            
-        # Duplicate Check
         headers = {
-            "apikey": SUPABASE_KEY, 
+            "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}", 
             "Content-Type": "application/json"
         }
@@ -119,51 +93,48 @@ def run_news_bot():
             try:
                 completion = client.chat.completions.create(
                     model="llama-3.1-8b-instant",
-                    temperature=0.7, 
+                    temperature=0.5, # Lower temperature for better JSON compliance
                     messages=[
                         {
                             "role": "system", 
-                            "content": "You are a SaaS Strategy Consultant. Return ONLY a valid JSON object."
+                            "content": "You are a SaaS Market Analyst. You MUST return a flat JSON object. Do NOT use nested objects or lists for values. All values must be strings."
                         },
                         {
                             "role": "user", 
                             "content": (
                                 f"News: {title}\n"
                                 f"Context: {latest.get('description', '')}\n\n"
-                                "Return JSON with these keys: 'feed_summary' (100 words), 'strategic_analysis' (3 paragraphs), 'impact' (High/Medium/Low), 'sentiment' (BULLISH/BEARISH/NEUTRAL)."
+                                "Return JSON with these exact keys: \n"
+                                "1. 'feed_summary': A string (100 words).\n"
+                                "2. 'strategic_analysis': A single string containing 3 paragraphs.\n"
+                                "3. 'impact': 'High', 'Medium', or 'Low'.\n"
+                                "4. 'sentiment': 'BULLISH', 'BEARISH', or 'NEUTRAL'."
                             )
                         }
                     ],
                     response_format={"type": "json_object"}
                 )
-                
                 ai_data = json.loads(completion.choices[0].message.content)
-                break 
-                
+                break
             except Exception as e:
-                print(f"⚠️ AI Attempt {attempt+1} failed: {e}")
-                time.sleep(2)
-        
-        if not ai_data:
-            print(f"❌ Failed to generate AI analysis for: {title}")
-            continue
+                print(f"🔄 AI Attempt {attempt+1} failed: {e}")
 
-        # Clean and format the analysis content
-        raw_analysis = ai_data.get('strategic_analysis', "")
-        if isinstance(raw_analysis, dict):
-            # If the AI returns a dict instead of a string, join the values
-            clean_analysis = "\n\n".join([str(v) for v in raw_analysis.values()])
+        if not ai_data: continue
+
+        # Safety check: If AI returned a dictionary for analysis, flatten it
+        analysis_raw = ai_data.get('strategic_analysis', "")
+        if isinstance(analysis_raw, dict):
+            analysis_text = " ".join([str(v) for v in analysis_raw.values()])
         else:
-            clean_analysis = str(raw_analysis)
+            analysis_text = str(analysis_raw)
 
-        # 4. Save to Supabase
-        # Mapping the AI fields to the database schema
         summary_text = str(ai_data.get('feed_summary', ""))
-        image_url = latest.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000"
+        
         payload = {
             "title": title,
             "summary": summary_text,
-            "analysis_content": clean_analysis.strip(), 
+            "content": analysis_text,
+            "analysis_content": analysis_text,
             "confidence_score": random.randint(95, 99),
             "strategic_impact": ai_data.get('impact', 'High'),
             "category": ai_data.get('sentiment', 'BULLISH'), 
@@ -173,7 +144,6 @@ def run_news_bot():
         }
         
         try:
-            # Change Prefer header to return representation so we get the ID
             save_headers = headers.copy()
             save_headers["Prefer"] = "return=representation"
             save_response = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=save_headers, json=payload)
@@ -183,16 +153,13 @@ def run_news_bot():
             
             print(f"✅ Intelligence Logged: {title[:50]}...")
             
-            # 5. Social Media Output
-            # Construct the deep link to your site
             app_url = os.getenv("APP_URL", "https://saas-sentinel-cyan.vercel.app")
             article_url = f"{app_url}/?article={article_id}" if article_id else f"{app_url}/"
             
-            display_summary = summary_text[:200] if summary_text else ""
-            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url}\n\n#SaaS #AI #MarketIntel"
+            display_summary = summary_text[:150] if summary_text else ""
+            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more: {article_url}\n\n#SaaS #AI #MarketIntel"
             
             post_to_linkedin(social_text, title, article_url, image_url)
-
             processed_count += 1
         except Exception as e:
             print(f"❌ Supabase Save Error: {e}")
