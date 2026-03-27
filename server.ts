@@ -135,8 +135,9 @@ app.use(async (req, res, next) => {
   }
 
   // Handle HTML requests, bot requests, or any path without an extension
-  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot;
+  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot || req.path.includes("_cookie_check");
   const articleQuery = req.query.article;
+  const returnUrl = req.query.return_url;
   const pathParts = req.path.split("/").filter(Boolean);
   let articleId = "";
   
@@ -146,6 +147,13 @@ app.use(async (req, res, next) => {
     articleId = String(articleQuery[0]);
   } else if (req.path.startsWith("/article/") && pathParts.length > 0) {
     articleId = pathParts[pathParts.length - 1];
+  } else if (typeof returnUrl === "string" && returnUrl.includes("article=")) {
+    // Extract article ID from return_url (happens during infrastructure cookie checks)
+    const match = returnUrl.match(/[?&]article=([^&]+)/);
+    if (match) {
+      articleId = match[1];
+      console.log(`[DEBUG] Extracted articleId ${articleId} from return_url`);
+    }
   }
 
   // If it's not an HTML/bot request and not an article request, let it pass
@@ -189,15 +197,23 @@ app.use(async (req, res, next) => {
     const host = req.get('host');
     const baseUrl = `${protocol}://${host}`;
     
-    let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
-    let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis. SaaS Sentinel provides elite B2B market intelligence for founders and investors.";
+    let ogTitle = "SaaS Sentinel | Elite B2B Market Intelligence";
+    let ogDescription = "Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for founders, investors, and developers.";
     let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-    // Use the full URL including query parameters for og:url to ensure LinkedIn sees the same version
-    const fullUrl = `${baseUrl}${req.originalUrl}`;
-    let ogUrl = fullUrl;
+    
+    // Use the shared app url for OG tags if available, otherwise fallback to dynamic
+    const sharedAppUrl = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
+    const finalBaseUrl = sharedAppUrl || baseUrl;
+    
+    // Use the full URL including query parameters for og:url
+    // If we're in a cookie check, reconstruct the original intended URL
+    let ogUrl = `${finalBaseUrl}${req.originalUrl}`;
+    if (req.path.includes("_cookie_check") && typeof returnUrl === "string") {
+      ogUrl = returnUrl;
+    }
 
     if (isBot) {
-      console.log(`[BOT-OG] BaseURL: ${baseUrl} | FullURL: ${fullUrl} | ArticleID: ${articleId}`);
+      console.log(`[BOT-OG] BaseURL: ${finalBaseUrl} | OgURL: ${ogUrl} | ArticleID: ${articleId}`);
     }
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
@@ -222,7 +238,7 @@ app.use(async (req, res, next) => {
             if (img.startsWith('//')) {
               ogImage = `https:${img}`;
             } else if (!img.startsWith('http')) {
-              const cleanBase = baseUrl.replace(/\/$/, '');
+              const cleanBase = finalBaseUrl.replace(/\/$/, '');
               const cleanImage = img.startsWith('/') ? img : `/${img}`;
               ogImage = `${cleanBase}${cleanImage}`;
             } else {
@@ -250,7 +266,7 @@ app.use(async (req, res, next) => {
   <meta property="og:image:secure_url" content="${ogImage}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="${ogTitle}" />
+  <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="SaaS Sentinel" />
@@ -258,9 +274,7 @@ app.use(async (req, res, next) => {
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
   <meta name="twitter:image" content="${ogImage}" />
-  <meta itemprop="name" content="${ogTitle}" />
-  <meta itemprop="description" content="${ogDescription}" />
-  <meta itemprop="image" content="${ogImage}" />
+  <meta name="twitter:url" content="${ogUrl}" />
 `;
 
     // Aggressive removal of existing tags (handles both property and name)
