@@ -108,13 +108,14 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     }
 
     const articleQuery = req.query.article;
+    const pathParts = req.path.split("/").filter(Boolean);
     let articleId = "";
     if (typeof articleQuery === "string") {
       articleId = articleQuery;
     } else if (Array.isArray(articleQuery)) {
       articleId = String(articleQuery[0]);
-    } else if (req.path.startsWith("/article/")) {
-      articleId = req.path.split("/").pop() || "";
+    } else if (req.path.startsWith("/article/") && pathParts.length > 0) {
+      articleId = pathParts[pathParts.length - 1];
     }
 
     try {
@@ -144,15 +145,15 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
         html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
       }
 
+      // Determine the base URL dynamically from the request
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.get('host');
+      const baseUrl = `${protocol}://${host}`;
+      
       let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
       let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis. SaaS Sentinel provides elite B2B market intelligence for founders and investors.";
       let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-      let ogUrl = "https://saas-sentinel-cyan.vercel.app";
-
-      try {
-        const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
-        ogUrl = `${baseUrl.replace(/\/$/, '')}${req.originalUrl}`;
-      } catch (e) {}
+      let ogUrl = `${baseUrl}${req.originalUrl}`;
 
       if (articleId && articleId !== "undefined" && articleId !== "null") {
         try {
@@ -170,15 +171,17 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
             ogTitle = article.title;
             const summary = article.summary || (article.content ? article.content.substring(0, 200) : "");
             // LinkedIn prefers descriptions > 100 chars
-            ogDescription = summary.length > 100 ? summary : (summary + " " + ogDescription).substring(0, 200);
+            ogDescription = (summary.length > 100 ? summary : (summary + " " + ogDescription)).substring(0, 200);
             
             if (article.image_url) {
               ogImage = article.image_url;
-              if (ogImage.startsWith('/')) {
-                const baseUrl = process.env.APP_URL || 'https://saas-sentinel-cyan.vercel.app';
-                ogImage = `${baseUrl.replace(/\/$/, '')}${ogImage}`;
+              if (!ogImage.startsWith('http')) {
+                const cleanBase = baseUrl.replace(/\/$/, '');
+                const cleanImage = ogImage.startsWith('/') ? ogImage : `/${ogImage}`;
+                ogImage = `${cleanBase}${cleanImage}`;
               }
             }
+            console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}", URL="${ogUrl}"`);
           }
         } catch (e) {
           console.error("[DEBUG] Error fetching article for OG tags:", e);
@@ -193,6 +196,8 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     <meta property="og:description" content="${ogDescription}" />
     <meta property="og:image" content="${ogImage}" />
     <meta property="og:image:secure_url" content="${ogImage}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="${ogTitle}" />
     <meta property="og:url" content="${ogUrl}" />
     <meta property="og:type" content="article" />
