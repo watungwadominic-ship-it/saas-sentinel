@@ -36,7 +36,8 @@ def post_to_linkedin(text, title, url, summary=None):
         import time
         from datetime import datetime
         cache_buster = int(datetime.now().timestamp())
-        final_url = f"{url}&t={cache_buster}"
+        separator = "&" if "?" in url else "?"
+        final_url = f"{url}{separator}t={cache_buster}"
         
         print(f"🔗 Sharing URL: {final_url}")
         
