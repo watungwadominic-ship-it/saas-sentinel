@@ -63,8 +63,8 @@ def post_to_linkedin(text, title, url, summary=None):
         }
         
         # Small delay to ensure Supabase is fully synced and server is ready
-        # Increased to 5s to handle Vercel cold starts and database sync better
-        time.sleep(5)
+        # Increased to 8s to handle Vercel cold starts and database sync better
+        time.sleep(8)
         
         response = requests.post("https://api.linkedin.com/v2/posts", headers=headers, json=post_data)
         if response.status_code in [200, 201]:
