@@ -111,6 +111,7 @@ app.use(async (req, res, next) => {
   
   console.log(`[DEBUG] [${new Date().toISOString()}] Request: ${req.method} ${req.originalUrl}`);
   console.log(`[DEBUG] User-Agent: ${userAgent}`);
+  console.log(`[DEBUG] Accept: ${accept}`);
   console.log(`[DEBUG] IsBot: ${isBot}`);
 
   // Skip API routes
@@ -182,14 +183,9 @@ app.use(async (req, res, next) => {
     let ogTitle = "SaaS Sentinel | Your Daily SaaS News & Insights";
     let ogDescription = "Stay ahead in the SaaS world with curated news, deep dives, and expert analysis. SaaS Sentinel provides elite B2B market intelligence for founders and investors.";
     let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
-    let ogUrl = `${baseUrl}${req.path}`;
-    if (articleId) {
-      // Ensure the URL in OG tags matches the shared URL structure
-      if (!ogUrl.includes('article=')) {
-        const sep = ogUrl.includes('?') ? '&' : '?';
-        ogUrl += `${sep}article=${articleId}`;
-      }
-    }
+    // Use the full URL including query parameters for og:url to ensure LinkedIn sees the same version
+    const fullUrl = `${baseUrl}${req.originalUrl}`;
+    let ogUrl = fullUrl;
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
       try {
@@ -208,18 +204,26 @@ app.use(async (req, res, next) => {
           ogDescription = (summary.length > 100 ? summary : (summary + " " + ogDescription)).substring(0, 200);
           
           if (article.image_url) {
-            ogImage = article.image_url;
-            if (!ogImage.startsWith('http')) {
+            let img = article.image_url;
+            if (img.startsWith('//')) {
+              ogImage = `https:${img}`;
+            } else if (!img.startsWith('http')) {
               const cleanBase = baseUrl.replace(/\/$/, '');
-              const cleanImage = ogImage.startsWith('/') ? ogImage : `/${ogImage}`;
+              const cleanImage = img.startsWith('/') ? img : `/${img}`;
               ogImage = `${cleanBase}${cleanImage}`;
+            } else {
+              ogImage = img;
             }
           }
           console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
+        } else {
+          console.log(`[DEBUG] Article found but title missing or null for ID ${articleId}`);
         }
       } catch (e) {
         console.error("[DEBUG] Error fetching article for OG tags:", e);
       }
+    } else {
+      console.log(`[DEBUG] No articleId provided in request, using default OG tags`);
     }
 
     const metaTags = `
@@ -230,7 +234,6 @@ app.use(async (req, res, next) => {
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
   <meta property="og:image:secure_url" content="${ogImage}" />
-  <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="${ogTitle}" />
@@ -246,12 +249,14 @@ app.use(async (req, res, next) => {
   <meta itemprop="image" content="${ogImage}" />
 `;
 
-    // Aggressive removal of existing tags
+    // Aggressive removal of existing tags (handles both property and name)
     html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
-    html = html.replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, '');
-    html = html.replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, '');
+    html = html.replace(/<meta[^>]+(?:property|name)=["']og:[^"']+["'][^>]*>/gi, '');
+    html = html.replace(/<meta[^>]+(?:property|name)=["']twitter:[^"']+["'][^>]*>/gi, '');
     html = html.replace(/<meta[^>]+name=["']description["'][^>]*>/gi, '');
     html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
+    html = html.replace(/<meta[^>]+name=["']keywords["'][^>]*>/gi, '');
+    html = html.replace(/<meta[^>]+name=["']author["'][^>]*>/gi, '');
 
     // Inject meta tags
     if (/<head[^>]*>/i.test(html)) {
@@ -266,7 +271,7 @@ app.use(async (req, res, next) => {
       html = html.replace(/<html/i, '<html prefix="og: http://ogp.me/ns#"');
     }
 
-    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     return res.status(200).send(html);
   } catch (error: any) {
