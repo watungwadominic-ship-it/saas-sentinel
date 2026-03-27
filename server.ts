@@ -97,6 +97,19 @@ app.all("/api/cron/fetch-news", async (req, res) => {
   }
 });
 
+// Health check route
+app.get("/api/health-check", (req, res) => {
+  const distPath = path.resolve(__dirname, "dist");
+  res.json({
+    status: "ok",
+    env: process.env.NODE_ENV,
+    cwd: process.cwd(),
+    distExists: fs.existsSync(distPath),
+    indexExists: fs.existsSync(path.join(distPath, "index.html")),
+    time: new Date().toISOString()
+  });
+});
+
 // OG Tag Injection Middleware
 app.use(async (req, res, next) => {
   // Only handle GET and HEAD requests for HTML/OG tags
@@ -107,12 +120,12 @@ app.use(async (req, res, next) => {
   const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
   // More inclusive bot detection
-  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider/i.test(userAgent);
+  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget/i.test(userAgent) || 
+                req.headers['x-linkedin-id'] !== undefined;
   
-  console.log(`[DEBUG] [${new Date().toISOString()}] Request: ${req.method} ${req.originalUrl}`);
-  console.log(`[DEBUG] User-Agent: ${userAgent}`);
-  console.log(`[DEBUG] Accept: ${accept}`);
-  console.log(`[DEBUG] IsBot: ${isBot}`);
+  if (isBot) {
+    console.log(`[BOT-DETECTED] [${new Date().toISOString()}] Agent: ${userAgent} | Path: ${req.originalUrl}`);
+  }
 
   // Skip API routes
   if (req.path.startsWith("/api/")) {
@@ -187,9 +200,13 @@ app.use(async (req, res, next) => {
     const fullUrl = `${baseUrl}${req.originalUrl}`;
     let ogUrl = fullUrl;
 
+    if (isBot) {
+      console.log(`[BOT-OG] BaseURL: ${baseUrl} | FullURL: ${fullUrl} | ArticleID: ${articleId}`);
+    }
+
     if (articleId && articleId !== "undefined" && articleId !== "null") {
       try {
-        const { fetchArticleById } = await import("./src/services/news_articles.js");
+        const { fetchArticleById } = await import("./src/services/news_articles.ts");
         const article = await Promise.race([
           fetchArticleById(articleId),
           new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
@@ -272,7 +289,13 @@ app.use(async (req, res, next) => {
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    if (isBot) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
     return res.status(200).send(html);
   } catch (error: any) {
     console.error("[DEBUG] Error in OG tag injection middleware:", error);
