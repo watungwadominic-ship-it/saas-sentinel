@@ -31,17 +31,15 @@ def post_to_linkedin(text, title, url, summary=None):
             "X-Restli-Protocol-Version": "2.0.0"
         }
         
-        # Using a cache-buster forces LinkedIn to scrape the page fresh
-        # instead of relying on its internal cache which might be empty or stale.
-        # We use a path-based cache buster (/v/timestamp) to avoid query parameters 
-        # that might trigger infrastructure-level cookie checks.
+        # Using a query parameter for cache busting as it's more standard for scrapers
+        # and less likely to confuse path-based routing.
         import time
         from datetime import datetime
         cache_buster = int(datetime.now().timestamp())
         
-        # Path-based URLs like /article/123/v/123456789 are cleaner
-        # and less likely to be flagged by bot-detection systems.
-        final_url = f"{url}/v/{cache_buster}"
+        # Query-based URLs like /article/123?ls=123456789 are standard
+        # and easier for the server to parse correctly.
+        final_url = f"{url}?ls={cache_buster}"
         
         print(f"🔗 Sharing URL: {final_url}")
         
