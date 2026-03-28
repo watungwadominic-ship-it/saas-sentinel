@@ -113,10 +113,11 @@ app.use(async (req, res, next) => {
   const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
   // Added LinkedInBot explicitly and made it more comprehensive
-  const isBot = /bot|googlebot|linkedin|linkedinbot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|whatsapp|redditbot|Applebot|Discordbot|Discord-GTM/i.test(userAgent) || 
+  const isBot = /bot|googlebot|linkedin|linkedinbot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|whatsapp|redditbot|Applebot|Discordbot|Discord-GTM|LinkedInBot\/1\.0/i.test(userAgent) || 
                 req.headers['x-linkedin-id'] !== undefined ||
                 req.headers['x-purpose'] === 'preview' ||
-                req.headers['purpose'] === 'preview';
+                req.headers['purpose'] === 'preview' ||
+                userAgent.includes('LinkedInBot');
   const isCookieCheck = req.path.includes("_cookie_check");
 
   if (isBot || isCookieCheck) {
@@ -228,7 +229,7 @@ app.use(async (req, res, next) => {
 
     let ogTitle = escapeHtml("SaaS Sentinel | Elite B2B Market Intelligence");
     let ogDescription = escapeHtml("Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for founders, investors, and developers.");
-    let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
+    let ogImage = escapeHtml("https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop");
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
     const sharedAppUrl = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
@@ -284,7 +285,7 @@ app.use(async (req, res, next) => {
               const cleanImage = img.startsWith('/') ? img : `/${img}`;
               resolvedImg = `${cleanBase}${cleanImage}`;
             }
-            ogImage = resolvedImg;
+            ogImage = escapeHtml(resolvedImg);
           }
           console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
         } else {
