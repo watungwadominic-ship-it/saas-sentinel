@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
-Sitemap: https://saas-sentinel-cyan.vercel.app/sitemap.xml
+Disallow: /api/
+Sitemap: https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app/sitemap.xml
