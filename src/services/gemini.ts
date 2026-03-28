@@ -89,9 +89,10 @@ export async function generateArticle(headline: string, snippet: string) {
             description: "3 bullet points summarizing the facts (The Breakdown)."
           },
           sentinel_take: { type: Type.STRING, description: "2 paragraphs of elite market analysis (The Sentinel's Take)." },
-          verdict: { type: Type.STRING, description: "1-sentence bold prediction (The Verdict)." }
+          verdict: { type: Type.STRING, description: "1-sentence bold prediction (The Verdict)." },
+          image_url: { type: Type.STRING, description: "A high-quality Unsplash image URL relevant to the SaaS/AI topic. Format: https://images.unsplash.com/photo-[ID]?auto=format&fit=crop&q=80&w=1200&h=630" }
         },
-        required: ["title", "content", "category", "breakdown", "sentinel_take", "verdict"]
+        required: ["title", "content", "category", "breakdown", "sentinel_take", "verdict", "image_url"]
       }
     }
   });
