@@ -112,9 +112,10 @@ app.use(async (req, res, next) => {
   // Log all requests to help debug bot traffic and redirects
   const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
-  console.log(`[DEBUG-REQ] [${new Date().toISOString()}] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 50)}`);
+  const xLinkedInId = req.headers['x-linkedin-id'];
   
-  // Added LinkedInBot explicitly and made it more comprehensive
+  console.log(`[DEBUG-REQ] [${new Date().toISOString()}] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 100)}`);
+  
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string);
   if (!articleId && req.path.startsWith("/article/")) {
@@ -128,7 +129,14 @@ app.use(async (req, res, next) => {
   const returnUrl = req.query.return_url as string;
   if (!articleId && returnUrl) {
     try {
-      const decodedReturnUrl = decodeURIComponent(returnUrl);
+      let decodedReturnUrl = returnUrl;
+      // Robust multi-level decoding for nested URLs
+      for (let i = 0; i < 3; i++) {
+        const next = decodeURIComponent(decodedReturnUrl);
+        if (next === decodedReturnUrl) break;
+        decodedReturnUrl = next;
+      }
+      
       const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id)=([^&]+)/);
       if (queryMatch) {
         articleId = queryMatch[1].split(/[?#\s\\]/)[0];
@@ -145,20 +153,22 @@ app.use(async (req, res, next) => {
   }
 
   const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM/i.test(userAgent) || 
-                req.headers['x-linkedin-id'] !== undefined ||
+                xLinkedInId !== undefined ||
                 req.headers['x-purpose'] === 'preview' ||
                 req.headers['purpose'] === 'preview' ||
                 userAgent.toLowerCase().includes('linkedin') ||
                 userAgent.toLowerCase().includes('bot') ||
                 userAgent.toLowerCase().includes('crawler') ||
                 userAgent.toLowerCase().includes('spider') ||
+                userAgent.toLowerCase().includes('authorizedentity') ||
                 !!articleId ||
                 req.query.t !== undefined ||
                 req.headers['range'] !== undefined; // Some bots use range requests
   const isCookieCheck = req.path.includes("_cookie_check") || 
                         req.query._cookie_check !== undefined || 
                         req.query.return_url !== undefined ||
-                        req.path === "/_cookie_check.html";
+                        req.path === "/_cookie_check.html" ||
+                        req.path.includes("cookie_check");
 
   if (isBot || isCookieCheck) {
     console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | CookieCheck: ${isCookieCheck} | Article: ${articleId} | Agent: ${userAgent}`);
@@ -354,6 +364,7 @@ app.use(async (req, res, next) => {
   <meta itemprop="name" content="${ogTitle}">
   <meta itemprop="description" content="${ogDescription}">
   <meta itemprop="image" content="${ogImage}">
+  <meta name="robots" content="index,follow,max-image-preview:large">
 `;
 
     // Aggressive removal of existing tags (handles both property and name)
