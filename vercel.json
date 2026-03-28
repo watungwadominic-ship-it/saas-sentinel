@@ -16,7 +16,21 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/server.ts" },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "User-Agent",
+          "value": ".*(LinkedInBot|linkedinbot|googlebot|FacebookExternalHit|facebookexternalhit|Twitterbot|twitterbot|Slackbot|slackbot|WhatsApp|whatsapp|TelegramBot|telegrambot|Discordbot|discordbot|bot).*"
+        }
+      ],
+      "dest": "/server.ts"
+    },
+    { "src": "/_cookie_check.html", "dest": "/server.ts" },
+    { "src": "/(.*)_cookie_check(.*)", "dest": "/server.ts" },
     { "src": "/(.*)", "has": [{ "type": "query", "key": "article" }], "dest": "/server.ts" },
+    { "src": "/(.*)", "has": [{ "type": "query", "key": "return_url" }], "dest": "/server.ts" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/server.ts" }
   ]
