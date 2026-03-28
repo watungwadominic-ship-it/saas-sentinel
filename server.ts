@@ -125,18 +125,7 @@ app.use(async (req, res, next) => {
                 xPurpose === 'preview' ||
                 userAgent.toLowerCase().includes('authorizedentity') ||
                 req.headers['range'] !== undefined ||
-                req.headers['x-fb-http-engine'] !== undefined ||
-                req.headers['x-vercel-id'] !== undefined ||
-                req.headers['x-now-id'] !== undefined;
-
-  const isCookieCheck = req.path.includes("_cookie_check") || 
-                        req.query._cookie_check !== undefined || 
-                        req.query.return_url !== undefined ||
-                        req.path === "/_cookie_check.html" ||
-                        req.path.includes("cookie_check") ||
-                        userAgent.includes("HeadlessChrome") ||
-                        userAgent.includes("VercelBot") ||
-                        (isLinkedIn && (req.path.includes("check") || req.query.return_url || req.path.includes("v/")));
+                req.headers['x-fb-http-engine'] !== undefined;
 
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string);
@@ -179,8 +168,8 @@ app.use(async (req, res, next) => {
   }
 
   // Detailed logging for all non-static requests to debug bot traffic
-  if (!req.path.includes(".") || isBot || isCookieCheck) {
-    console.log(`[DEBUG-REQ] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 50)}... | Article: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
+  if (!req.path.includes(".") || isBot) {
+    console.log(`[DEBUG-REQ] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 50)}... | Article: ${articleId} | isBot: ${isBot}`);
   }
 
   // CRITICAL: Skip static assets (images, css, js) - even for bots!
@@ -190,13 +179,8 @@ app.use(async (req, res, next) => {
     return next();
   }
 
-  // Detailed logging for all non-static requests to debug bot traffic
-  if (!req.path.includes(".") || isBot || isCookieCheck) {
-    console.log(`[DEBUG-REQ] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 50)}... | Article: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
-  }
-
-  if (isBot || isCookieCheck) {
-    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | LinkedIn: ${isLinkedIn} | CookieCheck: ${isCookieCheck} | Article: ${articleId} | Agent: ${userAgent}`);
+  if (isBot) {
+    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | LinkedIn: ${isLinkedIn} | Article: ${articleId} | Agent: ${userAgent}`);
   }
 
   // Handle robots.txt
@@ -215,14 +199,14 @@ app.use(async (req, res, next) => {
     return next();
   }
 
-  // Skip static assets (requests with extensions) UNLESS it's a bot OR a cookie check
-  // Bots and cookie checks should get the HTML even if they hit a weird URL
-  if (req.path.includes(".") && !isBot && !isCookieCheck) {
+  // Skip static assets (requests with extensions) UNLESS it's a bot
+  // Bots should get the HTML even if they hit a weird URL
+  if (req.path.includes(".") && !isBot) {
     return next();
   }
 
   // Handle HTML requests, bot requests, or any path without an extension
-  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot || isCookieCheck;
+  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot;
   
   // If it's not an HTML/bot request and not an article request, let it pass
   if (!isHtmlRequest && !articleId) {
@@ -288,7 +272,7 @@ app.use(async (req, res, next) => {
     let canonicalPath = req.path;
     
     // If we're in a cookie check, reconstruct the original intended path
-    if (isCookieCheck && typeof req.query.return_url === "string") {
+    if (typeof req.query.return_url === "string") {
       try {
         const decoded = decodeURIComponent(req.query.return_url as string);
         // Extract the path part, handling both full URLs and relative paths
@@ -322,8 +306,8 @@ app.use(async (req, res, next) => {
     const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
     let ogUrl = escapeHtml(`${cleanBaseUrl}${cleanPath}`);
 
-    if (isBot || isCookieCheck) {
-      console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | CanonicalPath: ${canonicalPath} | OgURL: ${ogUrl} | ArticleID: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
+    if (isBot) {
+      console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | CanonicalPath: ${canonicalPath} | OgURL: ${ogUrl} | ArticleID: ${articleId} | isBot: ${isBot}`);
     }
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
@@ -424,39 +408,14 @@ app.use(async (req, res, next) => {
     html = html.replace(/Checking your browser/gi, 'SaaS Sentinel Intelligence');
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
 
-    // If it's a bot or cookie check, strip all scripts to prevent client-side redirects or logic
+    // If it's a bot, strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
-    if (isBot || isCookieCheck) {
+    if (isBot) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-      
-      // Inject a clear, simple body for the bot to parse easily
-      const botBody = `
-        <div style="font-family:sans-serif;padding:2rem;max-width:800px;margin:0 auto;background-color:#f8f9fa;color:#212529;border-radius:2rem;margin-top:2rem;box-shadow:0 20px 50px rgba(0,0,0,0.1);">
-          <header style="border-bottom:2px solid #f08924;padding-bottom:1.5rem;margin-bottom:2.5rem;display:flex;align-items:center;gap:1rem;">
-            <div style="background:#f08924;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:1.5rem;">S</div>
-            <span style="color:#f08924;font-weight:800;letter-spacing:2px;font-size:1.2rem;text-transform:uppercase;">SAAS SENTINEL INTELLIGENCE</span>
-          </header>
-          <main>
-            <h1 style="font-size:3rem;line-height:1.1;margin-bottom:2rem;color:#1a1a1a;font-weight:900;letter-spacing:-0.02em;">${ogTitle}</h1>
-            <p style="font-size:1.4rem;line-height:1.6;color:#4a4a4a;margin-bottom:3rem;font-weight:400;">${ogDescription}</p>
-            <div style="margin:3rem 0;border-radius:2rem;overflow:hidden;box-shadow:0 30px 60px rgba(0,0,0,0.15);border:1px solid rgba(0,0,0,0.05);">
-              <img src="${ogImage}" alt="${ogTitle}" style="width:100%;display:block;" />
-            </div>
-            <div style="background:white;padding:2rem;border-radius:1.5rem;border-left:5px solid #f08924;margin-top:3rem;">
-              <p style="margin:0;font-style:italic;color:#666;font-size:1.1rem;">Strategic market analysis and ecosystem tracking for the next generation of B2B software.</p>
-            </div>
-          </main>
-          <footer style="margin-top:4rem;padding-top:2rem;border-top:1px solid #dee2e6;text-align:center;color:#adb5bd;font-size:0.9rem;font-weight:500;letter-spacing:1px;text-transform:uppercase;">
-            &copy; ${new Date().getFullYear()} SaaS Sentinel • Elite Market Intelligence
-          </footer>
-        </div>
-      `;
-      
-      html = html.replace(/<body[^>]*>([\s\S]*?)<\/body>/i, `<body style="background-color:#e9ecef;margin:0;padding:0;">${botBody}</body>`);
     }
 
     // Inject meta tags
-    const debugComment = isBot ? `\n  <!-- Bot Detection: ${userAgent.substring(0, 100)} | Article: ${articleId} | CookieCheck: ${isCookieCheck} -->\n` : '';
+    const debugComment = isBot ? `\n  <!-- Bot Detection: ${userAgent.substring(0, 100)} | Article: ${articleId} -->\n` : '';
     if (/<head[^>]*>/i.test(html)) {
       html = html.replace(/(<head[^>]*>)/i, `$1${debugComment}${metaTags}`);
     } else if (/<html[^>]*>/i.test(html)) {
@@ -474,19 +433,13 @@ app.use(async (req, res, next) => {
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Access-Control-Allow-Origin', '*');
     
-    if (isBot || isCookieCheck) {
+    if (isBot) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      res.setHeader('X-Robots-Tag', 'index, follow, max-image-preview:large');
       
-      // Legitimate bots should index the content, cookie checks should not
-      if (isBot) {
-        res.setHeader('X-Robots-Tag', 'index, follow, max-image-preview:large');
-      } else {
-        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-      }
-      
-      console.log(`[BOT-RESPONSE] Sent OG-enriched HTML for ${articleId || 'home'} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
+      console.log(`[BOT-RESPONSE] Sent OG-enriched HTML for ${articleId || 'home'} | isBot: ${isBot}`);
     } else {
       res.setHeader('Cache-Control', 'public, max-age=3600');
     }
