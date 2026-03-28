@@ -115,14 +115,19 @@ app.use(async (req, res, next) => {
   const xLinkedInId = req.headers['x-linkedin-id'];
   const xPurpose = req.headers['x-purpose'] || req.headers['purpose'];
   
+  // Force bot mode for testing
+  const forceBot = req.query.force_bot === 'true' || req.headers['x-force-bot'] === 'true';
+
   // Aggressive bot detection
-  const isLinkedIn = /linkedin|LinkedInBot/i.test(userAgent) || xLinkedInId !== undefined;
-  const isBot = isLinkedIn || 
-                /bot|googlebot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM|Twitterbot|SkypeUriPreview|BitlyBot|AhrefsBot|SemrushBot|MJ12bot|DotBot|Slack-ImgProxy|Slackbot-LinkExpanding|LinkedInBot\/1.0/i.test(userAgent) || 
+  const isLinkedIn = /linkedin/i.test(userAgent) || xLinkedInId !== undefined;
+  const isBot = forceBot || isLinkedIn || 
+                /bot|googlebot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM|Twitterbot|SkypeUriPreview|BitlyBot|AhrefsBot|SemrushBot|MJ12bot|DotBot|Slack-ImgProxy|Slackbot-LinkExpanding|LinkedInBot|AdsBot-Google|Mediapartners-Google|AdsBot-Google-Mobile|AdsBot-Google-Mobile-Apps|AdsBot-Google-Apps|AdsBot-Google-Mobile-Apps-Android|AdsBot-Google-Mobile-Apps-iOS/i.test(userAgent) || 
                 xPurpose === 'preview' ||
                 userAgent.toLowerCase().includes('authorizedentity') ||
                 req.headers['range'] !== undefined ||
-                req.headers['x-fb-http-engine'] !== undefined;
+                req.headers['x-fb-http-engine'] !== undefined ||
+                req.headers['x-vercel-id'] !== undefined ||
+                req.headers['x-now-id'] !== undefined;
 
   const isCookieCheck = req.path.includes("_cookie_check") || 
                         req.query._cookie_check !== undefined || 
@@ -130,7 +135,8 @@ app.use(async (req, res, next) => {
                         req.path === "/_cookie_check.html" ||
                         req.path.includes("cookie_check") ||
                         userAgent.includes("HeadlessChrome") ||
-                        (isLinkedIn && (req.path.includes("check") || req.query.return_url));
+                        userAgent.includes("VercelBot") ||
+                        (isLinkedIn && (req.path.includes("check") || req.query.return_url || req.path.includes("v/")));
 
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string);
@@ -170,6 +176,23 @@ app.use(async (req, res, next) => {
     } catch (e) {
       console.error("[DEBUG] Error parsing return_url for articleId:", e);
     }
+  }
+
+  // Detailed logging for all non-static requests to debug bot traffic
+  if (!req.path.includes(".") || isBot || isCookieCheck) {
+    console.log(`[DEBUG-REQ] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 50)}... | Article: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
+  }
+
+  // CRITICAL: Skip static assets (images, css, js) - even for bots!
+  // If we don't skip, bots trying to fetch the image will get the HTML page instead.
+  const isStaticAsset = /\.(jpg|jpeg|png|gif|svg|webp|css|js|ico|woff|woff2|ttf|otf|map|json)$/i.test(req.path);
+  if (isStaticAsset) {
+    return next();
+  }
+
+  // Detailed logging for all non-static requests to debug bot traffic
+  if (!req.path.includes(".") || isBot || isCookieCheck) {
+    console.log(`[DEBUG-REQ] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 50)}... | Article: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
   }
 
   if (isBot || isCookieCheck) {
@@ -283,6 +306,7 @@ app.use(async (req, res, next) => {
         }
         
         canonicalPath = pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}`;
+        console.log(`[DEBUG-COOKIE] Reconstructed canonicalPath: ${canonicalPath} from return_url`);
       } catch (e) {
         console.error("[DEBUG] Failed to parse returnUrl for canonicalPath:", e);
         canonicalPath = "/";
@@ -304,12 +328,14 @@ app.use(async (req, res, next) => {
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
       try {
+        console.log(`[DEBUG-OG] Attempting to fetch article ${articleId} for OG tags...`);
         // Use .js extension for compatibility with ESM and Node's TS stripping
         // Wrap in try-catch to handle potential module resolution issues
-        const { fetchArticleById } = await import("./src/services/news_articles.js").catch(async () => {
-          // Fallback to .ts if .js fails (though tsx should handle .js)
+        const { fetchArticleById } = await import("./src/services/news_articles.js").catch(async (err) => {
+          console.warn(`[DEBUG-OG] Failed to import .js, trying .ts: ${err.message}`);
           return await import("./src/services/news_articles.ts");
         });
+        
         const article = await Promise.race([
           fetchArticleById(articleId),
           new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
@@ -327,19 +353,21 @@ app.use(async (req, res, next) => {
             let img = article.image_url.trim();
             if (img && img.length > 5) {
               let resolvedImg = "";
-              if (img.startsWith('//')) {
-                resolvedImg = `https:${img}`;
-              } else if (img.startsWith('http:')) {
-                resolvedImg = img.replace('http:', 'https:');
-              } else if (img.startsWith('https:')) {
-                resolvedImg = img;
-              } else {
-                // Handle relative paths
-                const cleanBase = finalBaseUrl.replace(/\/$/, '');
-                const cleanImage = img.startsWith('/') ? img : `/${img}`;
-                resolvedImg = `${cleanBase}${cleanImage}`;
+              try {
+                // Use URL constructor for robust resolution
+                if (img.startsWith('http')) {
+                  resolvedImg = img.replace('http:', 'https:');
+                } else if (img.startsWith('//')) {
+                  resolvedImg = `https:${img}`;
+                } else {
+                  const cleanBase = finalBaseUrl.replace(/\/$/, '');
+                  const cleanImage = img.startsWith('/') ? img : `/${img}`;
+                  resolvedImg = `${cleanBase}${cleanImage}`;
+                }
+                ogImage = escapeHtml(resolvedImg);
+              } catch (e) {
+                console.error("[DEBUG] Failed to resolve image URL:", img, e);
               }
-              ogImage = escapeHtml(resolvedImg);
             }
           }
           console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
@@ -400,15 +428,31 @@ app.use(async (req, res, next) => {
     // that might confuse the scraper or lead it away from the OG tags.
     if (isBot || isCookieCheck) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-      // Add a fallback message in the body
-      html = html.replace(/<body[^>]*>([\s\S]*?)<\/body>/i, `<body style="font-family:sans-serif;padding:2rem;">
-        <div style="max-width:600px;margin:0 auto;">
-          <h1 style="color:#f08924;">${ogTitle}</h1>
-          <p style="font-size:1.2rem;line-height:1.6;color:#333;">${ogDescription}</p>
-          <img src="${ogImage}" style="width:100%;border-radius:1rem;margin:2rem 0;" />
-          <p style="color:#666;">Intelligence by SaaS Sentinel</p>
+      
+      // Inject a clear, simple body for the bot to parse easily
+      const botBody = `
+        <div style="font-family:sans-serif;padding:2rem;max-width:800px;margin:0 auto;background-color:#f8f9fa;color:#212529;border-radius:2rem;margin-top:2rem;box-shadow:0 20px 50px rgba(0,0,0,0.1);">
+          <header style="border-bottom:2px solid #f08924;padding-bottom:1.5rem;margin-bottom:2.5rem;display:flex;align-items:center;gap:1rem;">
+            <div style="background:#f08924;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:1.5rem;">S</div>
+            <span style="color:#f08924;font-weight:800;letter-spacing:2px;font-size:1.2rem;text-transform:uppercase;">SAAS SENTINEL INTELLIGENCE</span>
+          </header>
+          <main>
+            <h1 style="font-size:3rem;line-height:1.1;margin-bottom:2rem;color:#1a1a1a;font-weight:900;letter-spacing:-0.02em;">${ogTitle}</h1>
+            <p style="font-size:1.4rem;line-height:1.6;color:#4a4a4a;margin-bottom:3rem;font-weight:400;">${ogDescription}</p>
+            <div style="margin:3rem 0;border-radius:2rem;overflow:hidden;box-shadow:0 30px 60px rgba(0,0,0,0.15);border:1px solid rgba(0,0,0,0.05);">
+              <img src="${ogImage}" alt="${ogTitle}" style="width:100%;display:block;" />
+            </div>
+            <div style="background:white;padding:2rem;border-radius:1.5rem;border-left:5px solid #f08924;margin-top:3rem;">
+              <p style="margin:0;font-style:italic;color:#666;font-size:1.1rem;">Strategic market analysis and ecosystem tracking for the next generation of B2B software.</p>
+            </div>
+          </main>
+          <footer style="margin-top:4rem;padding-top:2rem;border-top:1px solid #dee2e6;text-align:center;color:#adb5bd;font-size:0.9rem;font-weight:500;letter-spacing:1px;text-transform:uppercase;">
+            &copy; ${new Date().getFullYear()} SaaS Sentinel • Elite Market Intelligence
+          </footer>
         </div>
-      </body>`);
+      `;
+      
+      html = html.replace(/<body[^>]*>([\s\S]*?)<\/body>/i, `<body style="background-color:#e9ecef;margin:0;padding:0;">${botBody}</body>`);
     }
 
     // Inject meta tags
@@ -427,6 +471,8 @@ app.use(async (req, res, next) => {
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Vary', 'User-Agent');
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     
     if (isBot || isCookieCheck) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
