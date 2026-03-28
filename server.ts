@@ -112,18 +112,54 @@ app.use(async (req, res, next) => {
   // Log all requests to help debug bot traffic and redirects
   const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
+  console.log(`[DEBUG-REQ] [${new Date().toISOString()}] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 50)}`);
+  
   // Added LinkedInBot explicitly and made it more comprehensive
+  // Extract article ID from query or path
+  let articleId = (req.query.article as string) || (req.query.article_id as string);
+  if (!articleId && req.path.startsWith("/article/")) {
+    articleId = req.path.split("/")[2];
+  }
+  if (!articleId && req.path.startsWith("/news/")) {
+    articleId = req.path.split("/")[2];
+  }
+
+  // Extract from return_url if present (infrastructure cookie checks)
+  const returnUrl = req.query.return_url as string;
+  if (!articleId && returnUrl) {
+    try {
+      const decodedReturnUrl = decodeURIComponent(returnUrl);
+      const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id)=([^&]+)/);
+      if (queryMatch) {
+        articleId = queryMatch[1].split(/[?#\s\\]/)[0];
+      }
+      if (!articleId) {
+        const pathMatch = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/);
+        if (pathMatch) {
+          articleId = pathMatch[1].split(/[?#\s\\]/)[0];
+        }
+      }
+    } catch (e) {
+      console.error("[DEBUG] Error parsing return_url for articleId:", e);
+    }
+  }
+
   const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM/i.test(userAgent) || 
                 req.headers['x-linkedin-id'] !== undefined ||
                 req.headers['x-purpose'] === 'preview' ||
                 req.headers['purpose'] === 'preview' ||
-                userAgent.toLowerCase().includes('linkedinbot');
+                userAgent.toLowerCase().includes('linkedin') ||
+                userAgent.toLowerCase().includes('bot') ||
+                !!articleId ||
+                req.query.t !== undefined;
   const isCookieCheck = req.path.includes("_cookie_check") || 
                         req.query._cookie_check !== undefined || 
-                        req.query.return_url !== undefined;
+                        req.query.return_url !== undefined ||
+                        req.path === "/_cookie_check.html";
 
   if (isBot || isCookieCheck) {
-    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | CookieCheck: ${isCookieCheck} | Agent: ${userAgent}`);
+    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | CookieCheck: ${isCookieCheck} | Article: ${articleId} | Agent: ${userAgent}`);
+    if (req.query.return_url) console.log(`[BOT-TRAFFIC] return_url: ${req.query.return_url}`);
   }
 
   // Only handle GET and HEAD requests for HTML/OG tags
@@ -144,41 +180,7 @@ app.use(async (req, res, next) => {
 
   // Handle HTML requests, bot requests, or any path without an extension
   const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot || isCookieCheck;
-  const articleQuery = req.query.article;
-  const returnUrl = req.query.return_url;
-  const pathParts = req.path.split("/").filter(Boolean);
-  let articleId = "";
   
-  if (typeof articleQuery === "string") {
-    articleId = articleQuery;
-  } else if (Array.isArray(articleQuery)) {
-    articleId = String(articleQuery[0]);
-  } else if (req.path.startsWith("/article/") && pathParts.length > 0) {
-    articleId = pathParts[pathParts.length - 1];
-  } else if (typeof returnUrl === "string") {
-    // Extract article ID from return_url (happens during infrastructure cookie checks)
-    // Handle both decoded and encoded versions
-    const decodedReturnUrl = decodeURIComponent(returnUrl);
-    
-    // Try query param style: ?article=ID
-    const queryMatch = decodedReturnUrl.match(/[?&]article=([^&]+)/);
-    if (queryMatch) {
-      articleId = queryMatch[1].split(/[?#\s\\]/)[0];
-    }
-    
-    // If not found in query, try path style: /article/ID
-    if (!articleId) {
-      const pathMatch = decodedReturnUrl.match(/\/article\/([^\/?#\s\\]+)/);
-      if (pathMatch) {
-        articleId = pathMatch[1].split(/[?#\s\\]/)[0];
-      }
-    }
-    
-    if (articleId) {
-      console.log(`[DEBUG] Extracted articleId ${articleId} from return_url: ${decodedReturnUrl}`);
-    }
-  }
-
   // If it's not an HTML/bot request and not an article request, let it pass
   if (!isHtmlRequest && !articleId) {
     return next();
@@ -239,13 +241,13 @@ app.use(async (req, res, next) => {
     const sharedAppUrl = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
     const finalBaseUrl = sharedAppUrl || baseUrl;
     
-    // Construct the canonical path for og:url
+    // Use the articleId and returnUrl extracted earlier in the middleware
     let canonicalPath = req.path;
     
     // If we're in a cookie check, reconstruct the original intended path
-    if (isCookieCheck && typeof returnUrl === "string") {
+    if (isCookieCheck && typeof req.query.return_url === "string") {
       try {
-        const decoded = decodeURIComponent(returnUrl);
+        const decoded = decodeURIComponent(req.query.return_url as string);
         // Extract the path part, handling both full URLs and relative paths
         let pathOnly = decoded.split(/[?#\s\\]/)[0];
         
@@ -359,6 +361,9 @@ app.use(async (req, res, next) => {
     html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
     html = html.replace(/<meta[^>]+name=["']keywords["'][^>]*>/gi, '');
     html = html.replace(/<meta[^>]+name=["']author["'][^>]*>/gi, '');
+    
+    // Also remove any generic "Cookie check" content if it somehow leaked into the base HTML
+    html = html.replace(/Cookie check/g, 'SaaS Sentinel');
 
     // Inject meta tags
     const debugComment = isBot ? `\n  <!-- Bot Detection: ${userAgent.substring(0, 100)} | Article: ${articleId} | CookieCheck: ${isCookieCheck} -->\n` : '';
