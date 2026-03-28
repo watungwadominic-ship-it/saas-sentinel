@@ -12,6 +12,7 @@ dotenv.config();
 console.log("🚀 Server starting...");
 
 const app = express();
+app.set('trust proxy', true);
 app.use(express.json());
 
 // Health Check for Vercel and AIS
@@ -112,8 +113,10 @@ app.use(async (req, res, next) => {
   const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
   // Added LinkedInBot explicitly and made it more comprehensive
-  const isBot = /bot|googlebot|linkedin|linkedinbot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget/i.test(userAgent) || 
-                req.headers['x-linkedin-id'] !== undefined;
+  const isBot = /bot|googlebot|linkedin|linkedinbot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver/i.test(userAgent) || 
+                req.headers['x-linkedin-id'] !== undefined ||
+                req.headers['x-purpose'] === 'preview' ||
+                req.headers['purpose'] === 'preview';
   const isCookieCheck = req.path.includes("_cookie_check");
 
   if (isBot || isCookieCheck) {
@@ -149,14 +152,25 @@ app.use(async (req, res, next) => {
     articleId = String(articleQuery[0]);
   } else if (req.path.startsWith("/article/") && pathParts.length > 0) {
     articleId = pathParts[pathParts.length - 1];
-  } else if (typeof returnUrl === "string" && (returnUrl.includes("article=") || returnUrl.includes("article%3D"))) {
+  } else if (typeof returnUrl === "string") {
     // Extract article ID from return_url (happens during infrastructure cookie checks)
     // Handle both decoded and encoded versions
     const decodedReturnUrl = decodeURIComponent(returnUrl);
-    const match = decodedReturnUrl.match(/[?&]article=([^&]+)/);
-    if (match) {
-      articleId = match[1].split(/[?#\s\\]/)[0]; // Clean up any trailing junk
-      console.log(`[DEBUG] Extracted articleId ${articleId} from return_url`);
+    
+    // Try query param style: ?article=ID
+    const queryMatch = decodedReturnUrl.match(/[?&]article=([^&]+)/);
+    if (queryMatch) {
+      articleId = queryMatch[1].split(/[?#\s\\]/)[0];
+    } else {
+      // Try path style: /article/ID
+      const pathMatch = decodedReturnUrl.match(/\/article\/([^\/?#\s\\]+)/);
+      if (pathMatch) {
+        articleId = pathMatch[1].split(/[?#\s\\]/)[0];
+      }
+    }
+    
+    if (articleId) {
+      console.log(`[DEBUG] Extracted articleId ${articleId} from return_url: ${decodedReturnUrl}`);
     }
   }
 
@@ -202,8 +216,18 @@ app.use(async (req, res, next) => {
     const host = req.get('host');
     const baseUrl = `${protocol}://${host}`;
     
-    let ogTitle = "SaaS Sentinel | Elite B2B Market Intelligence";
-    let ogDescription = "Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for founders, investors, and developers.";
+    const escapeHtml = (str: string) => {
+      if (!str) return "";
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    };
+
+    let ogTitle = escapeHtml("SaaS Sentinel | Elite B2B Market Intelligence");
+    let ogDescription = escapeHtml("Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for founders, investors, and developers.");
     let ogImage = "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop";
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
@@ -212,16 +236,17 @@ app.use(async (req, res, next) => {
     
     // Use the full URL including query parameters for og:url
     // If we're in a cookie check, reconstruct the original intended URL
-    let ogUrl = `${finalBaseUrl}${req.originalUrl}`;
+    let ogUrl = escapeHtml(`${finalBaseUrl}${req.originalUrl}`);
     if (isCookieCheck && typeof returnUrl === "string") {
       try {
-        ogUrl = decodeURIComponent(returnUrl).split(/[\s\\]/)[0];
+        let decodedUrl = decodeURIComponent(returnUrl).split(/[\s\\]/)[0];
         // Ensure it's an absolute URL
-        if (ogUrl.startsWith('/')) {
-          ogUrl = `${finalBaseUrl}${ogUrl}`;
+        if (decodedUrl.startsWith('/')) {
+          decodedUrl = `${finalBaseUrl}${decodedUrl}`;
         }
+        ogUrl = escapeHtml(decodedUrl);
       } catch (e) {
-        ogUrl = returnUrl;
+        ogUrl = escapeHtml(returnUrl);
       }
     }
 
@@ -242,22 +267,24 @@ app.use(async (req, res, next) => {
         });
 
         if (article && article.title) {
-          ogTitle = article.title;
+          ogTitle = escapeHtml(article.title);
           const summary = article.summary || (article.content ? article.content.substring(0, 200) : "");
-          ogDescription = (summary.length > 100 ? summary : (summary + " " + ogDescription)).substring(0, 200);
+          ogDescription = escapeHtml((summary.length > 100 ? summary : (summary + " " + ogDescription)).substring(0, 200));
           
           if (article.image_url) {
             let img = article.image_url.trim();
+            let resolvedImg = "";
             if (img.startsWith('//')) {
-              ogImage = `https:${img}`;
+              resolvedImg = `https:${img}`;
             } else if (img.startsWith('http')) {
-              ogImage = img;
+              resolvedImg = img;
             } else {
               // Handle relative paths
               const cleanBase = finalBaseUrl.replace(/\/$/, '');
               const cleanImage = img.startsWith('/') ? img : `/${img}`;
-              ogImage = `${cleanBase}${cleanImage}`;
+              resolvedImg = `${cleanBase}${cleanImage}`;
             }
+            ogImage = escapeHtml(resolvedImg);
           }
           console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
         } else {
@@ -301,12 +328,13 @@ app.use(async (req, res, next) => {
     html = html.replace(/<meta[^>]+name=["']author["'][^>]*>/gi, '');
 
     // Inject meta tags
+    const debugComment = isBot ? `\n  <!-- Bot Detection: ${userAgent.substring(0, 100)} | Article: ${articleId} | CookieCheck: ${isCookieCheck} -->\n` : '';
     if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(/(<head[^>]*>)/i, `$1${metaTags}`);
+      html = html.replace(/(<head[^>]*>)/i, `$1${debugComment}${metaTags}`);
     } else if (/<html[^>]*>/i.test(html)) {
-      html = html.replace(/(<html[^>]*>)/i, `$1<head>${metaTags}</head>`);
+      html = html.replace(/(<html[^>]*>)/i, `$1<head>${debugComment}${metaTags}</head>`);
     } else {
-      html = `<head>${metaTags}</head>${html}`;
+      html = `<head>${debugComment}${metaTags}</head>${html}`;
     }
     
     if (!html.includes('prefix="og:')) {
