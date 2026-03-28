@@ -150,8 +150,11 @@ app.use(async (req, res, next) => {
                 req.headers['purpose'] === 'preview' ||
                 userAgent.toLowerCase().includes('linkedin') ||
                 userAgent.toLowerCase().includes('bot') ||
+                userAgent.toLowerCase().includes('crawler') ||
+                userAgent.toLowerCase().includes('spider') ||
                 !!articleId ||
-                req.query.t !== undefined;
+                req.query.t !== undefined ||
+                req.headers['range'] !== undefined; // Some bots use range requests
   const isCookieCheck = req.path.includes("_cookie_check") || 
                         req.query._cookie_check !== undefined || 
                         req.query.return_url !== undefined ||
@@ -363,7 +366,9 @@ app.use(async (req, res, next) => {
     html = html.replace(/<meta[^>]+name=["']author["'][^>]*>/gi, '');
     
     // Also remove any generic "Cookie check" content if it somehow leaked into the base HTML
-    html = html.replace(/Cookie check/g, 'SaaS Sentinel');
+    html = html.replace(/Cookie check/gi, 'SaaS Sentinel');
+    html = html.replace(/Checking your browser/gi, 'SaaS Sentinel Intelligence');
+    html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
 
     // Inject meta tags
     const debugComment = isBot ? `\n  <!-- Bot Detection: ${userAgent.substring(0, 100)} | Article: ${articleId} | CookieCheck: ${isCookieCheck} -->\n` : '';
