@@ -113,7 +113,7 @@ app.use(async (req, res, next) => {
   const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
   // Added LinkedInBot explicitly and made it more comprehensive
-  const isBot = /bot|googlebot|linkedin|linkedinbot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|whatsapp|redditbot|Applebot|Discordbot|Discord-GTM|LinkedInBot\/1\.0/i.test(userAgent) || 
+  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM/i.test(userAgent) || 
                 req.headers['x-linkedin-id'] !== undefined ||
                 req.headers['x-purpose'] === 'preview' ||
                 req.headers['purpose'] === 'preview' ||
@@ -233,26 +233,32 @@ app.use(async (req, res, next) => {
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
     const sharedAppUrl = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
-    const finalBaseUrl = sharedAppUrl;
+    const finalBaseUrl = sharedAppUrl || baseUrl;
     
-    // Use the full URL including query parameters for og:url
-    // If we're in a cookie check, reconstruct the original intended URL
-    let ogUrl = escapeHtml(`${finalBaseUrl}${req.originalUrl}`);
+    // Construct the canonical path for og:url
+    let canonicalPath = req.path;
+    
+    // If we're in a cookie check, reconstruct the original intended path
     if (isCookieCheck && typeof returnUrl === "string") {
       try {
-        let decodedUrl = decodeURIComponent(returnUrl).split(/[\s\\]/)[0];
-        // Ensure it's an absolute URL
-        if (decodedUrl.startsWith('/')) {
-          decodedUrl = `${finalBaseUrl}${decodedUrl}`;
-        }
-        ogUrl = escapeHtml(decodedUrl);
+        const decoded = decodeURIComponent(returnUrl).split(/[?#\s\\]/)[0];
+        canonicalPath = decoded.startsWith('/') ? decoded : `/${decoded}`;
       } catch (e) {
-        ogUrl = escapeHtml(returnUrl);
+        canonicalPath = "/";
       }
     }
+    
+    // If we have an article ID, ensure the canonical URL points to the article page
+    if (articleId && articleId !== "undefined" && articleId !== "null") {
+      canonicalPath = `/article/${articleId}`;
+    }
+    
+    const cleanBaseUrl = finalBaseUrl.replace(/\/$/, '');
+    const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
+    let ogUrl = escapeHtml(`${cleanBaseUrl}${cleanPath}`);
 
     if (isBot) {
-      console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | OgURL: ${ogUrl} | ArticleID: ${articleId}`);
+      console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | CanonicalPath: ${canonicalPath} | OgURL: ${ogUrl} | ArticleID: ${articleId}`);
     }
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
