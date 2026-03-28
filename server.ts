@@ -152,7 +152,7 @@ app.use(async (req, res, next) => {
     }
   }
 
-  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM/i.test(userAgent) || 
+  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM|LinkedInBot\/1\.0/i.test(userAgent) || 
                 xLinkedInId !== undefined ||
                 req.headers['x-purpose'] === 'preview' ||
                 req.headers['purpose'] === 'preview' ||
@@ -163,6 +163,7 @@ app.use(async (req, res, next) => {
                 userAgent.toLowerCase().includes('authorizedentity') ||
                 !!articleId ||
                 req.query.t !== undefined ||
+                req.path.includes("/v/") || // Path-based cache buster
                 req.headers['range'] !== undefined; // Some bots use range requests
   const isCookieCheck = req.path.includes("_cookie_check") || 
                         req.query._cookie_check !== undefined || 
@@ -173,6 +174,12 @@ app.use(async (req, res, next) => {
   if (isBot || isCookieCheck) {
     console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | CookieCheck: ${isCookieCheck} | Article: ${articleId} | Agent: ${userAgent}`);
     if (req.query.return_url) console.log(`[BOT-TRAFFIC] return_url: ${req.query.return_url}`);
+  }
+
+  // Handle robots.txt
+  if (req.path === "/robots.txt") {
+    res.setHeader('Content-Type', 'text/plain');
+    return res.send("User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app/sitemap.xml");
   }
 
   // Only handle GET and HEAD requests for HTML/OG tags
