@@ -110,19 +110,39 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 // OG Tag Injection Middleware
 app.use(async (req, res, next) => {
   // Log all requests to help debug bot traffic and redirects
-  const userAgent = req.headers["user-agent"] || "";
+  const userAgent = (req.headers["user-agent"] || "").trim();
   const accept = req.headers.accept || "";
   const xLinkedInId = req.headers['x-linkedin-id'];
+  const xPurpose = req.headers['x-purpose'] || req.headers['purpose'];
   
-  console.log(`[DEBUG-REQ] [${new Date().toISOString()}] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 100)}`);
-  
+  // Aggressive bot detection
+  const isLinkedIn = /linkedin|LinkedInBot/i.test(userAgent) || xLinkedInId !== undefined;
+  const isBot = isLinkedIn || 
+                /bot|googlebot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM|Twitterbot|SkypeUriPreview|BitlyBot|AhrefsBot|SemrushBot|MJ12bot|DotBot|Slack-ImgProxy|Slackbot-LinkExpanding|LinkedInBot\/1.0/i.test(userAgent) || 
+                xPurpose === 'preview' ||
+                userAgent.toLowerCase().includes('authorizedentity') ||
+                req.headers['range'] !== undefined ||
+                req.headers['x-fb-http-engine'] !== undefined;
+
+  const isCookieCheck = req.path.includes("_cookie_check") || 
+                        req.query._cookie_check !== undefined || 
+                        req.query.return_url !== undefined ||
+                        req.path === "/_cookie_check.html" ||
+                        req.path.includes("cookie_check") ||
+                        userAgent.includes("HeadlessChrome") ||
+                        (isLinkedIn && (req.path.includes("check") || req.query.return_url));
+
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string);
-  if (!articleId && req.path.startsWith("/article/")) {
-    articleId = req.path.split("/")[2];
-  }
-  if (!articleId && req.path.startsWith("/news/")) {
-    articleId = req.path.split("/")[2];
+  
+  // Path-based extraction
+  if (!articleId) {
+    const pathParts = req.path.split("/");
+    // Matches /article/ID or /news/ID or /article/ID/v/TIMESTAMP
+    if (pathParts[1] === "article" || pathParts[1] === "news") {
+      // Ensure we only get the ID part, even if there's a /v/ suffix
+      articleId = pathParts[2].split(/[\/?#\s\\]/)[0];
+    }
   }
 
   // Extract from return_url if present (infrastructure cookie checks)
@@ -139,12 +159,12 @@ app.use(async (req, res, next) => {
       
       const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id)=([^&]+)/);
       if (queryMatch) {
-        articleId = queryMatch[1].split(/[?#\s\\]/)[0];
+        articleId = queryMatch[1].split(/[\/?#\s\\]/)[0];
       }
       if (!articleId) {
         const pathMatch = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/);
         if (pathMatch) {
-          articleId = pathMatch[1].split(/[?#\s\\]/)[0];
+          articleId = pathMatch[1].split(/[\/?#\s\\]/)[0];
         }
       }
     } catch (e) {
@@ -152,28 +172,8 @@ app.use(async (req, res, next) => {
     }
   }
 
-  const isBot = /bot|googlebot|linkedin|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM|LinkedInBot\/1\.0/i.test(userAgent) || 
-                xLinkedInId !== undefined ||
-                req.headers['x-purpose'] === 'preview' ||
-                req.headers['purpose'] === 'preview' ||
-                userAgent.toLowerCase().includes('linkedin') ||
-                userAgent.toLowerCase().includes('bot') ||
-                userAgent.toLowerCase().includes('crawler') ||
-                userAgent.toLowerCase().includes('spider') ||
-                userAgent.toLowerCase().includes('authorizedentity') ||
-                !!articleId ||
-                req.query.t !== undefined ||
-                req.path.includes("/v/") || // Path-based cache buster
-                req.headers['range'] !== undefined; // Some bots use range requests
-  const isCookieCheck = req.path.includes("_cookie_check") || 
-                        req.query._cookie_check !== undefined || 
-                        req.query.return_url !== undefined ||
-                        req.path === "/_cookie_check.html" ||
-                        req.path.includes("cookie_check");
-
   if (isBot || isCookieCheck) {
-    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | CookieCheck: ${isCookieCheck} | Article: ${articleId} | Agent: ${userAgent}`);
-    if (req.query.return_url) console.log(`[BOT-TRAFFIC] return_url: ${req.query.return_url}`);
+    console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | LinkedIn: ${isLinkedIn} | CookieCheck: ${isCookieCheck} | Article: ${articleId} | Agent: ${userAgent}`);
   }
 
   // Handle robots.txt
@@ -258,7 +258,7 @@ app.use(async (req, res, next) => {
     let ogImage = escapeHtml("https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop");
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
-    const sharedAppUrl = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
+    const sharedAppUrl = process.env.SHARED_APP_URL || "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
     const finalBaseUrl = sharedAppUrl || baseUrl;
     
     // Use the articleId and returnUrl extracted earlier in the middleware
@@ -298,14 +298,18 @@ app.use(async (req, res, next) => {
     const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
     let ogUrl = escapeHtml(`${cleanBaseUrl}${cleanPath}`);
 
-    if (isBot) {
-      console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | CanonicalPath: ${canonicalPath} | OgURL: ${ogUrl} | ArticleID: ${articleId}`);
+    if (isBot || isCookieCheck) {
+      console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | CanonicalPath: ${canonicalPath} | OgURL: ${ogUrl} | ArticleID: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
     }
 
     if (articleId && articleId !== "undefined" && articleId !== "null") {
       try {
         // Use .js extension for compatibility with ESM and Node's TS stripping
-        const { fetchArticleById } = await import("./src/services/news_articles.js");
+        // Wrap in try-catch to handle potential module resolution issues
+        const { fetchArticleById } = await import("./src/services/news_articles.js").catch(async () => {
+          // Fallback to .ts if .js fails (though tsx should handle .js)
+          return await import("./src/services/news_articles.ts");
+        });
         const article = await Promise.race([
           fetchArticleById(articleId),
           new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
@@ -325,7 +329,9 @@ app.use(async (req, res, next) => {
               let resolvedImg = "";
               if (img.startsWith('//')) {
                 resolvedImg = `https:${img}`;
-              } else if (img.startsWith('http')) {
+              } else if (img.startsWith('http:')) {
+                resolvedImg = img.replace('http:', 'https:');
+              } else if (img.startsWith('https:')) {
                 resolvedImg = img;
               } else {
                 // Handle relative paths
@@ -362,10 +368,12 @@ app.use(async (req, res, next) => {
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="SaaS Sentinel" />
+  <meta property="article:published_time" content="${new Date().toISOString()}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
   <meta name="twitter:image" content="${ogImage}" />
+  <meta name="twitter:image:alt" content="${ogTitle}" />
   <meta name="twitter:url" content="${ogUrl}" />
   <link rel="image_src" href="${ogImage}" />
   <meta itemprop="name" content="${ogTitle}">
@@ -388,6 +396,21 @@ app.use(async (req, res, next) => {
     html = html.replace(/Checking your browser/gi, 'SaaS Sentinel Intelligence');
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
 
+    // If it's a bot or cookie check, strip all scripts to prevent client-side redirects or logic
+    // that might confuse the scraper or lead it away from the OG tags.
+    if (isBot || isCookieCheck) {
+      html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      // Add a fallback message in the body
+      html = html.replace(/<body[^>]*>([\s\S]*?)<\/body>/i, `<body style="font-family:sans-serif;padding:2rem;">
+        <div style="max-width:600px;margin:0 auto;">
+          <h1 style="color:#f08924;">${ogTitle}</h1>
+          <p style="font-size:1.2rem;line-height:1.6;color:#333;">${ogDescription}</p>
+          <img src="${ogImage}" style="width:100%;border-radius:1rem;margin:2rem 0;" />
+          <p style="color:#666;">Intelligence by SaaS Sentinel</p>
+        </div>
+      </body>`);
+    }
+
     // Inject meta tags
     const debugComment = isBot ? `\n  <!-- Bot Detection: ${userAgent.substring(0, 100)} | Article: ${articleId} | CookieCheck: ${isCookieCheck} -->\n` : '';
     if (/<head[^>]*>/i.test(html)) {
@@ -403,13 +426,25 @@ app.use(async (req, res, next) => {
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    if (isBot) {
+    res.setHeader('Vary', 'User-Agent');
+    
+    if (isBot || isCookieCheck) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      
+      // Legitimate bots should index the content, cookie checks should not
+      if (isBot) {
+        res.setHeader('X-Robots-Tag', 'index, follow, max-image-preview:large');
+      } else {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      }
+      
+      console.log(`[BOT-RESPONSE] Sent OG-enriched HTML for ${articleId || 'home'} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
     } else {
       res.setHeader('Cache-Control', 'public, max-age=3600');
     }
+    
     return res.status(200).send(html);
   } catch (error: any) {
     console.error("[DEBUG] Error in OG tag injection middleware:", error);
