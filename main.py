@@ -31,22 +31,22 @@ def post_to_linkedin(text, title, url, summary=None):
             "X-Restli-Protocol-Version": "2.0.0"
         }
         
-        # Using a cache-buster (?t=) forces LinkedIn to scrape the page fresh
+        # Using a cache-buster forces LinkedIn to scrape the page fresh
         # instead of relying on its internal cache which might be empty or stale.
-        # We use a path-based cache buster to avoid query parameters that might trigger cookie checks.
+        # We use a path-based cache buster (/v/timestamp) to avoid query parameters 
+        # that might trigger infrastructure-level cookie checks.
         import time
         from datetime import datetime
         cache_buster = int(datetime.now().timestamp())
         
-        # We append the cache buster as a query param but only if needed
-        # Path-based URLs like /article/123 are cleaner
-        final_url = f"{url}?t={cache_buster}"
+        # Path-based URLs like /article/123/v/123456789 are cleaner
+        # and less likely to be flagged by bot-detection systems.
+        final_url = f"{url}/v/{cache_buster}"
         
         print(f"🔗 Sharing URL: {final_url}")
         
         # We explicitly include the 'content' block with 'article' source. 
         # This is the most reliable way to trigger a link preview with an image.
-        # We also add 'thumbnail' which some versions of the API use as a hint.
         post_data = {
             "author": LINKEDIN_PERSON_URN,
             "commentary": text.replace(url, final_url),
