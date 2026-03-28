@@ -118,7 +118,7 @@ app.use(async (req, res, next) => {
                 req.headers['x-purpose'] === 'preview' ||
                 req.headers['purpose'] === 'preview' ||
                 userAgent.includes('LinkedInBot');
-  const isCookieCheck = req.path.includes("_cookie_check");
+  const isCookieCheck = req.path.includes("_cookie_check") || req.query._cookie_check !== undefined;
 
   if (isBot || isCookieCheck) {
     console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | CookieCheck: ${isCookieCheck} | Agent: ${userAgent}`);
@@ -162,8 +162,10 @@ app.use(async (req, res, next) => {
     const queryMatch = decodedReturnUrl.match(/[?&]article=([^&]+)/);
     if (queryMatch) {
       articleId = queryMatch[1].split(/[?#\s\\]/)[0];
-    } else {
-      // Try path style: /article/ID
+    }
+    
+    // If not found in query, try path style: /article/ID
+    if (!articleId) {
       const pathMatch = decodedReturnUrl.match(/\/article\/([^\/?#\s\\]+)/);
       if (pathMatch) {
         articleId = pathMatch[1].split(/[?#\s\\]/)[0];
@@ -241,9 +243,24 @@ app.use(async (req, res, next) => {
     // If we're in a cookie check, reconstruct the original intended path
     if (isCookieCheck && typeof returnUrl === "string") {
       try {
-        const decoded = decodeURIComponent(returnUrl).split(/[?#\s\\]/)[0];
-        canonicalPath = decoded.startsWith('/') ? decoded : `/${decoded}`;
+        const decoded = decodeURIComponent(returnUrl);
+        // Extract the path part, handling both full URLs and relative paths
+        let pathOnly = decoded.split(/[?#\s\\]/)[0];
+        
+        if (pathOnly.includes('://')) {
+          try {
+            pathOnly = new URL(pathOnly).pathname;
+          } catch (e) {
+            // Fallback for malformed URLs that still have ://
+            const parts = pathOnly.split('://')[1].split('/');
+            parts.shift(); // remove host
+            pathOnly = '/' + parts.join('/');
+          }
+        }
+        
+        canonicalPath = pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}`;
       } catch (e) {
+        console.error("[DEBUG] Failed to parse returnUrl for canonicalPath:", e);
         canonicalPath = "/";
       }
     }
