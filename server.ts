@@ -193,7 +193,8 @@ app.use(async (req, res, next) => {
     }
 
     if (!html) {
-      html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
+      console.log("[DEBUG] No index.html found in any possible path, using minimal fallback");
+      html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
     }
 
     // Determine the base URL dynamically from the request
