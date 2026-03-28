@@ -113,7 +113,7 @@ app.use(async (req, res, next) => {
   const userAgent = req.headers["user-agent"] || "";
   const accept = req.headers.accept || "";
   // Added LinkedInBot explicitly and made it more comprehensive
-  const isBot = /bot|googlebot|linkedin|linkedinbot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver/i.test(userAgent) || 
+  const isBot = /bot|googlebot|linkedin|linkedinbot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|LinkedInBot|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|whatsapp|redditbot|Applebot|Discordbot|Discord-GTM/i.test(userAgent) || 
                 req.headers['x-linkedin-id'] !== undefined ||
                 req.headers['x-purpose'] === 'preview' ||
                 req.headers['purpose'] === 'preview';
@@ -284,7 +284,7 @@ app.use(async (req, res, next) => {
               const cleanImage = img.startsWith('/') ? img : `/${img}`;
               resolvedImg = `${cleanBase}${cleanImage}`;
             }
-            ogImage = escapeHtml(resolvedImg);
+            ogImage = resolvedImg;
           }
           console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
         } else {
@@ -305,6 +305,7 @@ app.use(async (req, res, next) => {
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
   <meta property="og:image:secure_url" content="${ogImage}" />
+  <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="${ogTitle}" />
@@ -316,6 +317,10 @@ app.use(async (req, res, next) => {
   <meta name="twitter:description" content="${ogDescription}" />
   <meta name="twitter:image" content="${ogImage}" />
   <meta name="twitter:url" content="${ogUrl}" />
+  <link rel="image_src" href="${ogImage}" />
+  <meta itemprop="name" content="${ogTitle}">
+  <meta itemprop="description" content="${ogDescription}">
+  <meta itemprop="image" content="${ogImage}">
 `;
 
     // Aggressive removal of existing tags (handles both property and name)
@@ -338,7 +343,7 @@ app.use(async (req, res, next) => {
     }
     
     if (!html.includes('prefix="og:')) {
-      html = html.replace(/<html/i, '<html prefix="og: http://ogp.me/ns#"');
+      html = html.replace(/<html([^>]*)>/i, '<html$1 prefix="og: http://ogp.me/ns#">');
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
