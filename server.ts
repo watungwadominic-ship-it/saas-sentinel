@@ -136,12 +136,13 @@ app.use(async (req, res, next) => {
                        xForwardedHost.startsWith('ais-') ||
                        xHost.startsWith('ais-');
 
+  // Aggressive bot detection - LinkedIn should ALWAYS be treated as a bot even on preview URLs
   const isBot = (forceBot || isLinkedIn || 
                 /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|linkedinbot|authorizedentity|linkedin-bot|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf)\b/i.test(userAgent) || 
                 req.headers['x-fb-http-engine'] !== undefined ||
                 req.headers['x-linkedin-id'] !== undefined ||
                 (req.path.startsWith("/__cookie_check.html")) ||
-                (req.path === "/__cookie_check.html" && req.query.return_url)) && !isAISPreview;
+                (req.path === "/__cookie_check.html" && req.query.return_url)) && (!isAISPreview || isLinkedIn || forceBot);
 
   // If it's not a bot and not a cookie check, let Vite/Static handle it
   // This is CRITICAL for the AI Studio preview to work correctly in development
@@ -271,9 +272,9 @@ app.use(async (req, res, next) => {
     }
 
     if (!html || html.includes("Cookie check") || html.includes("Checking your browser") || html.includes("Please wait while your application starts") || req.path === "/__cookie_check.html" || req.path.includes("cookie_check")) {
-      if (isBot && !isAISPreview) {
+      if (isBot) {
         console.log(`[DEBUG] Detected cookie check content or empty HTML in index.html (or direct cookie check path), using fallback for bot | Path: ${req.path}`);
-        html = `<!DOCTYPE html><html prefix="og: http://ogp.me/ns#"><head><title>SaaS Sentinel | Elite B2B Market Intelligence</title><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
+        html = `<!DOCTYPE html><html prefix="og: http://ogp.me/ns#"><head><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
       }
     }
 
@@ -469,6 +470,7 @@ app.use(async (req, res, next) => {
     html = html.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '');
     html = html.replace(/<meta[^>]+name=["']keywords["'][^>]*>/gi, '');
     html = html.replace(/<meta[^>]+name=["']author["'][^>]*>/gi, '');
+    html = html.replace(/<meta[^>]+name=["']title["'][^>]*>/gi, '');
     
     // Also remove any generic "Cookie check" content if it somehow leaked into the base HTML
     html = html.replace(/Cookie check/gi, 'SaaS Sentinel');
@@ -476,6 +478,7 @@ app.use(async (req, res, next) => {
     html = html.replace(/Please wait while your application starts/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/__cookie_check\.html/gi, 'index.html');
+    html = html.replace(/<meta[^>]+content=["']Cookie check["'][^>]*>/gi, '');
 
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
