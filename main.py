@@ -37,11 +37,13 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         from datetime import datetime
         cache_buster = int(datetime.now().timestamp())
         
-        # Query-based URLs like /article/123?ls=123456789 are standard
-        # and easier for the server to parse correctly.
-        # We add force_bot=true to ensure our server always serves OG tags
-        # even if the bot detection fails or infrastructure redirects occur.
-        final_url = f"{url}?ls={cache_buster}&force_bot=true"
+        # Ensure we don't have multiple question marks or malformed query strings
+        if "?" in url:
+            final_url = f"{url}&ls={cache_buster}&force_bot=true"
+        else:
+            final_url = f"{url}?ls={cache_buster}&force_bot=true"
+        
+        print(f"DEBUG: Final URL for LinkedIn: {final_url}")
         
         print(f"🔗 Sharing URL: {final_url}")
         
