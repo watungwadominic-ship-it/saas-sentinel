@@ -121,11 +121,13 @@ app.use(async (req, res, next) => {
   // Aggressive bot detection
   const isLinkedIn = /linkedin/i.test(userAgent) || xLinkedInId !== undefined;
   const isBot = forceBot || isLinkedIn || 
-                /bot|googlebot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM|Twitterbot|SkypeUriPreview|BitlyBot|AhrefsBot|SemrushBot|MJ12bot|DotBot|Slack-ImgProxy|Slackbot-LinkExpanding|LinkedInBot|AdsBot-Google|Mediapartners-Google|AdsBot-Google-Mobile|AdsBot-Google-Mobile-Apps|AdsBot-Google-Apps|AdsBot-Google-Mobile-Apps-Android|AdsBot-Google-Mobile-Apps-iOS/i.test(userAgent) || 
+                /LinkedInBot|linkedin|bot|googlebot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM|Twitterbot|SkypeUriPreview|BitlyBot|AhrefsBot|SemrushBot|MJ12bot|DotBot|Slack-ImgProxy|Slackbot-LinkExpanding|AdsBot-Google|Mediapartners-Google|AdsBot-Google-Mobile|AdsBot-Google-Mobile-Apps|AdsBot-Google-Apps|AdsBot-Google-Mobile-Apps-Android|AdsBot-Google-Mobile-Apps-iOS/i.test(userAgent) || 
                 xPurpose === 'preview' ||
                 userAgent.toLowerCase().includes('authorizedentity') ||
+                userAgent.toLowerCase().includes('linkedin') ||
                 req.headers['range'] !== undefined ||
-                req.headers['x-fb-http-engine'] !== undefined;
+                req.headers['x-fb-http-engine'] !== undefined ||
+                (req.path === "/__cookie_check.html" && req.query.return_url);
 
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string);
@@ -199,9 +201,10 @@ app.use(async (req, res, next) => {
     return next();
   }
 
-  // Skip static assets (requests with extensions) UNLESS it's a bot
+  // Skip static assets (requests with extensions) UNLESS it's a bot or a cookie check
   // Bots should get the HTML even if they hit a weird URL
-  if (req.path.includes(".") && !isBot) {
+  const isCookieCheck = req.path === "/__cookie_check.html";
+  if (req.path.includes(".") && !isBot && !isCookieCheck) {
     return next();
   }
 
