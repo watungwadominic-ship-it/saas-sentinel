@@ -116,12 +116,24 @@ app.use(async (req, res, next) => {
   const xPurpose = req.headers['x-purpose'] || req.headers['purpose'];
   
   // Force bot mode for testing
-  const forceBot = req.query.force_bot === 'true' || req.headers['x-force-bot'] === 'true';
+  let forceBot = req.query.force_bot === 'true' || req.headers['x-force-bot'] === 'true';
+  
+  // Also check for force_bot in the return_url if present
+  if (!forceBot && req.query.return_url) {
+    try {
+      const decoded = decodeURIComponent(req.query.return_url as string);
+      if (decoded.includes('force_bot=true')) {
+        forceBot = true;
+        console.log(`[DEBUG-COOKIE] Force bot detected in return_url`);
+      }
+    } catch (e) {}
+  }
 
-  // Aggressive bot detection
   // Aggressive bot detection
   const isLinkedIn = /linkedin/i.test(userAgent) || 
                      userAgent.includes('authorizedentity') || 
+                     userAgent.includes('linkedinbot') ||
+                     userAgent.includes('linkedin-bot') ||
                      userAgent.includes('apache-httpclient') ||
                      xLinkedInId !== undefined;
                      
@@ -141,8 +153,8 @@ app.use(async (req, res, next) => {
                 /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf)\b/i.test(userAgent) || 
                 req.headers['x-fb-http-engine'] !== undefined ||
                 req.headers['x-linkedin-id'] !== undefined ||
-                (req.path.startsWith("/__cookie_check.html")) ||
-                (req.path === "/__cookie_check.html" && req.query.return_url)) && (!isAISPreview || isLinkedIn || forceBot || req.path.includes('cookie_check'));
+                (req.path.includes("cookie_check")) ||
+                (req.query.return_url !== undefined)) && (!isAISPreview || isLinkedIn || forceBot || req.path.includes('cookie_check'));
 
   // Log every request that hits the middleware for debugging
   if (isBot || req.path.includes('article') || req.path.includes('news')) {
@@ -257,36 +269,51 @@ app.use(async (req, res, next) => {
   }
 
   try {
-    const possiblePaths = [
-      path.join(process.cwd(), "dist", "index.html"),
-      path.join(process.cwd(), "index.html"),
-      path.join(__dirname, "dist", "index.html"),
-      path.join(__dirname, "index.html"),
-      "/var/task/dist/index.html",
-      "/var/task/index.html",
-    ];
-
-    let indexPath = "";
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        indexPath = p;
-        break;
-      }
-    }
-
     let html = "";
-    if (indexPath) {
-      try {
-        html = fs.readFileSync(indexPath, "utf-8");
-      } catch (e) {
-        console.error(`[DEBUG] Failed to read index.html at ${indexPath}:`, e);
-      }
-    }
+    
+    // For bots, we prefer a clean, minimal HTML to avoid any "Cookie check" scripts
+    // that might be present in the actual index.html file.
+    if (isBot) {
+      console.log(`[DEBUG-BOT] Generating clean HTML for bot | Path: ${req.path} | Article: ${articleId}`);
+      html = `<!DOCTYPE html>
+<html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>`;
+    } else {
+      const possiblePaths = [
+        path.join(process.cwd(), "dist", "index.html"),
+        path.join(process.cwd(), "index.html"),
+        path.join(__dirname, "dist", "index.html"),
+        path.join(__dirname, "index.html"),
+        "/var/task/dist/index.html",
+        "/var/task/index.html",
+      ];
 
-    if (!html || html.includes("Cookie check") || html.includes("Checking your browser") || html.includes("Please wait while your application starts") || req.path === "/__cookie_check.html" || req.path.includes("cookie_check")) {
-      if (isBot) {
-        console.log(`[DEBUG] Detected cookie check content or empty HTML in index.html (or direct cookie check path), using fallback for bot | Path: ${req.path}`);
-        html = `<!DOCTYPE html><html prefix="og: http://ogp.me/ns#"><head><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
+      let indexPath = "";
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          indexPath = p;
+          break;
+        }
+      }
+
+      if (indexPath) {
+        try {
+          html = fs.readFileSync(indexPath, "utf-8");
+        } catch (e) {
+          console.error(`[DEBUG] Failed to read index.html at ${indexPath}:`, e);
+        }
+      }
+
+      if (!html || html.toLowerCase().includes("cookie check") || html.toLowerCase().includes("checking your browser") || req.path.includes("cookie_check")) {
+        console.log(`[DEBUG] Detected cookie check content or empty HTML in index.html, using fallback | Path: ${req.path}`);
+        html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
       }
     }
 
@@ -500,12 +527,14 @@ app.use(async (req, res, next) => {
   <meta property="og:title" content="${ogTitle}" />
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
+  <meta property="og:image:url" content="${ogImage}" />
   <meta property="og:image:secure_url" content="${ogImage}" />
   <meta property="og:image:type" content="${ogImageType}" />${imageDimensions}
   <meta property="og:image:alt" content="${ogTitle}" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="SaaS Sentinel" />
+  <meta property="og:updated_time" content="${new Date().toISOString()}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
@@ -563,7 +592,7 @@ app.use(async (req, res, next) => {
     }
     
     if (!html.includes('prefix="og:')) {
-      html = html.replace(/<html([^>]*)>/i, '<html$1 prefix="og: http://ogp.me/ns#">');
+      html = html.replace(/<html([^>]*)>/i, '<html$1 prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">');
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
