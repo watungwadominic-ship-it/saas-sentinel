@@ -212,14 +212,9 @@ def run_news_bot():
             
         payload = {
             "title": title,
-            "summary": summary_text,
             "content": clean_analysis.strip(),
-            "sentinel_take": clean_analysis.strip(),
-            "verdict": f"Strategic Impact: {ai_data.get('impact', 'High')}. Market Sentiment: {ai_data.get('sentiment', 'BULLISH')}.",
-            "breakdown": [summary_text[:150], "Strategic analysis completed by SaaS Sentinel AI.", f"Impact Assessment: {ai_data.get('impact', 'High')}"],
             "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": image_url,
-            "source": "SaaS Sentinel Intelligence",
             "created_at": latest.get('publishedAt') or datetime.now().isoformat()
         }
         
