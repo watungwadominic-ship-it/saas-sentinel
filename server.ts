@@ -246,6 +246,44 @@ app.use(async (req, res, next) => {
     return res.send("User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app/sitemap.xml");
   }
 
+  // Handle sitemap.xml
+  if (req.path === "/sitemap.xml") {
+    try {
+      const { supabase } = await import("./src/services/supabase.js");
+      const { data: articles } = await supabase.from("news_articles").select("id, created_at").order("created_at", { ascending: false });
+      
+      const sharedAppUrl = process.env.SHARED_APP_URL || "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
+      const baseUrl = sharedAppUrl.replace(/\/$/, '');
+      
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${baseUrl}/</loc>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>`;
+      
+      if (articles) {
+        articles.forEach(a => {
+          xml += `
+  <url>
+    <loc>${baseUrl}/article/${a.id}</loc>
+    <lastmod>${new Date(a.created_at).toISOString().split('T')[0]}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>`;
+        });
+      }
+      
+      xml += `\n</urlset>`;
+      res.setHeader('Content-Type', 'application/xml');
+      return res.send(xml);
+    } catch (e) {
+      console.error("Sitemap Error:", e);
+      return res.status(500).send("Error generating sitemap");
+    }
+  }
+
   // Only handle GET and HEAD requests for HTML/OG tags
   if (req.method !== "GET" && req.method !== "HEAD") {
     return next();
@@ -526,7 +564,17 @@ app.use(async (req, res, next) => {
     // Always provide dimensions for LinkedIn to ensure proper layout
     // Default to 1200x630 if we're not sure
     
+    // Ensure ogImage is absolute
+    if (ogImage && !ogImage.startsWith('http')) {
+      const cleanBase = finalBaseUrl.replace(/\/$/, '');
+      ogImage = `${cleanBase}${ogImage.startsWith('/') ? '' : '/'}${ogImage}`;
+    }
+
     const metaTags = `
+  <title>${ogTitle}</title>
+  <meta name="description" content="${ogDescription}" />
+  <meta property="og:title" content="${ogTitle}" />
+  <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
   <meta property="og:image:url" content="${ogImage}" />
   <meta property="og:image:secure_url" content="${ogImage}" />
@@ -534,33 +582,21 @@ app.use(async (req, res, next) => {
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="${ogTitle}" />
-  <meta property="og:locale" content="en_US" />
-  <meta name="twitter:image" content="${ogImage}" />
-  <meta name="twitter:image:src" content="${ogImage}" />
-  <meta name="twitter:image:alt" content="${ogTitle}" />
-  <meta itemprop="image" content="${ogImage}">
-  <meta property="og:title" content="${ogTitle}" />
-  <meta property="og:description" content="${ogDescription}" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
-  <meta property="article:published_time" content="${new Date().toISOString()}" />
   <meta property="og:site_name" content="SaaS Sentinel" />
-  <meta property="og:updated_time" content="${new Date().toISOString()}" />
+  <meta property="og:locale" content="en_US" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
+  <meta name="twitter:image" content="${ogImage}" />
   <meta name="twitter:url" content="${ogUrl}" />
-  <meta name="title" content="${ogTitle}" />
-  <meta name="description" content="${ogDescription}" />
   <link rel="canonical" href="${ogUrl}" />
   <meta name="robots" content="index,follow,max-image-preview:large">
-  <meta itemprop="name" content="${ogTitle}">
-  <meta itemprop="description" content="${ogDescription}">
-  <title>${ogTitle}</title>
 `;
 
     if (isBot) {
-      console.log(`[BOT-META] Full Generated Tags for ${articleId || 'home'}:\n${metaTags}`);
+      console.log(`[BOT-META] Generated Tags for ${articleId || 'home'}: Title="${ogTitle}", Image="${ogImage}"`);
     }
 
     // Aggressive removal of existing tags (handles both property and name)
