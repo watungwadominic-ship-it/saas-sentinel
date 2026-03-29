@@ -121,13 +121,16 @@ app.use(async (req, res, next) => {
   // Aggressive bot detection
   const isLinkedIn = userAgent.includes('linkedin') || 
                      userAgent.includes('authorizedentity') || 
+                     userAgent.includes('linkedinbot') ||
                      xLinkedInId !== undefined;
                      
   const isBot = forceBot || isLinkedIn || 
-                /bot|google|baidu|bing|msn|duck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|preview|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dot|headless|selenium|puppeteer/i.test(userAgent) || 
+                /bot|google|baidu|bing|msn|duck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|preview|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dot|headless|selenium|puppeteer|linkedin|authorizedentity|linkedinbot/i.test(userAgent) || 
                 xPurpose === 'preview' ||
                 req.headers['range'] !== undefined ||
                 req.headers['x-fb-http-engine'] !== undefined ||
+                req.headers['x-request-id'] !== undefined ||
+                (req.path.startsWith("/__cookie_check.html")) ||
                 (req.path === "/__cookie_check.html" && req.query.return_url);
 
   // Log cookie check requests specifically to debug LinkedIn
@@ -158,7 +161,7 @@ app.use(async (req, res, next) => {
         decodedReturnUrl = next;
       }
       
-      const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id)=([^&]+)/);
+      const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id|id)=([^&]+)/);
       if (queryMatch) {
         articleId = queryMatch[1].split(/[\/?#\s\\]/)[0];
       }
@@ -251,9 +254,16 @@ app.use(async (req, res, next) => {
       }
     }
 
+    if (!html || html.includes("Cookie check") || html.includes("Checking your browser") || html.includes("Please wait while your application starts")) {
+      if (isBot) {
+        console.log(`[DEBUG] Detected cookie check content or empty HTML in index.html, using fallback for bot | Path: ${req.path}`);
+        html = `<!DOCTYPE html><html prefix="og: http://ogp.me/ns#"><head><title>SaaS Sentinel</title><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
+      }
+    }
+
     if (!html) {
       console.log("[DEBUG] No index.html found in any possible path, using minimal fallback");
-      html = `<!DOCTYPE html><html><head><title>SaaS Sentinel</title><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
+      html = `<!DOCTYPE html><html prefix="og: http://ogp.me/ns#"><head><title>SaaS Sentinel</title><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
     }
 
     // Determine the base URL dynamically from the request
@@ -273,7 +283,14 @@ app.use(async (req, res, next) => {
 
     let ogTitle = escapeHtml("SaaS Sentinel | Elite B2B Market Intelligence");
     let ogDescription = escapeHtml("Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for founders, investors, and developers.");
-    let ogImage = escapeHtml("https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop");
+    
+    const FALLBACK_IMAGES = [
+      "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&h=630&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1200&h=630&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1200&h=630&auto=format&fit=crop"
+    ];
+    let ogImage = escapeHtml(FALLBACK_IMAGES[0]);
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
     const sharedAppUrl = process.env.SHARED_APP_URL || "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
@@ -353,11 +370,21 @@ app.use(async (req, res, next) => {
                   resolvedImg = img.replace('http:', 'https:');
                 } else if (img.startsWith('//')) {
                   resolvedImg = `https:${img}`;
+                } else if (img.match(/^[a-zA-Z0-9_-]+$/)) {
+                  // If it's just an ID or keyword, try to make it an Unsplash URL
+                  resolvedImg = `https://images.unsplash.com/photo-${img}?auto=format&fit=crop&q=80&w=1200&h=630`;
                 } else {
                   const cleanBase = finalBaseUrl.replace(/\/$/, '');
                   const cleanImage = img.startsWith('/') ? img : `/${img}`;
                   resolvedImg = `${cleanBase}${cleanImage}`;
                 }
+                
+                // Final validation: if it doesn't look like a URL, use fallback
+                if (!resolvedImg.includes('://')) {
+                   const randomIdx = Math.floor(Math.random() * FALLBACK_IMAGES.length);
+                   resolvedImg = FALLBACK_IMAGES[randomIdx];
+                }
+                
                 ogImage = escapeHtml(resolvedImg);
               } catch (e) {
                 console.error("[DEBUG] Failed to resolve image URL:", img, e);
@@ -413,7 +440,9 @@ app.use(async (req, res, next) => {
     // Also remove any generic "Cookie check" content if it somehow leaked into the base HTML
     html = html.replace(/Cookie check/gi, 'SaaS Sentinel');
     html = html.replace(/Checking your browser/gi, 'SaaS Sentinel Intelligence');
+    html = html.replace(/Please wait while your application starts/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
+    html = html.replace(/__cookie_check\.html/gi, 'index.html');
 
     // If it's a bot, strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
