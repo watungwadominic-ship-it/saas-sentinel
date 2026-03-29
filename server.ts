@@ -151,22 +151,22 @@ app.use(async (req, res, next) => {
 
   // Aggressive bot detection - LinkedIn should ALWAYS be treated as a bot even on preview URLs
   // Added req.query.ls check as it's a strong signal from our news bot
-  const isBot = (forceBot || isLinkedIn || 
-                /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent) || 
+  const isBotUA = /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent);
+  
+  const isBot = (forceBot || isLinkedIn || isBotUA || 
                 req.headers['x-fb-http-engine'] !== undefined ||
                 req.headers['x-linkedin-id'] !== undefined ||
-                req.query.ls !== undefined ||
-                (req.path.includes("cookie_check")) ||
-                (req.query.return_url !== undefined)) && (!isAISPreview || isLinkedIn || forceBot || req.path.includes('cookie_check'));
+                req.query.ls !== undefined) && (!isAISPreview || isLinkedIn || forceBot);
 
   // Log every request that hits the middleware for debugging
-  if (isBot || req.path.includes('article') || req.path.includes('news') || req.path.includes('cookie_check')) {
+  if (isBot || req.path.includes('article') || req.path.includes('news') || req.path.includes('cookie_check') || req.query.return_url) {
     console.log(`[DEBUG-REQUEST] Path: ${req.path} | Bot: ${isBot} | LinkedIn: ${isLinkedIn} | AIS Preview: ${isAISPreview} | UA: ${userAgent.substring(0, 100)}...`);
   }
 
   // If it's not a bot and not a cookie check, let Vite/Static handle it
   // This is CRITICAL for the AI Studio preview to work correctly in development
-  if (!isBot && !forceBot && !isLinkedIn && req.path !== "/__cookie_check.html") {
+  const isCookieCheckPath = req.path.includes("cookie_check") || req.path === "/__cookie_check.html";
+  if (!isBot && !isCookieCheckPath && !req.query.return_url) {
     return next();
   }
 
