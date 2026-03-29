@@ -114,11 +114,11 @@ app.use(async (req, res, next) => {
   const accept = (req.headers.accept || "").toLowerCase();
   const xLinkedInId = req.headers['x-linkedin-id'];
   const xPurpose = req.headers['x-purpose'] || req.headers['purpose'];
+  // Force bot mode for testing - more robust check to handle malformed query strings
+  const forceBotQuery = String(req.query.force_bot || '');
+  let forceBot = forceBotQuery.includes('true') || req.headers['x-force-bot'] === 'true';
   
-  // Force bot mode for testing
-  let forceBot = req.query.force_bot === 'true' || req.headers['x-force-bot'] === 'true';
-  
-  // Also check for force_bot in the return_url if present
+  // Also check for force_bot in the return_url if present (infrastructure cookie checks)
   if (!forceBot && req.query.return_url) {
     try {
       const decoded = decodeURIComponent(req.query.return_url as string);
@@ -134,6 +134,7 @@ app.use(async (req, res, next) => {
                      userAgent.includes('authorizedentity') || 
                      userAgent.includes('linkedinbot') ||
                      userAgent.includes('linkedin-bot') ||
+                     userAgent.includes('authorized-entity') ||
                      userAgent.includes('apache-httpclient') ||
                      xLinkedInId !== undefined;
                      
@@ -149,10 +150,12 @@ app.use(async (req, res, next) => {
                        xHost.startsWith('ais-');
 
   // Aggressive bot detection - LinkedIn should ALWAYS be treated as a bot even on preview URLs
+  // Added req.query.ls check as it's a strong signal from our news bot
   const isBot = (forceBot || isLinkedIn || 
                 /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent) || 
                 req.headers['x-fb-http-engine'] !== undefined ||
                 req.headers['x-linkedin-id'] !== undefined ||
+                req.query.ls !== undefined ||
                 (req.path.includes("cookie_check")) ||
                 (req.query.return_url !== undefined)) && (!isAISPreview || isLinkedIn || forceBot || req.path.includes('cookie_check'));
 
@@ -280,6 +283,7 @@ app.use(async (req, res, next) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SaaS Sentinel Intelligence Report</title>
   <!-- SaaS Sentinel Bot Fallback -->
 </head>
 <body>
@@ -392,8 +396,12 @@ app.use(async (req, res, next) => {
     
     // Ensure the og:url includes force_bot=true if we are in bot mode
     // This encourages crawlers to use the bot-optimized version if they re-crawl the canonical URL
-    const urlSeparator = cleanPath.includes('?') ? '&' : '?';
-    let ogUrl = escapeHtml(`${cleanBaseUrl}${cleanPath}${forceBot ? urlSeparator + 'force_bot=true' : ''}`);
+    let ogUrl = `${cleanBaseUrl}${cleanPath}`;
+    if (forceBot) {
+      const separator = ogUrl.includes('?') ? '&' : '?';
+      ogUrl += `${separator}force_bot=true`;
+    }
+    ogUrl = escapeHtml(ogUrl);
 
     if (isBot) {
       console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | CanonicalPath: ${canonicalPath} | OgURL: ${ogUrl} | ArticleID: ${articleId} | isBot: ${isBot}`);
@@ -599,7 +607,8 @@ app.use(async (req, res, next) => {
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Length', Buffer.byteLength(html).toString());
+    // Remove Content-Length to avoid potential 206 Partial Content issues with some crawlers
+    // res.setHeader('Content-Length', Buffer.byteLength(html).toString());
     res.setHeader('Vary', 'User-Agent');
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Access-Control-Allow-Origin', '*');
