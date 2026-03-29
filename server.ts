@@ -191,7 +191,9 @@ app.use(async (req, res, next) => {
       }
       
       if (articleId) {
-        console.log(`[DEBUG-COOKIE] Extracted ArticleID ${articleId} from return_url`);
+        console.log(`[DEBUG-COOKIE] Extracted ArticleID ${articleId} from return_url: ${returnUrl}`);
+      } else {
+        console.log(`[DEBUG-COOKIE] Failed to extract ArticleID from return_url: ${returnUrl}`);
       }
     } catch (e) {
       console.error("[DEBUG] Error parsing return_url for articleId:", e);
@@ -479,6 +481,7 @@ app.use(async (req, res, next) => {
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/__cookie_check\.html/gi, 'index.html');
     html = html.replace(/<meta[^>]+content=["']Cookie check["'][^>]*>/gi, '');
+    html = html.replace(/<title>Cookie check<\/title>/gi, `<title>${ogTitle}</title>`);
 
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
