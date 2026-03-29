@@ -213,15 +213,15 @@ def run_news_bot():
         payload = {
             "title": title,
             "summary": summary_text,
-            "content": clean_analysis.strip(), # Map analysis to content
-            "sentinel_take": clean_analysis.strip(), # Also map to sentinel_take for frontend
+            "content": clean_analysis.strip(),
+            "sentinel_take": clean_analysis.strip(),
             "verdict": f"Strategic Impact: {ai_data.get('impact', 'High')}. Market Sentiment: {ai_data.get('sentiment', 'BULLISH')}.",
             "breakdown": [summary_text[:150], "Strategic analysis completed by SaaS Sentinel AI.", f"Impact Assessment: {ai_data.get('impact', 'High')}"],
-            "confidence_score": random.randint(95, 99),
             "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": image_url,
             "source": "SaaS Sentinel Intelligence",
-            "published_at": latest.get('publishedAt') or datetime.now().isoformat()
+            "read_time": "4 min read",
+            "created_at": latest.get('publishedAt') or datetime.now().isoformat()
         }
         
         try:
@@ -229,6 +229,10 @@ def run_news_bot():
             save_headers = headers.copy()
             save_headers["Prefer"] = "return=representation"
             save_response = requests.post(f"{SUPABASE_URL}/rest/v1/news_articles", headers=save_headers, json=payload)
+            
+            if save_response.status_code >= 400:
+                print(f"❌ Supabase Error Details: {save_response.text}")
+                
             save_response.raise_for_status()
             saved_data = save_response.json()
             article_id = saved_data[0]['id'] if saved_data else None
