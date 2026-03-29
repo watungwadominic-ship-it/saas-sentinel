@@ -51,7 +51,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         # This is the most reliable way to trigger a link preview with an image.
         post_data = {
             "author": LINKEDIN_PERSON_URN,
-            "commentary": text.replace(url, final_url),
+            "commentary": text, # Use the original text which contains the clean URL
             "visibility": "PUBLIC",
             "distribution": {
                 "feedDistribution": "MAIN_FEED",
