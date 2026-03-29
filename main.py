@@ -18,7 +18,7 @@ NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
 LINKEDIN_PERSON_URN = os.environ.get("LINKEDIN_PERSON_URN")
 
-def post_to_linkedin(text, title, url, summary=None):
+def post_to_linkedin(text, title, url, summary=None, image_url=None):
     if not all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]):
         print("⏭️ Skipping LinkedIn: Credentials missing.")
         return
@@ -64,6 +64,10 @@ def post_to_linkedin(text, title, url, summary=None):
             "lifecycleState": "PUBLISHED",
             "isReshareDisabledByAuthor": False
         }
+
+        # If an image URL is provided, explicitly set it as the thumbnail
+        if image_url:
+            post_data["content"]["article"]["thumbnail"] = image_url
         
         # Small delay to ensure Supabase is fully synced and server is ready
         # Increased to 15s to handle Vercel cold starts and database sync better
@@ -245,7 +249,7 @@ def run_news_bot():
             # Ensure there is a space after the URL to prevent social media scrapers from including trailing characters
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url} \n\n#SaaS #AI #MarketIntel"
             
-            post_to_linkedin(social_text, title, article_url, summary_text)
+            post_to_linkedin(social_text, title, article_url, summary_text, image_url)
 
             processed_count += 1
         except Exception as e:
