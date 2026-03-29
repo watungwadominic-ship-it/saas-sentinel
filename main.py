@@ -220,7 +220,6 @@ def run_news_bot():
             "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": image_url,
             "source": "SaaS Sentinel Intelligence",
-            "read_time": "4 min read",
             "created_at": latest.get('publishedAt') or datetime.now().isoformat()
         }
         
