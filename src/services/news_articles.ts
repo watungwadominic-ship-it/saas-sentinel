@@ -58,13 +58,8 @@ export async function saveNewsArticle(article: Partial<Article>) {
         title: article.title,
         content: article.content,
         category: article.category,
-        summary: article.summary,
         created_at: new Date().toISOString(),
-        source: article.source,
-        image_url: article.image_url,
-        breakdown: article.breakdown,
-        sentinel_take: article.sentinel_take,
-        verdict: article.verdict
+        image_url: article.image_url
       }
     ])
     .select();
