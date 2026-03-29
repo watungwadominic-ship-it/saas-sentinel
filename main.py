@@ -58,7 +58,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
                 "article": {
                     "source": final_url,
                     "title": title,
-                    "description": (summary or title)[:250].ljust(100)
+                    "description": (summary or title)[:250]
                 }
             },
             "lifecycleState": "PUBLISHED",
@@ -72,6 +72,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         
         print(f"📡 Sending to LinkedIn: {title[:50]}...")
         print(f"🔗 Final Sharing URL: {final_url}")
+        print(f"🖼️ Image URL being shared: {image_url}")
         
         # Log the full payload for debugging (masking the token)
         debug_payload = post_data.copy()
