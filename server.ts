@@ -119,10 +119,9 @@ app.use(async (req, res, next) => {
   const forceBot = req.query.force_bot === 'true' || req.headers['x-force-bot'] === 'true';
 
   // Aggressive bot detection
-  const isLinkedIn = userAgent.includes('linkedin') || 
+  // Aggressive bot detection
+  const isLinkedIn = /linkedin/i.test(userAgent) || 
                      userAgent.includes('authorizedentity') || 
-                     userAgent.includes('linkedinbot') ||
-                     userAgent.includes('linkedin-bot') ||
                      userAgent.includes('apache-httpclient') ||
                      xLinkedInId !== undefined;
                      
@@ -139,11 +138,11 @@ app.use(async (req, res, next) => {
 
   // Aggressive bot detection - LinkedIn should ALWAYS be treated as a bot even on preview URLs
   const isBot = (forceBot || isLinkedIn || 
-                /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|linkedinbot|authorizedentity|linkedin-bot|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf)\b/i.test(userAgent) || 
+                /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf)\b/i.test(userAgent) || 
                 req.headers['x-fb-http-engine'] !== undefined ||
                 req.headers['x-linkedin-id'] !== undefined ||
                 (req.path.startsWith("/__cookie_check.html")) ||
-                (req.path === "/__cookie_check.html" && req.query.return_url)) && (!isAISPreview || isLinkedIn || forceBot);
+                (req.path === "/__cookie_check.html" && req.query.return_url)) && (!isAISPreview || isLinkedIn || forceBot || req.path.includes('cookie_check'));
 
   // Log every request that hits the middleware for debugging
   if (isBot || req.path.includes('article') || req.path.includes('news')) {
@@ -197,7 +196,14 @@ app.use(async (req, res, next) => {
       if (articleId) {
         console.log(`[DEBUG-COOKIE] Extracted ArticleID ${articleId} from return_url: ${returnUrl}`);
       } else {
-        console.log(`[DEBUG-COOKIE] Failed to extract ArticleID from return_url: ${returnUrl}`);
+        // Last ditch effort: look for any 3-digit or longer number in the URL which might be the ID
+        const genericIdMatch = decodedReturnUrl.match(/(\d{3,})/);
+        if (genericIdMatch) {
+          articleId = genericIdMatch[1];
+          console.log(`[DEBUG-COOKIE] Generic ID extraction from return_url: ${articleId}`);
+        } else {
+          console.log(`[DEBUG-COOKIE] Failed to extract ArticleID from return_url: ${returnUrl}`);
+        }
       }
     } catch (e) {
       console.error("[DEBUG] Error parsing return_url for articleId:", e);
@@ -488,6 +494,7 @@ app.use(async (req, res, next) => {
 
     const metaTags = `
   <title>${ogTitle}</title>
+  <meta name="title" content="${ogTitle}" />
   <meta name="description" content="${ogDescription}" />
   <link rel="canonical" href="${ogUrl}" />
   <meta property="og:title" content="${ogTitle}" />
@@ -527,12 +534,17 @@ app.use(async (req, res, next) => {
     html = html.replace(/<meta[^>]+name=["']title["'][^>]*>/gi, '');
     
     // Also remove any generic "Cookie check" content if it somehow leaked into the base HTML
+    html = html.replace(/<title[^>]*>Cookie check<\/title>/gi, '');
     html = html.replace(/Cookie check/gi, 'SaaS Sentinel');
     html = html.replace(/Checking your browser/gi, 'SaaS Sentinel Intelligence');
     html = html.replace(/Please wait while your application starts/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/__cookie_check\.html/gi, 'index.html');
     html = html.replace(/<meta[^>]+content=["']Cookie check["'][^>]*>/gi, '');
+    
+    if (isBot && req.path.includes('cookie_check')) {
+      console.log(`[DEBUG-COOKIE] Serving OG tags for cookie check path. ArticleID: ${articleId}`);
+    }
 
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
@@ -555,6 +567,7 @@ app.use(async (req, res, next) => {
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Length', Buffer.byteLength(html).toString());
     res.setHeader('Vary', 'User-Agent');
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Access-Control-Allow-Origin', '*');
