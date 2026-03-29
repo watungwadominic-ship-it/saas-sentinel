@@ -60,7 +60,6 @@ export async function saveNewsArticle(article: Partial<Article>) {
         category: article.category,
         summary: article.summary,
         created_at: new Date().toISOString(),
-        read_time: article.readTime,
         source: article.source,
         image_url: article.image_url,
         breakdown: article.breakdown,
