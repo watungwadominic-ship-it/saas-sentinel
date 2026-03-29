@@ -867,9 +867,9 @@ export default function App() {
     const hasArticleId = params.get('article') || params.get('articleId') || params.get('id') || window.location.pathname.includes('/article/') || window.location.pathname.includes('/news/');
     
     if (!consent) {
-      // If it's a deep link, maybe delay the consent a bit or show it after a scroll
+      // If it's a deep link, delay the consent significantly to allow reading
       if (hasArticleId) {
-        const timer = setTimeout(() => setShowCookieConsent(true), 3000);
+        const timer = setTimeout(() => setShowCookieConsent(true), 10000); // 10 seconds delay for deep links
         return () => clearTimeout(timer);
       } else {
         setShowCookieConsent(true);
@@ -1086,6 +1086,23 @@ export default function App() {
         const params = new URLSearchParams(window.location.search);
         let articleId = params.get('article') || params.get('articleId') || params.get('id');
         
+        // Also check return_url if present (infrastructure cookie check)
+        if (!articleId && params.get('return_url')) {
+          try {
+            const returnUrl = decodeURIComponent(params.get('return_url')!);
+            const returnParams = new URLSearchParams(returnUrl.split('?')[1] || '');
+            articleId = returnParams.get('article') || returnParams.get('articleId') || returnParams.get('id');
+            
+            if (!articleId) {
+              const pathParts = returnUrl.split(/[?#\s\\]/)[0].split('/');
+              const articleIdx = pathParts.findIndex(p => p === 'article' || p === 'news');
+              if (articleIdx !== -1 && pathParts[articleIdx + 1]) {
+                articleId = pathParts[articleIdx + 1];
+              }
+            }
+          } catch (e) {}
+        }
+        
         if (!articleId) {
           const pathParts = window.location.pathname.split('/');
           // Support both /article/ID and /news/ID formats
@@ -1103,6 +1120,20 @@ export default function App() {
             setShowAbout(false);
             setShowPrivacy(false);
             setShowArchive(false);
+          } else {
+            // If not found in the list, fetch it specifically
+            try {
+              const { fetchArticleById } = await import('./services/news_articles.js');
+              const article = await fetchArticleById(articleId);
+              if (article) {
+                setSelectedArticle(article);
+                setShowAbout(false);
+                setShowPrivacy(false);
+                setShowArchive(false);
+              }
+            } catch (err) {
+              console.error("Failed to fetch specific article for deep link:", err);
+            }
           }
         }
       } catch (error) {
