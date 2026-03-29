@@ -144,19 +144,19 @@ app.use(async (req, res, next) => {
                 (req.path.startsWith("/__cookie_check.html")) ||
                 (req.path === "/__cookie_check.html" && req.query.return_url)) && (!isAISPreview || isLinkedIn || forceBot);
 
+  // Log every request that hits the middleware for debugging
+  if (isBot || req.path.includes('article') || req.path.includes('news')) {
+    console.log(`[DEBUG-REQUEST] Path: ${req.path} | Bot: ${isBot} | AIS Preview: ${isAISPreview} | UA: ${userAgent.substring(0, 50)}...`);
+  }
+
   // If it's not a bot and not a cookie check, let Vite/Static handle it
   // This is CRITICAL for the AI Studio preview to work correctly in development
   if (!isBot && !forceBot && !isLinkedIn && req.path !== "/__cookie_check.html") {
     return next();
   }
 
-  // Log cookie check requests specifically to debug LinkedIn
-  if (req.path === "/__cookie_check.html" || (isBot && !isAISPreview)) {
-    console.log(`[BOT-DEBUG] Path: ${req.path} | Bot: ${isBot} | AIS Preview: ${isAISPreview} | Agent: ${userAgent} | Headers: ${JSON.stringify(req.headers)}`);
-  }
-
   // Extract article ID from query or path
-  let articleId = (req.query.article as string) || (req.query.article_id as string);
+  let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string);
   
   // Path-based extraction
   if (!articleId) {
@@ -164,7 +164,10 @@ app.use(async (req, res, next) => {
     // Matches /article/ID or /news/ID or /article/ID/v/TIMESTAMP
     if (pathParts[1] === "article" || pathParts[1] === "news") {
       articleId = pathParts[2].split(/[\/?#\s\\]/)[0];
+      console.log(`[DEBUG-ID] Extracted ID from path: ${articleId}`);
     }
+  } else {
+    console.log(`[DEBUG-ID] Extracted ID from query: ${articleId}`);
   }
 
   // Extract from return_url if present (infrastructure cookie checks)
@@ -382,14 +385,16 @@ app.use(async (req, res, next) => {
           
           if (article.image_url) {
             let img = article.image_url.trim();
-            console.log(`[DEBUG-OG] Article Image URL: ${img}`);
+            console.log(`[DEBUG-OG] Article Image URL from DB: ${img}`);
             if (img && img.length > 5) {
               let resolvedImg = "";
               try {
-                if (img.startsWith('http')) {
+                if (img.startsWith('http:')) {
                   resolvedImg = img.replace('http:', 'https:');
                 } else if (img.startsWith('//')) {
                   resolvedImg = `https:${img}`;
+                } else if (img.startsWith('https:')) {
+                  resolvedImg = img;
                 } else if (img.match(/^[a-zA-Z0-9_-]+$/)) {
                   // If it's just an ID or keyword, try to make it an Unsplash URL
                   resolvedImg = `https://images.unsplash.com/photo-${img}?auto=format&fit=crop&q=80&w=1200&h=630`;
@@ -421,7 +426,7 @@ app.use(async (req, res, next) => {
                 }
                 
                 ogImage = escapeHtml(resolvedImg);
-                console.log(`[DEBUG-OG] Resolved Image URL: ${resolvedImg}`);
+                console.log(`[DEBUG-OG] Final Resolved Image URL: ${resolvedImg}`);
               } catch (e) {
                 console.error("[DEBUG] Failed to resolve image URL:", img, e);
               }
@@ -436,6 +441,14 @@ app.use(async (req, res, next) => {
       }
     }
 
+    // Determine image type dynamically
+    let ogImageType = "image/jpeg";
+    const lowerImage = ogImage.toLowerCase();
+    if (lowerImage.includes(".png")) ogImageType = "image/png";
+    else if (lowerImage.includes(".gif")) ogImageType = "image/gif";
+    else if (lowerImage.includes(".webp")) ogImageType = "image/webp";
+    else if (lowerImage.includes(".svg")) ogImageType = "image/svg+xml";
+
     const metaTags = `
   <title>${ogTitle}</title>
   <meta name="description" content="${ogDescription}" />
@@ -444,7 +457,7 @@ app.use(async (req, res, next) => {
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
   <meta property="og:image:secure_url" content="${ogImage}" />
-  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:type" content="${ogImageType}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="${ogTitle}" />
@@ -481,7 +494,6 @@ app.use(async (req, res, next) => {
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/__cookie_check\.html/gi, 'index.html');
     html = html.replace(/<meta[^>]+content=["']Cookie check["'][^>]*>/gi, '');
-    html = html.replace(/<title>Cookie check<\/title>/gi, `<title>${ogTitle}</title>`);
 
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
