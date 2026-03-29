@@ -150,15 +150,15 @@ app.use(async (req, res, next) => {
 
   // Aggressive bot detection - LinkedIn should ALWAYS be treated as a bot even on preview URLs
   const isBot = (forceBot || isLinkedIn || 
-                /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf)\b/i.test(userAgent) || 
+                /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent) || 
                 req.headers['x-fb-http-engine'] !== undefined ||
                 req.headers['x-linkedin-id'] !== undefined ||
                 (req.path.includes("cookie_check")) ||
                 (req.query.return_url !== undefined)) && (!isAISPreview || isLinkedIn || forceBot || req.path.includes('cookie_check'));
 
   // Log every request that hits the middleware for debugging
-  if (isBot || req.path.includes('article') || req.path.includes('news')) {
-    console.log(`[DEBUG-REQUEST] Path: ${req.path} | Bot: ${isBot} | AIS Preview: ${isAISPreview} | UA: ${userAgent.substring(0, 50)}...`);
+  if (isBot || req.path.includes('article') || req.path.includes('news') || req.path.includes('cookie_check')) {
+    console.log(`[DEBUG-REQUEST] Path: ${req.path} | Bot: ${isBot} | LinkedIn: ${isLinkedIn} | AIS Preview: ${isAISPreview} | UA: ${userAgent.substring(0, 100)}...`);
   }
 
   // If it's not a bot and not a cookie check, let Vite/Static handle it
@@ -271,18 +271,19 @@ app.use(async (req, res, next) => {
   try {
     let html = "";
     
-    // For bots, we prefer a clean, minimal HTML to avoid any "Cookie check" scripts
+    // For bots or cookie check redirects, we prefer a clean, minimal HTML to avoid any "Cookie check" scripts
     // that might be present in the actual index.html file.
-    if (isBot) {
-      console.log(`[DEBUG-BOT] Generating clean HTML for bot | Path: ${req.path} | Article: ${articleId}`);
+    if (isBot || req.path.includes("cookie_check")) {
+      console.log(`[DEBUG-BOT] Generating clean HTML for bot or cookie check | Path: ${req.path} | Article: ${articleId}`);
       html = `<!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- SaaS Sentinel Bot Fallback -->
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">SaaS Sentinel Intelligence Report</div>
 </body>
 </html>`;
     } else {
@@ -434,13 +435,10 @@ app.use(async (req, res, next) => {
                   resolvedImg = `https://images.unsplash.com/photo-${img}?auto=format&fit=crop&q=80&w=1200&h=630`;
                 } else if (img.includes('unsplash.com')) {
                   // Ensure Unsplash URLs have proper dimensions for social media
-                  if (!img.includes('w=') || !img.includes('h=')) {
-                    // Remove existing w/h if they exist to avoid conflicts, then add our own
-                    const cleanUrl = img.split('?')[0];
-                    resolvedImg = `${cleanUrl}?auto=format&fit=crop&q=80&w=1200&h=630`;
-                  } else {
-                    resolvedImg = img;
-                  }
+                  // We split by '?' to remove existing params and add our own optimized ones
+                  const cleanUrl = img.split('?')[0];
+                  resolvedImg = `${cleanUrl}?auto=format&fit=crop&q=80&w=1200&h=630`;
+                  console.log(`[DEBUG-OG] Optimized Unsplash URL: ${resolvedImg}`);
                 } else {
                   // For other URLs, if they are relative, they are likely from the news source
                   // and we can't easily resolve them here without the source domain.
@@ -520,17 +518,17 @@ app.use(async (req, res, next) => {
   <meta property="og:image:height" content="630" />`;
 
     const metaTags = `
-  <title>${ogTitle}</title>
-  <meta name="title" content="${ogTitle}" />
-  <meta name="description" content="${ogDescription}" />
-  <link rel="canonical" href="${ogUrl}" />
-  <meta property="og:title" content="${ogTitle}" />
-  <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
   <meta property="og:image:url" content="${ogImage}" />
   <meta property="og:image:secure_url" content="${ogImage}" />
   <meta property="og:image:type" content="${ogImageType}" />${imageDimensions}
   <meta property="og:image:alt" content="${ogTitle}" />
+  <meta name="twitter:image" content="${ogImage}" />
+  <meta name="twitter:image:src" content="${ogImage}" />
+  <meta name="twitter:image:alt" content="${ogTitle}" />
+  <meta itemprop="image" content="${ogImage}">
+  <meta property="og:title" content="${ogTitle}" />
+  <meta property="og:description" content="${ogDescription}" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="SaaS Sentinel" />
@@ -538,14 +536,14 @@ app.use(async (req, res, next) => {
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
-  <meta name="twitter:image" content="${ogImage}" />
-  <meta name="twitter:image:src" content="${ogImage}" />
-  <meta name="twitter:image:alt" content="${ogTitle}" />
   <meta name="twitter:url" content="${ogUrl}" />
+  <meta name="title" content="${ogTitle}" />
+  <meta name="description" content="${ogDescription}" />
+  <link rel="canonical" href="${ogUrl}" />
   <meta name="robots" content="index,follow,max-image-preview:large">
   <meta itemprop="name" content="${ogTitle}">
   <meta itemprop="description" content="${ogDescription}">
-  <meta itemprop="image" content="${ogImage}">
+  <title>${ogTitle}</title>
 `;
 
     if (isBot) {
