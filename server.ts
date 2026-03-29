@@ -171,40 +171,29 @@ app.use(async (req, res, next) => {
   const referer = req.get('referer') || '';
   
   const isAISPreview = xPurpose === 'preview' || 
-                       userAgent.includes('google-cloud-run-preview') ||
+                       userAgent.includes('google-cloud-run') || 
+                       userAgent.includes('google-cloud-resource-manager') ||
                        referer.includes('aistudio.google.com') ||
                        xForwardedHost.startsWith('ais-') ||
-                       xHost.startsWith('ais-');
+                       xHost.startsWith('ais-') ||
+                       xHost.includes('run.app');
 
-  // Aggressive bot detection - LinkedIn should ALWAYS be treated as a bot even on preview URLs
-  // Added req.query.ls check as it's a strong signal from our news bot
   const isBotUA = /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent);
   
-  // Detection for common browsers - we should NEVER treat these as bots for script stripping
-  // unless it's a known bot UA that also includes browser strings (like some crawlers)
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
+  
+  // Explicit signals that override browser detection
+  const isExplicitBot = forceBot || isLinkedIn || (req.query.ls !== undefined) || 
+                        (req.headers['x-fb-http-engine'] !== undefined) ||
+                        (req.headers['x-linkedin-id'] !== undefined);
 
-  const isBot = (forceBot || isLinkedIn || isBotUA || 
-                req.headers['x-fb-http-engine'] !== undefined ||
-                req.headers['x-linkedin-id'] !== undefined ||
-                req.query.ls !== undefined) && (!isAISPreview || isLinkedIn || forceBot) && !isRealBrowser;
-
-  // Log every request that hits the middleware for debugging
-  if (isBot || req.path.includes('article') || req.path.includes('news') || req.path.includes('cookie_check') || req.query.return_url) {
-    console.log(`[DEBUG-REQUEST] Path: ${req.path} | Bot: ${isBot} | LinkedIn: ${isLinkedIn} | AIS Preview: ${isAISPreview} | UA: ${userAgent.substring(0, 100)}...`);
-  }
-
-  // If it's not a bot and not a cookie check, let Vite/Static handle it
-  // This is CRITICAL for the AI Studio preview to work correctly in development
-  const isCookieCheckPath = req.path.includes("cookie_check") || req.path === "/__cookie_check.html";
-  if (!isBot && !isCookieCheckPath && !req.query.return_url) {
-    return next();
-  }
+  // LinkedIn is ALWAYS a bot for us, even in AI Studio preview
+  const isBot = (isExplicitBot || isBotUA) && (!isAISPreview || isLinkedIn || forceBot);
 
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string) || (req.query.articleId as string);
   
-  // Path-based extraction
+  // Path-based extraction (e.g. /article/257)
   if (!articleId) {
     const pathParts = req.path.split("/");
     // Matches /article/ID or /news/ID or /article/ID/v/TIMESTAMP
@@ -212,8 +201,6 @@ app.use(async (req, res, next) => {
       articleId = pathParts[2].split(/[\/?#\s\\]/)[0];
       console.log(`[DEBUG-ID] Extracted ID from path: ${articleId}`);
     }
-  } else {
-    console.log(`[DEBUG-ID] Extracted ID from query: ${articleId}`);
   }
 
   // Extract from return_url if present (infrastructure cookie checks)
@@ -221,21 +208,24 @@ app.use(async (req, res, next) => {
   if (!articleId && returnUrl) {
     try {
       let decodedReturnUrl = returnUrl;
+      // Multi-pass decode to handle nested encoding
       for (let i = 0; i < 3; i++) {
         const next = decodeURIComponent(decodedReturnUrl);
         if (next === decodedReturnUrl) break;
         decodedReturnUrl = next;
       }
       
+      // Try to find ID in query params of return_url
       const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id|id|articleId)=([^&]+)/i);
       if (queryMatch) {
         articleId = queryMatch[1].split(/[\/?#\s\\]/)[0];
       }
       
+      // Try to find ID in path of return_url
       if (!articleId) {
-        const pathMatch = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/i);
-        if (pathMatch) {
-          articleId = pathMatch[1].split(/[\/?#\s\\]/)[0];
+        const pathM = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/i);
+        if (pathM) {
+          articleId = pathM[1].split(/[\/?#\s\\]/)[0];
         }
       }
       
@@ -247,12 +237,10 @@ app.use(async (req, res, next) => {
         if (genericIdMatch) {
           articleId = genericIdMatch[1];
           console.log(`[DEBUG-COOKIE] Generic ID extraction from return_url: ${articleId}`);
-        } else {
-          console.log(`[DEBUG-COOKIE] Failed to extract ArticleID from return_url: ${returnUrl}`);
         }
       }
     } catch (e) {
-      console.error("[DEBUG] Error parsing return_url for articleId:", e);
+      console.error(`[DEBUG-ERR] Failed to parse return_url: ${e}`);
     }
   }
 
@@ -360,33 +348,9 @@ app.use(async (req, res, next) => {
 </body>
 </html>`;
     } else {
-      const possiblePaths = [
-        path.join(process.cwd(), "dist", "index.html"),
-        path.join(process.cwd(), "index.html"),
-        path.join(__dirname, "dist", "index.html"),
-        path.join(__dirname, "index.html"),
-        "/var/task/dist/index.html",
-        "/var/task/index.html",
-      ];
-
-      let indexPath = "";
-      for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-          indexPath = p;
-          break;
-        }
-      }
-
-      if (indexPath) {
-        try {
-          html = fs.readFileSync(indexPath, "utf-8");
-        } catch (e) {
-          console.error(`[DEBUG] Failed to read index.html at ${indexPath}:`, e);
-        }
-      }
-
-      if (!html || html.toLowerCase().includes("cookie check") || html.toLowerCase().includes("checking your browser") || req.path.includes("cookie_check")) {
-        console.log(`[DEBUG] Detected cookie check content or empty HTML in index.html, using fallback | Path: ${req.path}`);
+      try {
+        html = fs.readFileSync(path.join(process.cwd(), "dist", "index.html"), "utf-8");
+      } catch (e) {
         html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
       }
     }
@@ -575,7 +539,9 @@ app.use(async (req, res, next) => {
                 // This is especially useful for URLs without extensions or from domains that block LinkedIn
                 if (resolvedImg && !resolvedImg.includes(finalBaseUrl) && !resolvedImg.includes('picsum.photos') && !resolvedImg.includes('unsplash.com')) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
-                  const proxiedUrl = `${finalBaseUrl.replace(/\/$/, '')}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg`;
+                  // Ensure we use a clean base URL without trailing slash
+                  const cleanBase = finalBaseUrl.replace(/\/$/, '');
+                  const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg`;
                   ogImage = escapeHtml(proxiedUrl);
                 }
               } catch (e) {
@@ -632,6 +598,8 @@ app.use(async (req, res, next) => {
   <meta name="twitter:url" content="${ogUrl}" />
   <link rel="canonical" href="${ogUrl}" />
   <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="author" content="SaaS Sentinel">
+  <meta name="publish_date" content="${new Date().toISOString()}">
 `;
 
     if (isBot) {
@@ -657,10 +625,6 @@ app.use(async (req, res, next) => {
     html = html.replace(/__cookie_check\.html/gi, 'index.html');
     html = html.replace(/<meta[^>]+content=["']Cookie check["'][^>]*>/gi, '');
     
-    if (isBot && req.path.includes('cookie_check')) {
-      console.log(`[DEBUG-COOKIE] Serving OG tags for cookie check path. ArticleID: ${articleId}`);
-    }
-
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
     if (isBot && !isAISPreview) {
@@ -682,8 +646,6 @@ app.use(async (req, res, next) => {
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    // Remove Content-Length to avoid potential 206 Partial Content issues with some crawlers
-    // res.setHeader('Content-Length', Buffer.byteLength(html).toString());
     res.setHeader('Vary', 'User-Agent');
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Access-Control-Allow-Origin', '*');
