@@ -190,21 +190,37 @@ def run_news_bot():
         # 4. Save to Supabase
         # Mapping the AI fields to the database schema
         summary_text = str(ai_data.get('feed_summary', ""))
-        image_url = latest.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200"
         
-        # Fix protocol-relative URLs
-        if image_url and image_url.startswith('//'):
-            image_url = f"https:{image_url}"
+        # Ensure image URL is absolute and has proper dimensions
+        image_url = latest.get('urlToImage')
+        if not image_url:
+            # Better fallback with proper dimensions for social media
+            image_url = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630"
+        
+        source_url = latest.get('url', '')
+        if image_url and not image_url.startswith('http'):
+            if image_url.startswith('//'):
+                image_url = f"https:{image_url}"
+            elif source_url:
+                from urllib.parse import urljoin
+                image_url = urljoin(source_url, image_url)
+        
+        # If it's an Unsplash URL, ensure it has the right dimensions
+        if "unsplash.com" in image_url and ("w=" not in image_url or "h=" not in image_url):
+            base_img = image_url.split('?')[0]
+            image_url = f"{base_img}?auto=format&fit=crop&q=80&w=1200&h=630"
             
         payload = {
             "title": title,
             "summary": summary_text,
-            "analysis_content": clean_analysis.strip(), 
+            "content": clean_analysis.strip(), # Map analysis to content
+            "sentinel_take": clean_analysis.strip(), # Also map to sentinel_take for frontend
+            "verdict": f"Strategic Impact: {ai_data.get('impact', 'High')}. Market Sentiment: {ai_data.get('sentiment', 'BULLISH')}.",
+            "breakdown": [summary_text[:150], "Strategic analysis completed by SaaS Sentinel AI.", f"Impact Assessment: {ai_data.get('impact', 'High')}"],
             "confidence_score": random.randint(95, 99),
-            "strategic_impact": ai_data.get('impact', 'High'),
             "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": image_url,
-            "source_url": latest.get('url'),
+            "source": "SaaS Sentinel Intelligence",
             "published_at": latest.get('publishedAt') or datetime.now().isoformat()
         }
         
@@ -218,6 +234,8 @@ def run_news_bot():
             article_id = saved_data[0]['id'] if saved_data else None
             
             print(f"✅ Intelligence Logged: {title[:50]}...")
+            print(f"🖼️ Image URL: {image_url}")
+            print(f"🆔 Article ID: {article_id}")
             
             # Use path-based URLs which are less likely to trigger infrastructure cookie checks
             # than query-parameter based URLs.
