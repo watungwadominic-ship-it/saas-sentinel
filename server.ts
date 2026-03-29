@@ -119,12 +119,14 @@ app.use(async (req, res, next) => {
   const forceBot = req.query.force_bot === 'true' || req.headers['x-force-bot'] === 'true';
 
   // Aggressive bot detection
-  const isLinkedIn = /linkedin/i.test(userAgent) || xLinkedInId !== undefined;
+  const isLinkedIn = /linkedin/i.test(userAgent) || 
+                     xLinkedInId !== undefined || 
+                     userAgent.includes('LinkedInBot') ||
+                     userAgent.includes('authorizedentity');
+  
   const isBot = forceBot || isLinkedIn || 
-                /LinkedInBot|linkedin|bot|googlebot|facebook|twitter|slack|whatsapp|telegram|crawler|spider|archiver|curl|wget|bingbot|yandex|baiduspider|duckduckbot|facebot|ia_archiver|Apache-HttpClient|facebookexternalhit|Embedly|quora link preview|showyoubot|outbrain|pinterest|vkShare|W3C_Validator|redditbot|Applebot|Discordbot|Discord-GTM|Twitterbot|SkypeUriPreview|BitlyBot|AhrefsBot|SemrushBot|MJ12bot|DotBot|Slack-ImgProxy|Slackbot-LinkExpanding|AdsBot-Google|Mediapartners-Google|AdsBot-Google-Mobile|AdsBot-Google-Mobile-Apps|AdsBot-Google-Apps|AdsBot-Google-Mobile-Apps-Android|AdsBot-Google-Mobile-Apps-iOS/i.test(userAgent) || 
+                /bot|google|baidu|bing|msn|duckduckgo|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|applebot|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|preview|embedly|quora|showyoubot|outbrain|W3C_Validator|SkypeUriPreview|BitlyBot|AhrefsBot|SemrushBot|MJ12bot|DotBot/i.test(userAgent) || 
                 xPurpose === 'preview' ||
-                userAgent.toLowerCase().includes('authorizedentity') ||
-                userAgent.toLowerCase().includes('linkedin') ||
                 req.headers['range'] !== undefined ||
                 req.headers['x-fb-http-engine'] !== undefined ||
                 (req.path === "/__cookie_check.html" && req.query.return_url);
@@ -137,7 +139,7 @@ app.use(async (req, res, next) => {
     const pathParts = req.path.split("/");
     // Matches /article/ID or /news/ID or /article/ID/v/TIMESTAMP
     if (pathParts[1] === "article" || pathParts[1] === "news") {
-      // Ensure we only get the ID part, even if there's a /v/ suffix
+      // Ensure we only get the ID part, even if there's a /v/ suffix or other junk
       articleId = pathParts[2].split(/[\/?#\s\\]/)[0];
     }
   }
@@ -154,15 +156,22 @@ app.use(async (req, res, next) => {
         decodedReturnUrl = next;
       }
       
+      // Try to find article ID in the decoded return URL
       const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id)=([^&]+)/);
       if (queryMatch) {
         articleId = queryMatch[1].split(/[\/?#\s\\]/)[0];
       }
+      
       if (!articleId) {
+        // Match /article/ID or /news/ID in the return URL
         const pathMatch = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/);
         if (pathMatch) {
           articleId = pathMatch[1].split(/[\/?#\s\\]/)[0];
         }
+      }
+      
+      if (articleId) {
+        console.log(`[DEBUG-COOKIE] Extracted ArticleID ${articleId} from return_url: ${decodedReturnUrl.substring(0, 100)}...`);
       }
     } catch (e) {
       console.error("[DEBUG] Error parsing return_url for articleId:", e);
@@ -170,14 +179,13 @@ app.use(async (req, res, next) => {
   }
 
   // Detailed logging for all non-static requests to debug bot traffic
-  if (!req.path.includes(".") || isBot) {
-    console.log(`[DEBUG-REQ] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 50)}... | Article: ${articleId} | isBot: ${isBot}`);
+  if (!req.path.includes(".") || isBot || req.path === "/__cookie_check.html") {
+    console.log(`[DEBUG-REQ] ${req.method} ${req.path} | Agent: ${userAgent.substring(0, 60)}... | Article: ${articleId} | isBot: ${isBot} | isLinkedIn: ${isLinkedIn}`);
   }
 
   // CRITICAL: Skip static assets (images, css, js) - even for bots!
-  // If we don't skip, bots trying to fetch the image will get the HTML page instead.
   const isStaticAsset = /\.(jpg|jpeg|png|gif|svg|webp|css|js|ico|woff|woff2|ttf|otf|map|json)$/i.test(req.path);
-  if (isStaticAsset) {
+  if (isStaticAsset && req.path !== "/__cookie_check.html") {
     return next();
   }
 
@@ -316,20 +324,20 @@ app.use(async (req, res, next) => {
     if (articleId && articleId !== "undefined" && articleId !== "null") {
       try {
         console.log(`[DEBUG-OG] Attempting to fetch article ${articleId} for OG tags...`);
-        // Use .js extension for compatibility with ESM and Node's TS stripping
-        // Wrap in try-catch to handle potential module resolution issues
-        const { fetchArticleById } = await import("./src/services/news_articles.js").catch(async (err) => {
-          console.warn(`[DEBUG-OG] Failed to import .js, trying .ts: ${err.message}`);
-          return await import("./src/services/news_articles.ts");
+        const { supabase } = await import("./src/services/supabase.js").catch(async (err) => {
+          console.warn(`[DEBUG-OG] Failed to import supabase.js, trying .ts: ${err.message}`);
+          return await import("./src/services/supabase.ts");
         });
         
-        const article = await Promise.race([
-          fetchArticleById(articleId),
-          new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
-        ]).catch((err) => {
-          console.error(`[DEBUG] Article fetch failed or timed out for ID ${articleId}:`, err);
-          return null;
-        });
+        const { data: article, error: fetchError } = await supabase
+          .from("news_articles")
+          .select("*")
+          .eq("id", articleId)
+          .maybeSingle();
+
+        if (fetchError) {
+          console.error(`[DEBUG-OG] Supabase fetch error for ID ${articleId}:`, fetchError);
+        }
 
         if (article && article.title) {
           ogTitle = escapeHtml(article.title);
@@ -341,7 +349,6 @@ app.use(async (req, res, next) => {
             if (img && img.length > 5) {
               let resolvedImg = "";
               try {
-                // Use URL constructor for robust resolution
                 if (img.startsWith('http')) {
                   resolvedImg = img.replace('http:', 'https:');
                 } else if (img.startsWith('//')) {
@@ -357,15 +364,13 @@ app.use(async (req, res, next) => {
               }
             }
           }
-          console.log(`[DEBUG] OG Tags generated for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
+          console.log(`[DEBUG-OG] Success for ${articleId}: Title="${ogTitle}", Image="${ogImage}"`);
         } else {
-          console.log(`[DEBUG] Article found but title missing or null for ID ${articleId}`);
+          console.log(`[DEBUG-OG] Article not found or title missing for ID ${articleId}`);
         }
       } catch (e) {
-        console.error("[DEBUG] Error fetching article for OG tags:", e);
+        console.error("[DEBUG-OG] Error fetching article:", e);
       }
-    } else {
-      console.log(`[DEBUG] No articleId provided in request, using default OG tags`);
     }
 
     const metaTags = `
@@ -383,19 +388,18 @@ app.use(async (req, res, next) => {
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="SaaS Sentinel" />
-  <meta property="article:published_time" content="${new Date().toISOString()}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
   <meta name="twitter:image" content="${ogImage}" />
   <meta name="twitter:image:alt" content="${ogTitle}" />
   <meta name="twitter:url" content="${ogUrl}" />
-  <link rel="image_src" href="${ogImage}" />
-  <meta itemprop="name" content="${ogTitle}">
-  <meta itemprop="description" content="${ogDescription}">
-  <meta itemprop="image" content="${ogImage}">
   <meta name="robots" content="index,follow,max-image-preview:large">
 `;
+
+    if (isBot) {
+      console.log(`[BOT-META] Generated Tags for ${articleId || 'home'}:\n${metaTags.substring(0, 500)}...`);
+    }
 
     // Aggressive removal of existing tags (handles both property and name)
     html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
