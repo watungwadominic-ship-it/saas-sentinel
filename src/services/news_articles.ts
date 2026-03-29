@@ -57,9 +57,15 @@ export async function saveNewsArticle(article: Partial<Article>) {
       {
         title: article.title,
         content: article.content,
+        summary: article.summary,
         category: article.category,
         created_at: new Date().toISOString(),
-        image_url: article.image_url
+        image_url: article.image_url,
+        read_time: article.readTime || '5 min read',
+        source: article.source || 'SaaS Sentinel AI',
+        breakdown: article.breakdown,
+        sentinel_take: article.sentinel_take,
+        verdict: article.verdict
       }
     ])
     .select();
