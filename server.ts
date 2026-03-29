@@ -123,6 +123,7 @@ app.use(async (req, res, next) => {
                      userAgent.includes('authorizedentity') || 
                      userAgent.includes('linkedinbot') ||
                      userAgent.includes('linkedin-bot') ||
+                     userAgent.includes('apache-httpclient') ||
                      xLinkedInId !== undefined;
                      
   // AI Studio Preview detection - we should NOT treat this as a bot for script stripping
@@ -425,6 +426,36 @@ app.use(async (req, res, next) => {
                    resolvedImg = FALLBACK_IMAGES[randomIdx];
                 }
                 
+                // Clean up URL: remove common tracking params that might confuse crawlers
+                // but keep most others to avoid breaking CDN-specific features
+                try {
+                  const urlObj = new URL(resolvedImg);
+                  const params = urlObj.searchParams;
+                  
+                  // Parameters to explicitly remove
+                  const trackingParams = [
+                    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 
+                    'fbclid', 'gclid', '_ga', '_gl', 'mc_cid', 'mc_eid', 'ls', 'v'
+                  ];
+                  
+                  trackingParams.forEach(p => params.delete(p));
+                  
+                  // Special handling for WordPress proxy de-proxying
+                  if (resolvedImg.includes('i0.wp.com') || resolvedImg.includes('i1.wp.com') || resolvedImg.includes('i2.wp.com')) {
+                    const wpMatch = resolvedImg.match(/i[0-2]\.wp\.com\/(.+)/);
+                    if (wpMatch) {
+                      let original = wpMatch[1].split('?')[0];
+                      if (!original.startsWith('http')) original = 'https://' + original;
+                      resolvedImg = original;
+                      console.log(`[DEBUG-OG] De-proxied WP image: ${resolvedImg}`);
+                    }
+                  } else {
+                    resolvedImg = urlObj.toString();
+                  }
+                } catch (urlErr) {
+                  console.warn("[DEBUG] Could not parse URL for cleaning:", resolvedImg);
+                }
+
                 ogImage = escapeHtml(resolvedImg);
                 console.log(`[DEBUG-OG] Final Resolved Image URL: ${resolvedImg}`);
               } catch (e) {
@@ -449,6 +480,12 @@ app.use(async (req, res, next) => {
     else if (lowerImage.includes(".webp")) ogImageType = "image/webp";
     else if (lowerImage.includes(".svg")) ogImageType = "image/svg+xml";
 
+    // Always provide dimensions for LinkedIn to ensure proper layout
+    // Default to 1200x630 if we're not sure
+    const imageDimensions = `
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />`;
+
     const metaTags = `
   <title>${ogTitle}</title>
   <meta name="description" content="${ogDescription}" />
@@ -457,9 +494,7 @@ app.use(async (req, res, next) => {
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
   <meta property="og:image:secure_url" content="${ogImage}" />
-  <meta property="og:image:type" content="${ogImageType}" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
+  <meta property="og:image:type" content="${ogImageType}" />${imageDimensions}
   <meta property="og:image:alt" content="${ogTitle}" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
@@ -468,13 +503,17 @@ app.use(async (req, res, next) => {
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
   <meta name="twitter:image" content="${ogImage}" />
+  <meta name="twitter:image:src" content="${ogImage}" />
   <meta name="twitter:image:alt" content="${ogTitle}" />
   <meta name="twitter:url" content="${ogUrl}" />
   <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta itemprop="name" content="${ogTitle}">
+  <meta itemprop="description" content="${ogDescription}">
+  <meta itemprop="image" content="${ogImage}">
 `;
 
     if (isBot) {
-      console.log(`[BOT-META] Generated Tags for ${articleId || 'home'}:\n${metaTags.substring(0, 500)}...`);
+      console.log(`[BOT-META] Full Generated Tags for ${articleId || 'home'}:\n${metaTags}`);
     }
 
     // Aggressive removal of existing tags (handles both property and name)
