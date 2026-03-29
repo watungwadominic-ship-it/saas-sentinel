@@ -862,8 +862,18 @@ export default function App() {
   // Check for cookie consent
   useEffect(() => {
     const consent = localStorage.getItem('cookie-consent');
+    // Check if we are viewing a specific article to avoid distracting new users immediately
+    const params = new URLSearchParams(window.location.search);
+    const hasArticleId = params.get('article') || params.get('articleId') || params.get('id') || window.location.pathname.includes('/article/') || window.location.pathname.includes('/news/');
+    
     if (!consent) {
-      setShowCookieConsent(true);
+      // If it's a deep link, maybe delay the consent a bit or show it after a scroll
+      if (hasArticleId) {
+        const timer = setTimeout(() => setShowCookieConsent(true), 3000);
+        return () => clearTimeout(timer);
+      } else {
+        setShowCookieConsent(true);
+      }
     }
   }, []);
 
@@ -1072,12 +1082,27 @@ export default function App() {
         setArticles(data);
 
         // Check for article parameter in URL after articles are loaded
+        // Handle deep linking from URL params or path
         const params = new URLSearchParams(window.location.search);
-        const articleId = params.get('article');
+        let articleId = params.get('article') || params.get('articleId') || params.get('id');
+        
+        if (!articleId) {
+          const pathParts = window.location.pathname.split('/');
+          // Support both /article/ID and /news/ID formats
+          const articleIdx = pathParts.findIndex(p => p === 'article' || p === 'news');
+          if (articleIdx !== -1 && pathParts[articleIdx + 1]) {
+            articleId = pathParts[articleIdx + 1];
+          }
+        }
+
         if (articleId) {
           const found = data.find(a => a.id === articleId);
           if (found) {
             setSelectedArticle(found);
+            // Clear other views to ensure we show the article
+            setShowAbout(false);
+            setShowPrivacy(false);
+            setShowArchive(false);
           }
         }
       } catch (error) {
