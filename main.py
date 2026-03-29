@@ -49,6 +49,8 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         
         # We explicitly include the 'content' block with 'article' source. 
         # This is the most reliable way to trigger a link preview with an image.
+        # We REMOVED force_bot=true because it was causing human users to see the bot fallback page.
+        # LinkedIn's crawler is automatically detected by its User-Agent in server.ts.
         post_data = {
             "author": LINKEDIN_PERSON_URN,
             "commentary": text, # Use the original text which contains the clean URL
@@ -60,9 +62,9 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             },
             "content": {
                 "article": {
-                    "source": final_url,
+                    "source": url, # Use the clean URL without force_bot=true
                     "title": title,
-                    "description": (summary or title)[:250]
+                    "description": str(summary or title)[:250]
                 }
             },
             "lifecycleState": "PUBLISHED",
@@ -154,7 +156,7 @@ def run_news_bot():
         for attempt in range(3):
             try:
                 completion = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="llama-3.3-70b-versatile",
                     temperature=0.7, 
                     messages=[
                         {
