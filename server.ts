@@ -110,8 +110,8 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 // OG Tag Injection Middleware
 app.use(async (req, res, next) => {
   // Log all requests to help debug bot traffic and redirects
-  const userAgent = (req.headers["user-agent"] || "").trim();
-  const accept = req.headers.accept || "";
+  const userAgent = (req.headers["user-agent"] || "").toLowerCase();
+  const accept = (req.headers.accept || "").toLowerCase();
   const xLinkedInId = req.headers['x-linkedin-id'];
   const xPurpose = req.headers['x-purpose'] || req.headers['purpose'];
   
@@ -119,17 +119,21 @@ app.use(async (req, res, next) => {
   const forceBot = req.query.force_bot === 'true' || req.headers['x-force-bot'] === 'true';
 
   // Aggressive bot detection
-  const isLinkedIn = /linkedin/i.test(userAgent) || 
-                     xLinkedInId !== undefined || 
-                     userAgent.includes('LinkedInBot') ||
-                     userAgent.includes('authorizedentity');
-  
+  const isLinkedIn = userAgent.includes('linkedin') || 
+                     userAgent.includes('authorizedentity') || 
+                     xLinkedInId !== undefined;
+                     
   const isBot = forceBot || isLinkedIn || 
-                /bot|google|baidu|bing|msn|duckduckgo|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|applebot|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|preview|embedly|quora|showyoubot|outbrain|W3C_Validator|SkypeUriPreview|BitlyBot|AhrefsBot|SemrushBot|MJ12bot|DotBot/i.test(userAgent) || 
+                /bot|google|baidu|bing|msn|duck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|preview|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dot|headless|selenium|puppeteer/i.test(userAgent) || 
                 xPurpose === 'preview' ||
                 req.headers['range'] !== undefined ||
                 req.headers['x-fb-http-engine'] !== undefined ||
                 (req.path === "/__cookie_check.html" && req.query.return_url);
+
+  // Log cookie check requests specifically to debug LinkedIn
+  if (req.path === "/__cookie_check.html" || isBot) {
+    console.log(`[BOT-DEBUG] Path: ${req.path} | Bot: ${isBot} | Agent: ${userAgent} | Headers: ${JSON.stringify(req.headers)}`);
+  }
 
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string);
@@ -139,7 +143,6 @@ app.use(async (req, res, next) => {
     const pathParts = req.path.split("/");
     // Matches /article/ID or /news/ID or /article/ID/v/TIMESTAMP
     if (pathParts[1] === "article" || pathParts[1] === "news") {
-      // Ensure we only get the ID part, even if there's a /v/ suffix or other junk
       articleId = pathParts[2].split(/[\/?#\s\\]/)[0];
     }
   }
@@ -149,21 +152,18 @@ app.use(async (req, res, next) => {
   if (!articleId && returnUrl) {
     try {
       let decodedReturnUrl = returnUrl;
-      // Robust multi-level decoding for nested URLs
       for (let i = 0; i < 3; i++) {
         const next = decodeURIComponent(decodedReturnUrl);
         if (next === decodedReturnUrl) break;
         decodedReturnUrl = next;
       }
       
-      // Try to find article ID in the decoded return URL
       const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id)=([^&]+)/);
       if (queryMatch) {
         articleId = queryMatch[1].split(/[\/?#\s\\]/)[0];
       }
       
       if (!articleId) {
-        // Match /article/ID or /news/ID in the return URL
         const pathMatch = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/);
         if (pathMatch) {
           articleId = pathMatch[1].split(/[\/?#\s\\]/)[0];
@@ -171,7 +171,7 @@ app.use(async (req, res, next) => {
       }
       
       if (articleId) {
-        console.log(`[DEBUG-COOKIE] Extracted ArticleID ${articleId} from return_url: ${decodedReturnUrl.substring(0, 100)}...`);
+        console.log(`[DEBUG-COOKIE] Extracted ArticleID ${articleId} from return_url`);
       }
     } catch (e) {
       console.error("[DEBUG] Error parsing return_url for articleId:", e);
