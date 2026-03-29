@@ -64,10 +64,6 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             "lifecycleState": "PUBLISHED",
             "isReshareDisabledByAuthor": False
         }
-
-        # If an image URL is provided, explicitly set it as the thumbnail
-        if image_url:
-            post_data["content"]["article"]["thumbnail"] = image_url
         
         # Small delay to ensure Supabase is fully synced and server is ready
         # Increased to 15s to handle Vercel cold starts and database sync better
