@@ -122,14 +122,16 @@ app.use(async (req, res, next) => {
   const isLinkedIn = userAgent.includes('linkedin') || 
                      userAgent.includes('authorizedentity') || 
                      userAgent.includes('linkedinbot') ||
+                     userAgent.includes('linkedin-bot') ||
                      xLinkedInId !== undefined;
                      
   const isBot = forceBot || isLinkedIn || 
-                /bot|google|baidu|bing|msn|duck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|preview|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dot|headless|selenium|puppeteer|linkedin|authorizedentity|linkedinbot/i.test(userAgent) || 
+                /bot|google|baidu|bing|msn|duck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|preview|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dot|headless|selenium|puppeteer|linkedin|authorizedentity|linkedinbot|linkedin-bot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|bingbot|baiduspider|yandexbot|duckduckbot|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf/i.test(userAgent) || 
                 xPurpose === 'preview' ||
                 req.headers['range'] !== undefined ||
                 req.headers['x-fb-http-engine'] !== undefined ||
                 req.headers['x-request-id'] !== undefined ||
+                req.headers['x-linkedin-id'] !== undefined ||
                 (req.path.startsWith("/__cookie_check.html")) ||
                 (req.path === "/__cookie_check.html" && req.query.return_url);
 
@@ -161,13 +163,13 @@ app.use(async (req, res, next) => {
         decodedReturnUrl = next;
       }
       
-      const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id|id)=([^&]+)/);
+      const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id|id|articleId)=([^&]+)/i);
       if (queryMatch) {
         articleId = queryMatch[1].split(/[\/?#\s\\]/)[0];
       }
       
       if (!articleId) {
-        const pathMatch = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/);
+        const pathMatch = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/i);
         if (pathMatch) {
           articleId = pathMatch[1].split(/[\/?#\s\\]/)[0];
         }
@@ -254,10 +256,10 @@ app.use(async (req, res, next) => {
       }
     }
 
-    if (!html || html.includes("Cookie check") || html.includes("Checking your browser") || html.includes("Please wait while your application starts")) {
+    if (!html || html.includes("Cookie check") || html.includes("Checking your browser") || html.includes("Please wait while your application starts") || req.path === "/__cookie_check.html" || req.path.includes("cookie_check")) {
       if (isBot) {
-        console.log(`[DEBUG] Detected cookie check content or empty HTML in index.html, using fallback for bot | Path: ${req.path}`);
-        html = `<!DOCTYPE html><html prefix="og: http://ogp.me/ns#"><head><title>SaaS Sentinel</title><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
+        console.log(`[DEBUG] Detected cookie check content or empty HTML in index.html (or direct cookie check path), using fallback for bot | Path: ${req.path}`);
+        html = `<!DOCTYPE html><html prefix="og: http://ogp.me/ns#"><head><title>SaaS Sentinel | Elite B2B Market Intelligence</title><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
       }
     }
 
@@ -363,6 +365,7 @@ app.use(async (req, res, next) => {
           
           if (article.image_url) {
             let img = article.image_url.trim();
+            console.log(`[DEBUG-OG] Article Image URL: ${img}`);
             if (img && img.length > 5) {
               let resolvedImg = "";
               try {
@@ -373,10 +376,25 @@ app.use(async (req, res, next) => {
                 } else if (img.match(/^[a-zA-Z0-9_-]+$/)) {
                   // If it's just an ID or keyword, try to make it an Unsplash URL
                   resolvedImg = `https://images.unsplash.com/photo-${img}?auto=format&fit=crop&q=80&w=1200&h=630`;
+                } else if (img.includes('unsplash.com')) {
+                  // Ensure Unsplash URLs have proper dimensions for social media
+                  if (!img.includes('w=') || !img.includes('h=')) {
+                    // Remove existing w/h if they exist to avoid conflicts, then add our own
+                    const cleanUrl = img.split('?')[0];
+                    resolvedImg = `${cleanUrl}?auto=format&fit=crop&q=80&w=1200&h=630`;
+                  } else {
+                    resolvedImg = img;
+                  }
                 } else {
-                  const cleanBase = finalBaseUrl.replace(/\/$/, '');
-                  const cleanImage = img.startsWith('/') ? img : `/${img}`;
-                  resolvedImg = `${cleanBase}${cleanImage}`;
+                  // For other URLs, if they are relative, they are likely from the news source
+                  // and we can't easily resolve them here without the source domain.
+                  // But if they look like a path, we'll try our domain as a last resort.
+                  if (img.startsWith('/')) {
+                    const cleanBase = finalBaseUrl.replace(/\/$/, '');
+                    resolvedImg = `${cleanBase}${img}`;
+                  } else {
+                    resolvedImg = img;
+                  }
                 }
                 
                 // Final validation: if it doesn't look like a URL, use fallback
@@ -386,6 +404,7 @@ app.use(async (req, res, next) => {
                 }
                 
                 ogImage = escapeHtml(resolvedImg);
+                console.log(`[DEBUG-OG] Resolved Image URL: ${resolvedImg}`);
               } catch (e) {
                 console.error("[DEBUG] Failed to resolve image URL:", img, e);
               }
