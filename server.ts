@@ -125,19 +125,33 @@ app.use(async (req, res, next) => {
                      userAgent.includes('linkedin-bot') ||
                      xLinkedInId !== undefined;
                      
-  const isBot = forceBot || isLinkedIn || 
-                /bot|google|baidu|bing|msn|duck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|preview|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dot|headless|selenium|puppeteer|linkedin|authorizedentity|linkedinbot|linkedin-bot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|bingbot|baiduspider|yandexbot|duckduckbot|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf/i.test(userAgent) || 
-                xPurpose === 'preview' ||
-                req.headers['range'] !== undefined ||
+  // AI Studio Preview detection - we should NOT treat this as a bot for script stripping
+  const xForwardedHost = req.get('x-forwarded-host') || '';
+  const xHost = req.get('host') || '';
+  const referer = req.get('referer') || '';
+  
+  const isAISPreview = xPurpose === 'preview' || 
+                       userAgent.includes('google-cloud-run-preview') ||
+                       referer.includes('aistudio.google.com') ||
+                       xForwardedHost.startsWith('ais-') ||
+                       xHost.startsWith('ais-');
+
+  const isBot = (forceBot || isLinkedIn || 
+                /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|linkedinbot|authorizedentity|linkedin-bot|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf)\b/i.test(userAgent) || 
                 req.headers['x-fb-http-engine'] !== undefined ||
-                req.headers['x-request-id'] !== undefined ||
                 req.headers['x-linkedin-id'] !== undefined ||
                 (req.path.startsWith("/__cookie_check.html")) ||
-                (req.path === "/__cookie_check.html" && req.query.return_url);
+                (req.path === "/__cookie_check.html" && req.query.return_url)) && !isAISPreview;
+
+  // If it's not a bot and not a cookie check, let Vite/Static handle it
+  // This is CRITICAL for the AI Studio preview to work correctly in development
+  if (!isBot && !forceBot && !isLinkedIn && req.path !== "/__cookie_check.html") {
+    return next();
+  }
 
   // Log cookie check requests specifically to debug LinkedIn
-  if (req.path === "/__cookie_check.html" || isBot) {
-    console.log(`[BOT-DEBUG] Path: ${req.path} | Bot: ${isBot} | Agent: ${userAgent} | Headers: ${JSON.stringify(req.headers)}`);
+  if (req.path === "/__cookie_check.html" || (isBot && !isAISPreview)) {
+    console.log(`[BOT-DEBUG] Path: ${req.path} | Bot: ${isBot} | AIS Preview: ${isAISPreview} | Agent: ${userAgent} | Headers: ${JSON.stringify(req.headers)}`);
   }
 
   // Extract article ID from query or path
@@ -257,7 +271,7 @@ app.use(async (req, res, next) => {
     }
 
     if (!html || html.includes("Cookie check") || html.includes("Checking your browser") || html.includes("Please wait while your application starts") || req.path === "/__cookie_check.html" || req.path.includes("cookie_check")) {
-      if (isBot) {
+      if (isBot && !isAISPreview) {
         console.log(`[DEBUG] Detected cookie check content or empty HTML in index.html (or direct cookie check path), using fallback for bot | Path: ${req.path}`);
         html = `<!DOCTYPE html><html prefix="og: http://ogp.me/ns#"><head><title>SaaS Sentinel | Elite B2B Market Intelligence</title><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
       }
@@ -463,9 +477,9 @@ app.use(async (req, res, next) => {
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/__cookie_check\.html/gi, 'index.html');
 
-    // If it's a bot, strip all scripts to prevent client-side redirects or logic
+    // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
-    if (isBot) {
+    if (isBot && !isAISPreview) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
     }
 
