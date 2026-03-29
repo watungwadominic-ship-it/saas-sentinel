@@ -35,6 +35,33 @@ app.get("/api/health-check", (req, res) => {
   });
 });
 
+// Image Proxy to bypass social media crawler restrictions
+app.get("/api/proxy-image", async (req, res) => {
+  const imageUrl = req.query.url as string;
+  if (!imageUrl) return res.status(400).send("Missing URL");
+
+  try {
+    console.log(`[PROXY] Fetching image: ${imageUrl}`);
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
+
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error) {
+    console.error(`[PROXY-ERROR] ${error}`);
+    res.status(500).send("Error proxying image");
+  }
+});
+
 // API Routes
 app.get("/api/health", async (req, res) => {
   try {
@@ -153,10 +180,14 @@ app.use(async (req, res, next) => {
   // Added req.query.ls check as it's a strong signal from our news bot
   const isBotUA = /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent);
   
+  // Detection for common browsers - we should NEVER treat these as bots for script stripping
+  // unless it's a known bot UA that also includes browser strings (like some crawlers)
+  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
+
   const isBot = (forceBot || isLinkedIn || isBotUA || 
                 req.headers['x-fb-http-engine'] !== undefined ||
                 req.headers['x-linkedin-id'] !== undefined ||
-                req.query.ls !== undefined) && (!isAISPreview || isLinkedIn || forceBot);
+                req.query.ls !== undefined) && (!isAISPreview || isLinkedIn || forceBot) && !isRealBrowser;
 
   // Log every request that hits the middleware for debugging
   if (isBot || req.path.includes('article') || req.path.includes('news') || req.path.includes('cookie_check') || req.query.return_url) {
@@ -171,7 +202,7 @@ app.use(async (req, res, next) => {
   }
 
   // Extract article ID from query or path
-  let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string);
+  let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string) || (req.query.articleId as string);
   
   // Path-based extraction
   if (!articleId) {
@@ -539,6 +570,14 @@ app.use(async (req, res, next) => {
 
                 ogImage = escapeHtml(resolvedImg);
                 console.log(`[DEBUG-OG] Final Resolved Image URL: ${resolvedImg}`);
+                
+                // Proxy third-party images to bypass LinkedIn's crawler restrictions
+                // This is especially useful for URLs without extensions or from domains that block LinkedIn
+                if (resolvedImg && !resolvedImg.includes(finalBaseUrl) && !resolvedImg.includes('picsum.photos') && !resolvedImg.includes('unsplash.com')) {
+                  console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
+                  const proxiedUrl = `${finalBaseUrl.replace(/\/$/, '')}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg`;
+                  ogImage = escapeHtml(proxiedUrl);
+                }
               } catch (e) {
                 console.error("[DEBUG] Failed to resolve image URL:", img, e);
               }
