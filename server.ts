@@ -389,7 +389,11 @@ app.use(async (req, res, next) => {
     
     const cleanBaseUrl = finalBaseUrl.replace(/\/$/, '');
     const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
-    let ogUrl = escapeHtml(`${cleanBaseUrl}${cleanPath}`);
+    
+    // Ensure the og:url includes force_bot=true if we are in bot mode
+    // This encourages crawlers to use the bot-optimized version if they re-crawl the canonical URL
+    const urlSeparator = cleanPath.includes('?') ? '&' : '?';
+    let ogUrl = escapeHtml(`${cleanBaseUrl}${cleanPath}${forceBot ? urlSeparator + 'force_bot=true' : ''}`);
 
     if (isBot) {
       console.log(`[BOT-OG-GEN] BaseURL: ${finalBaseUrl} | CanonicalPath: ${canonicalPath} | OgURL: ${ogUrl} | ArticleID: ${articleId} | isBot: ${isBot}`);
@@ -513,16 +517,16 @@ app.use(async (req, res, next) => {
 
     // Always provide dimensions for LinkedIn to ensure proper layout
     // Default to 1200x630 if we're not sure
-    const imageDimensions = `
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />`;
-
+    
     const metaTags = `
   <meta property="og:image" content="${ogImage}" />
   <meta property="og:image:url" content="${ogImage}" />
   <meta property="og:image:secure_url" content="${ogImage}" />
-  <meta property="og:image:type" content="${ogImageType}" />${imageDimensions}
+  <meta property="og:image:type" content="${ogImageType}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="${ogTitle}" />
+  <meta property="og:locale" content="en_US" />
   <meta name="twitter:image" content="${ogImage}" />
   <meta name="twitter:image:src" content="${ogImage}" />
   <meta name="twitter:image:alt" content="${ogTitle}" />
@@ -531,6 +535,7 @@ app.use(async (req, res, next) => {
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:type" content="article" />
+  <meta property="article:published_time" content="${new Date().toISOString()}" />
   <meta property="og:site_name" content="SaaS Sentinel" />
   <meta property="og:updated_time" content="${new Date().toISOString()}" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -598,6 +603,8 @@ app.use(async (req, res, next) => {
     res.setHeader('Vary', 'User-Agent');
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-SaaS-Sentinel-Bot', isBot ? 'true' : 'false');
+    res.setHeader('X-SaaS-Sentinel-Article', articleId || 'none');
     
     if (isBot) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
