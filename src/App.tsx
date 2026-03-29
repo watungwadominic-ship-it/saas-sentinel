@@ -1113,23 +1113,29 @@ export default function App() {
         }
 
         if (articleId) {
-          const found = data.find(a => a.id === articleId);
+          console.log(`[DEBUG-APP] Attempting to deep link to articleId: ${articleId} (Type: ${typeof articleId})`);
+          const found = data.find(a => String(a.id) === String(articleId));
           if (found) {
+            console.log(`[DEBUG-APP] Found article in list: ${found.title}`);
             setSelectedArticle(found);
             // Clear other views to ensure we show the article
             setShowAbout(false);
             setShowPrivacy(false);
             setShowArchive(false);
           } else {
+            console.log(`[DEBUG-APP] Article not found in list, fetching from server...`);
             // If not found in the list, fetch it specifically
             try {
               const { fetchArticleById } = await import('./services/news_articles.js');
               const article = await fetchArticleById(articleId);
               if (article) {
+                console.log(`[DEBUG-APP] Fetched article from server: ${article.title}`);
                 setSelectedArticle(article);
                 setShowAbout(false);
                 setShowPrivacy(false);
                 setShowArchive(false);
+              } else {
+                console.warn(`[DEBUG-APP] Article ${articleId} not found on server either.`);
               }
             } catch (err) {
               console.error("Failed to fetch specific article for deep link:", err);
