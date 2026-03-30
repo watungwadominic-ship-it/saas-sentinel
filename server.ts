@@ -535,7 +535,6 @@ app.use(async (req, res, next) => {
                 // Proxy third-party images to bypass social media crawler restrictions
                 // CRITICAL: LinkedIn's crawler (LinkedInBot) is often blocked by infrastructure cookie checks
                 // if we use the proxy URL. For LinkedIn, we'll try to provide the original URL if it's absolute.
-                const isLinkedIn = userAgent.includes('linkedin');
                 
                 if (resolvedImg && !isLinkedIn && !resolvedImg.includes(finalBaseUrl) && !resolvedImg.includes('picsum.photos') && !resolvedImg.includes('unsplash.com')) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
@@ -548,6 +547,12 @@ app.use(async (req, res, next) => {
                     const cleanBase = finalBaseUrl.replace(/\/$/, '');
                     resolvedImg = `${cleanBase}${resolvedImg.startsWith('/') ? '' : '/'}${resolvedImg}`;
                   }
+                  
+                  // Force HTTPS for LinkedIn to avoid mixed content issues
+                  if (resolvedImg.startsWith('http://')) {
+                    resolvedImg = resolvedImg.replace('http://', 'https://');
+                  }
+                  
                   ogImage = escapeHtml(resolvedImg);
                 }
               } catch (e) {
@@ -628,12 +633,15 @@ app.use(async (req, res, next) => {
     
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
-    if (isBot && !isAISPreview) {
+    // LinkedIn is an exception: we ALWAYS strip scripts for LinkedIn to ensure it sees the OG tags clearly.
+    if (isBot && (!isAISPreview || isLinkedIn)) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
       // Add no-cache for bots to ensure scrapers always get fresh metadata
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      // Set Vary header to ensure caches distinguish between bot and non-bot responses
+      res.setHeader('Vary', 'User-Agent');
     }
 
     // Inject meta tags
