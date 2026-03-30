@@ -1080,6 +1080,14 @@ export default function App() {
           const article = await fetchArticleById(articleId);
           if (article) {
             console.log(`[DEBUG-APP] Fetched article for deep link: ${article.title}`);
+            
+            // Switch tab if needed to show the best view
+            if (article.category === 'Analysis' || article.category === 'Market') {
+              setActiveTab('Market Analysis');
+            } else {
+              setActiveTab('Intelligence Feed');
+            }
+            
             setSelectedArticle(article);
             setShowAbout(false);
             setShowPrivacy(false);
