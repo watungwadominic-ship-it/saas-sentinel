@@ -174,7 +174,9 @@ app.use(async (req, res, next) => {
   const isAISPreview = xPurpose === 'preview' || 
                        referer.includes('aistudio.google.com') ||
                        xForwardedHost.startsWith('ais-dev-') ||
-                       xHost.startsWith('ais-dev-');
+                       xHost.startsWith('ais-dev-') ||
+                       xForwardedHost.startsWith('ais-pre-') ||
+                       xHost.startsWith('ais-pre-');
 
   const isBotUA = /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent);
   
