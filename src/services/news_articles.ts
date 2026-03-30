@@ -17,20 +17,36 @@ export async function fetchNewsArticles(categories?: string[]): Promise<Article[
     return [];
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    title: row.title,
-    content: row.content,
-    summary: row.summary || (row.content ? row.content.substring(0, 150) + '...' : 'No content available.'),
-    category: row.category,
-    date: row.created_at,
-    readTime: row.read_time || '5 min read',
-    source: row.source || 'SaaS Sentinel',
-    image_url: row.image_url,
-    breakdown: row.breakdown,
-    sentinel_take: row.sentinel_take,
-    verdict: row.verdict
-  }));
+  return (data || []).map((row: any) => {
+    // Handle legacy JSON summaries or malformed strings
+    let summary = row.summary;
+    if (summary && (summary.startsWith('{') || summary.startsWith('['))) {
+      try {
+        const parsed = JSON.parse(summary);
+        summary = parsed.summary || parsed.feed_summary || (Array.isArray(parsed) ? parsed[0] : summary);
+      } catch (e) {
+        // Not valid JSON, keep as is
+      }
+    }
+
+    // Fallback for content
+    const content = row.content || row.analysis_content || '';
+
+    return {
+      id: row.id,
+      title: row.title,
+      content: content,
+      summary: summary || (content ? content.substring(0, 150) + '...' : 'No content available.'),
+      category: row.category,
+      date: row.created_at,
+      readTime: row.read_time || '5 min read',
+      source: row.source || 'SaaS Sentinel',
+      image_url: row.image_url,
+      breakdown: row.breakdown,
+      sentinel_take: row.sentinel_take,
+      verdict: row.verdict
+    };
+  });
 }
 
 export async function saveNewsArticle(article: Partial<Article>) {
@@ -102,11 +118,26 @@ export async function fetchArticleById(id: string): Promise<Article | null> {
     }
 
     const row = data as any;
+    
+    // Handle legacy JSON summaries or malformed strings
+    let summary = row.summary;
+    if (summary && (summary.startsWith('{') || summary.startsWith('['))) {
+      try {
+        const parsed = JSON.parse(summary);
+        summary = parsed.summary || parsed.feed_summary || (Array.isArray(parsed) ? parsed[0] : summary);
+      } catch (e) {
+        // Not valid JSON, keep as is
+      }
+    }
+
+    // Fallback for content
+    const content = row.content || row.analysis_content || '';
+
     return {
       id: row.id,
       title: row.title,
-      content: row.content,
-      summary: row.summary || (row.content ? row.content.substring(0, 150) + '...' : 'No content available.'),
+      content: content,
+      summary: summary || (content ? content.substring(0, 150) + '...' : 'No content available.'),
       category: row.category,
       date: row.created_at,
       readTime: row.read_time || '5 min read',
