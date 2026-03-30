@@ -254,7 +254,8 @@ def run_news_bot():
             # Use path-based URLs which are less likely to trigger infrastructure cookie checks
             # than query-parameter based URLs.
             shared_url = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app"
-            app_url = str(os.getenv("SHARED_APP_URL", shared_url)).rstrip('/')
+            env_url = os.getenv("SHARED_APP_URL")
+            app_url = str(env_url if env_url else shared_url).rstrip('/')
             article_url = f"{app_url}/article/{article_id}" if article_id else f"{app_url}/"
         
             display_summary = summary_text[:200] if summary_text else ""
