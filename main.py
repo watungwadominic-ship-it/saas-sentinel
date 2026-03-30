@@ -39,8 +39,8 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         print(f"🔗 Sharing URL: {url}")
         
         # We explicitly include the 'content' block with 'article' source. 
-        # This is the most reliable way to trigger a link preview with an image.
-        # We also provide a thumbnail to force LinkedIn to use our image.
+        # This is the most reliable way to trigger a link preview.
+        # LinkedIn will scrape the image from the OG tags served by server.ts.
         post_data = {
             "author": author_urn,
             "commentary": text,
@@ -54,8 +54,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
                 "article": {
                     "source": url,
                     "title": title,
-                    "description": str(summary or title)[:250],
-                    "thumbnail": image_url
+                    "description": str(summary or title)[:250]
                 }
             },
             "lifecycleState": "PUBLISHED",
