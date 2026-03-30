@@ -38,9 +38,34 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             
         print(f"🔗 Sharing URL: {url}")
         
+        # Clean and ensure absolute image URL for LinkedIn thumbnail
+        thumbnail_url = None
+        if image_url:
+            thumbnail_url = str(image_url).strip()
+            if not thumbnail_url.startswith('http'):
+                # Use the app_url to make it absolute if it's a relative path
+                app_url_clean = str(os.getenv("SHARED_APP_URL", "")).rstrip('/')
+                if app_url_clean:
+                    thumbnail_url = f"{app_url_clean}{'/' if not thumbnail_url.startswith('/') else ''}{thumbnail_url}"
+            
+            # Force HTTPS for LinkedIn
+            if thumbnail_url.startswith('http://'):
+                thumbnail_url = thumbnail_url.replace('http://', 'https://')
+        
         # We explicitly include the 'content' block with 'article' source. 
         # This is the most reliable way to trigger a link preview.
-        # LinkedIn will scrape the image from the OG tags served by server.ts.
+        # LinkedIn will scrape the image from the OG tags served by server.ts,
+        # but providing a thumbnail directly is even more robust.
+        article_content = {
+            "source": url,
+            "title": title,
+            "description": str(summary or title)[:250]
+        }
+        
+        if thumbnail_url:
+            article_content["thumbnail"] = thumbnail_url
+            print(f"🖼️ Including thumbnail: {thumbnail_url}")
+
         post_data = {
             "author": author_urn,
             "commentary": text,
@@ -51,11 +76,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
                 "thirdPartyDistributionChannels": []
             },
             "content": {
-                "article": {
-                    "source": url,
-                    "title": title,
-                    "description": str(summary or title)[:250]
-                }
+                "article": article_content
             },
             "lifecycleState": "PUBLISHED",
             "isReshareDisabledByAuthor": False
