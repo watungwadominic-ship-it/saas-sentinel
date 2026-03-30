@@ -43,10 +43,10 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         print(f"⏳ Waiting 25s for database sync and server readiness...")
         time.sleep(25)
         
-        # Add a cache-buster and force_bot parameter to the URL for LinkedIn 
-        # to ensure it scrapes fresh metadata and bypasses infrastructure cookie checks.
+        # Use a dedicated OG tag route for social sharing to bypass infrastructure cookie checks.
+        # This route serves minimal HTML with OG tags for bots and redirects users to the real article.
         cache_buster = int(time.time())
-        scraping_url = f"{url}{'&' if '?' in url else '?'}force_bot=true&v={cache_buster}"
+        scraping_url = f"{url.replace('/article/', '/api/og/article/')}{'&' if '?' in url else '?'}force_bot=true&v={cache_buster}"
         
         print(f"📡 Sending to LinkedIn: {title[:50]}...")
         
