@@ -688,12 +688,53 @@
             }
             
             // Handle direct article links
-            const urlParams = new URLSearchParams(window.location.search);
-            const articleId = urlParams.get('article');
-            if (articleId) {
-              // Wait a bit for articles to be rendered/cached
-              setTimeout(() => openArticle(articleId), 500);
-            }
+            const handleDeepLink = () => {
+              const url = new URL(window.location.href);
+              const searchParams = url.searchParams;
+              
+              let articleId = searchParams.get('article') || 
+                              searchParams.get('articleId') || 
+                              searchParams.get('id');
+              
+              // Try return_url
+              const returnUrl = searchParams.get('return_url');
+              if (!articleId && returnUrl) {
+                try {
+                  const decodedReturnUrl = decodeURIComponent(returnUrl);
+                  const returnUrlObj = new URL(decodedReturnUrl, window.location.origin);
+                  articleId = returnUrlObj.searchParams.get('article') || 
+                              returnUrlObj.searchParams.get('articleId') || 
+                              returnUrlObj.searchParams.get('id');
+                  
+                  if (!articleId) {
+                    const returnPathParts = returnUrlObj.pathname.split('/');
+                    const returnArticleIdx = returnPathParts.findIndex(p => p === 'article' || p === 'news');
+                    if (returnArticleIdx !== -1 && returnUrlObj.pathname.split('/')[returnArticleIdx + 1]) {
+                      articleId = returnUrlObj.pathname.split('/')[returnArticleIdx + 1];
+                    }
+                  }
+                } catch (e) {}
+              }
+              
+              // Try path-based
+              if (!articleId) {
+                const pathParts = window.location.pathname.split('/');
+                const articleIdx = pathParts.findIndex(p => p === 'article' || p === 'news');
+                if (articleIdx !== -1 && pathParts[articleIdx + 1]) {
+                  articleId = pathParts[articleIdx + 1];
+                }
+              }
+
+              if (articleId && articleId !== 'undefined' && articleId !== 'null' && articleId.trim() !== '') {
+                console.log("[DEBUG-HTML] Deep link detected:", articleId);
+                // Wait a bit for articles to be rendered/cached
+                setTimeout(() => openArticle(articleId), 500);
+              }
+            };
+
+            handleDeepLink();
+            window.addEventListener('popstate', handleDeepLink);
+            window.addEventListener('hashchange', handleDeepLink);
           } else {
             console.error('Supabase not loaded');
           }
