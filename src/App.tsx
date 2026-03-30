@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './services/supabase.js';
 import { Article } from './types.js';
 import { generateArticle, fetchTopSaaSNews, parseNewsIntoStories } from './services/gemini.js';
-import { fetchNewsArticles, saveNewsArticle } from './services/news_articles.js';
+import { fetchNewsArticles, saveNewsArticle, fetchArticleById } from './services/news_articles.js';
 import { addSubscriber } from './services/subscribers.js';
 import ReactMarkdown from 'react-markdown';
 import { 
@@ -1027,6 +1027,73 @@ export default function App() {
     }
   };
 
+  // Deep Linking Logic
+  useEffect(() => {
+    async function handleDeepLink() {
+      const params = new URLSearchParams(window.location.search);
+      let articleId = params.get('article') || params.get('articleId') || params.get('id');
+      
+      // Also check return_url if present (infrastructure cookie check)
+      if (!articleId && params.get('return_url')) {
+        try {
+          const returnUrl = decodeURIComponent(params.get('return_url')!);
+          const returnParams = new URLSearchParams(returnUrl.split('?')[1] || '');
+          articleId = returnParams.get('article') || returnParams.get('articleId') || returnParams.get('id');
+          
+          if (!articleId) {
+            const pathParts = returnUrl.split(/[?#\s\\]/)[0].split('/');
+            const articleIdx = pathParts.findIndex(p => p === 'article' || p === 'news');
+            if (articleIdx !== -1 && pathParts[articleIdx + 1]) {
+              articleId = pathParts[articleIdx + 1];
+            }
+          }
+        } catch (e) {}
+      }
+      
+      if (!articleId) {
+        const pathParts = window.location.pathname.split('/');
+        // Support both /article/ID and /news/ID formats
+        const articleIdx = pathParts.findIndex(p => p === 'article' || p === 'news');
+        if (articleIdx !== -1 && pathParts[articleIdx + 1]) {
+          articleId = pathParts[articleIdx + 1];
+        }
+      }
+
+      if (articleId) {
+        console.log(`[DEBUG-APP] Deep link detected for articleId: ${articleId}`);
+        
+        // If we already have articles, try to find it
+        if (articles.length > 0) {
+          const found = articles.find(a => String(a.id) === String(articleId));
+          if (found) {
+            console.log(`[DEBUG-APP] Found article in current list: ${found.title}`);
+            setSelectedArticle(found);
+            setShowAbout(false);
+            setShowPrivacy(false);
+            setShowArchive(false);
+            return;
+          }
+        }
+
+        // If not found in list or list not loaded yet, fetch specifically
+        try {
+          const article = await fetchArticleById(articleId);
+          if (article) {
+            console.log(`[DEBUG-APP] Fetched article for deep link: ${article.title}`);
+            setSelectedArticle(article);
+            setShowAbout(false);
+            setShowPrivacy(false);
+            setShowArchive(false);
+          }
+        } catch (err) {
+          console.error("Failed to fetch specific article for deep link:", err);
+        }
+      }
+    }
+
+    handleDeepLink();
+  }, [articles.length]); // Re-run when articles are loaded or if we navigate
+
   // Articles Listener (Supabase)
   useEffect(() => {
     async function loadArticles() {
@@ -1080,68 +1147,6 @@ export default function App() {
           }
         }
         setArticles(data);
-
-        // Check for article parameter in URL after articles are loaded
-        // Handle deep linking from URL params or path
-        const params = new URLSearchParams(window.location.search);
-        let articleId = params.get('article') || params.get('articleId') || params.get('id');
-        
-        // Also check return_url if present (infrastructure cookie check)
-        if (!articleId && params.get('return_url')) {
-          try {
-            const returnUrl = decodeURIComponent(params.get('return_url')!);
-            const returnParams = new URLSearchParams(returnUrl.split('?')[1] || '');
-            articleId = returnParams.get('article') || returnParams.get('articleId') || returnParams.get('id');
-            
-            if (!articleId) {
-              const pathParts = returnUrl.split(/[?#\s\\]/)[0].split('/');
-              const articleIdx = pathParts.findIndex(p => p === 'article' || p === 'news');
-              if (articleIdx !== -1 && pathParts[articleIdx + 1]) {
-                articleId = pathParts[articleIdx + 1];
-              }
-            }
-          } catch (e) {}
-        }
-        
-        if (!articleId) {
-          const pathParts = window.location.pathname.split('/');
-          // Support both /article/ID and /news/ID formats
-          const articleIdx = pathParts.findIndex(p => p === 'article' || p === 'news');
-          if (articleIdx !== -1 && pathParts[articleIdx + 1]) {
-            articleId = pathParts[articleIdx + 1];
-          }
-        }
-
-        if (articleId) {
-          console.log(`[DEBUG-APP] Attempting to deep link to articleId: ${articleId} (Type: ${typeof articleId})`);
-          const found = data.find(a => String(a.id) === String(articleId));
-          if (found) {
-            console.log(`[DEBUG-APP] Found article in list: ${found.title}`);
-            setSelectedArticle(found);
-            // Clear other views to ensure we show the article
-            setShowAbout(false);
-            setShowPrivacy(false);
-            setShowArchive(false);
-          } else {
-            console.log(`[DEBUG-APP] Article not found in list, fetching from server...`);
-            // If not found in the list, fetch it specifically
-            try {
-              const { fetchArticleById } = await import('./services/news_articles.js');
-              const article = await fetchArticleById(articleId);
-              if (article) {
-                console.log(`[DEBUG-APP] Fetched article from server: ${article.title}`);
-                setSelectedArticle(article);
-                setShowAbout(false);
-                setShowPrivacy(false);
-                setShowArchive(false);
-              } else {
-                console.warn(`[DEBUG-APP] Article ${articleId} not found on server either.`);
-              }
-            } catch (err) {
-              console.error("Failed to fetch specific article for deep link:", err);
-            }
-          }
-        }
       } catch (error) {
         console.error("Failed to load articles", error);
       } finally {
