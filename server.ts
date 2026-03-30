@@ -134,7 +134,7 @@ app.get("/api/og/article/:id", async (req, res, next) => {
   const userAgent = (req.headers["user-agent"] || "").toLowerCase();
   
   // Basic bot detection for the redirect logic
-  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|well-known|authorizedentity|authorized-entity|apache-httpclient|post-inspector|validator|scraper|preview|metadata|og-tag|social-share)\b/i.test(userAgent);
+  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|well-known|authorizedentity|authorized-entity|apache-httpclient|post-inspector|validator|scraper|preview|metadata|og-tag|social-share|inspection|prefetch)\b/i.test(userAgent);
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
   
   // If it's a real browser, redirect to the actual article page
@@ -215,6 +215,9 @@ app.use(async (req, res, next) => {
                      userAgent.includes('linkedin') ||
                      userAgent.includes('well-known') ||
                      userAgent.includes('bot') ||
+                     userAgent.includes('crawler') ||
+                     userAgent.includes('spider') ||
+                     userAgent.includes('inspection') ||
                      xLinkedInId !== undefined;
                      
   // AI Studio Preview detection - we should NOT treat this as a bot for script stripping
@@ -229,7 +232,7 @@ app.use(async (req, res, next) => {
                        xForwardedHost.startsWith('ais-pre-') ||
                        xHost.startsWith('ais-pre-');
 
-  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|well-known|authorizedentity|authorized-entity|apache-httpclient|post-inspector|validator|scraper|preview|metadata|og-tag|social-share)\b/i.test(userAgent);
+  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|well-known|authorizedentity|authorized-entity|apache-httpclient|post-inspector|validator|scraper|preview|metadata|og-tag|social-share|inspection|prefetch)\b/i.test(userAgent);
   
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
   
@@ -244,12 +247,17 @@ app.use(async (req, res, next) => {
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string) || (req.query.articleId as string);
   
-  // Path-based extraction (e.g. /article/257)
+  // Path-based extraction (e.g. /article/257 or /api/og/article/257)
   if (!articleId) {
     const pathParts = req.path.split("/");
-    // Matches /article/ID or /news/ID or /article/ID/v/TIMESTAMP
+    // Matches /article/ID or /news/ID or /api/og/article/ID
     if (pathParts[1] === "article" || pathParts[1] === "news") {
       articleId = pathParts[2].split(/[\/?#\s\\]/)[0];
+    } else if (pathParts[1] === "api" && pathParts[2] === "og" && pathParts[3] === "article") {
+      articleId = pathParts[4].split(/[\/?#\s\\]/)[0];
+    }
+    
+    if (articleId) {
       console.log(`[DEBUG-ID] Extracted ID from path: ${articleId}`);
     }
   }
@@ -274,7 +282,7 @@ app.use(async (req, res, next) => {
       
       // Try to find ID in path of return_url
       if (!articleId) {
-        const pathM = decodedReturnUrl.match(/\/(?:article|news)\/([^\/?#\s\\]+)/i);
+        const pathM = decodedReturnUrl.match(/\/(?:article|news|api\/og\/article)\/([^\/?#\s\\]+)/i);
         if (pathM) {
           articleId = pathM[1].split(/[\/?#\s\\]/)[0];
         }
@@ -301,8 +309,11 @@ app.use(async (req, res, next) => {
   }
 
   // CRITICAL: Skip static assets (images, css, js) - even for bots!
+  // UNLESS it's a cookie check path which we need to intercept
   const isStaticAsset = /\.(jpg|jpeg|png|gif|svg|webp|css|js|ico|woff|woff2|ttf|otf|map|json)$/i.test(req.path);
-  if (isStaticAsset && req.path !== "/__cookie_check.html") {
+  const isCookieCheckPath = req.path === "/__cookie_check.html" || req.path === "/_cookie_check.html" || req.path.includes("cookie_check");
+  
+  if (isStaticAsset && !isCookieCheckPath) {
     return next();
   }
 
@@ -359,8 +370,8 @@ app.use(async (req, res, next) => {
     return next();
   }
 
-  // Skip API routes
-  if (req.path.startsWith("/api/")) {
+  // Skip API routes (except for our internal OG route)
+  if (req.path.startsWith("/api/") && !(req as any).isOgApiRoute) {
     return next();
   }
 
@@ -605,7 +616,8 @@ app.use(async (req, res, next) => {
                 if (resolvedImg && !isTrusted && !resolvedImg.includes(finalBaseUrl)) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
                   const cleanBase = cleanBaseUrl; // Use the reliable SHARED_APP_URL based base
-                  const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg&v=${Date.now()}`;
+                  // Simplify proxy URL to be more crawler-friendly
+                  const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}`;
                   ogImage = escapeHtml(proxiedUrl);
                 } else if (resolvedImg) {
                   // For trusted domains or our own domain, use the original URL but ensure it's absolute
