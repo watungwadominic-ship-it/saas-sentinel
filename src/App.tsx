@@ -1059,7 +1059,7 @@ export default function App() {
         }
       }
 
-      if (articleId) {
+      if (articleId && articleId !== 'undefined' && articleId !== 'null') {
         console.log(`[DEBUG-APP] Deep link detected for articleId: ${articleId}`);
         
         // If we already have articles, try to find it
@@ -1079,7 +1079,10 @@ export default function App() {
             setShowAbout(false);
             setShowPrivacy(false);
             setShowArchive(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
+          } else {
+            console.log(`[DEBUG-APP] Article ${articleId} not found in current list of ${articles.length} articles. Fetching specifically...`);
           }
         }
 
@@ -1100,6 +1103,7 @@ export default function App() {
             setShowAbout(false);
             setShowPrivacy(false);
             setShowArchive(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
           }
         } catch (err) {
           console.error("Failed to fetch specific article for deep link:", err);
@@ -1108,7 +1112,7 @@ export default function App() {
     }
 
     handleDeepLink();
-  }, [articles.length]); // Re-run when articles are loaded or if we navigate
+  }, [articles.length, window.location.pathname, window.location.search]); // Re-run when articles are loaded or if we navigate
 
   // Articles Listener (Supabase)
   useEffect(() => {
