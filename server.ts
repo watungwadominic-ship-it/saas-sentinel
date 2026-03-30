@@ -163,6 +163,7 @@ app.use(async (req, res, next) => {
                      userAgent.includes('linkedin-bot') ||
                      userAgent.includes('authorized-entity') ||
                      userAgent.includes('apache-httpclient') ||
+                     userAgent.includes('linkedin-post-inspector') ||
                      xLinkedInId !== undefined;
                      
   // AI Studio Preview detection - we should NOT treat this as a bot for script stripping
@@ -171,12 +172,9 @@ app.use(async (req, res, next) => {
   const referer = req.get('referer') || '';
   
   const isAISPreview = xPurpose === 'preview' || 
-                       userAgent.includes('google-cloud-run') || 
-                       userAgent.includes('google-cloud-resource-manager') ||
                        referer.includes('aistudio.google.com') ||
-                       xForwardedHost.startsWith('ais-') ||
-                       xHost.startsWith('ais-') ||
-                       xHost.includes('run.app');
+                       xForwardedHost.startsWith('ais-dev-') ||
+                       xHost.startsWith('ais-dev-');
 
   const isBotUA = /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent);
   
@@ -387,8 +385,8 @@ app.use(async (req, res, next) => {
     let ogImage = escapeHtml(FALLBACK_IMAGES[0]);
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
-    const sharedAppUrl = process.env.SHARED_APP_URL || "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app";
-    const finalBaseUrl = sharedAppUrl || baseUrl;
+    // We prefer the dynamic baseUrl for dev environments to ensure proxying works correctly
+    const finalBaseUrl = process.env.SHARED_APP_URL || baseUrl;
     
     // Use the articleId and returnUrl extracted earlier in the middleware
     let canonicalPath = req.path;
@@ -427,13 +425,10 @@ app.use(async (req, res, next) => {
     const cleanBaseUrl = finalBaseUrl.replace(/\/$/, '');
     const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
     
-    // Ensure the og:url includes force_bot=true if we are in bot mode
-    // This encourages crawlers to use the bot-optimized version if they re-crawl the canonical URL
+    // CRITICAL: Do NOT include force_bot=true in the og:url. 
+    // This ensures that when a human clicks the link on LinkedIn, they are taken to the 
+    // clean URL which will serve the full React app (since they aren't a bot).
     let ogUrl = `${cleanBaseUrl}${cleanPath}`;
-    if (forceBot) {
-      const separator = ogUrl.includes('?') ? '&' : '?';
-      ogUrl += `${separator}force_bot=true`;
-    }
     ogUrl = escapeHtml(ogUrl);
 
     if (isBot) {
@@ -540,7 +535,8 @@ app.use(async (req, res, next) => {
                 if (resolvedImg && !resolvedImg.includes(finalBaseUrl) && !resolvedImg.includes('picsum.photos') && !resolvedImg.includes('unsplash.com')) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
                   // Ensure we use a clean base URL without trailing slash
-                  const cleanBase = finalBaseUrl.replace(/\/$/, '');
+                  // We use the dynamic baseUrl here to ensure the proxy is reachable from the current environment
+                  const cleanBase = baseUrl.replace(/\/$/, '');
                   const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg`;
                   ogImage = escapeHtml(proxiedUrl);
                 }
@@ -595,6 +591,7 @@ app.use(async (req, res, next) => {
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
   <meta name="twitter:image" content="${ogImage}" />
+  <meta name="twitter:image:alt" content="${ogTitle}" />
   <meta name="twitter:url" content="${ogUrl}" />
   <link rel="canonical" href="${ogUrl}" />
   <meta name="robots" content="index,follow,max-image-preview:large">
