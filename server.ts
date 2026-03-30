@@ -532,15 +532,23 @@ app.use(async (req, res, next) => {
                 ogImage = escapeHtml(resolvedImg);
                 console.log(`[DEBUG-OG] Final Resolved Image URL: ${resolvedImg}`);
                 
-                // Proxy third-party images to bypass LinkedIn's crawler restrictions
-                // This is especially useful for URLs without extensions or from domains that block LinkedIn
-                if (resolvedImg && !resolvedImg.includes(finalBaseUrl) && !resolvedImg.includes('picsum.photos') && !resolvedImg.includes('unsplash.com')) {
+                // Proxy third-party images to bypass social media crawler restrictions
+                // CRITICAL: LinkedIn's crawler (LinkedInBot) is often blocked by infrastructure cookie checks
+                // if we use the proxy URL. For LinkedIn, we'll try to provide the original URL if it's absolute.
+                const isLinkedIn = userAgent.includes('linkedin');
+                
+                if (resolvedImg && !isLinkedIn && !resolvedImg.includes(finalBaseUrl) && !resolvedImg.includes('picsum.photos') && !resolvedImg.includes('unsplash.com')) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
-                  // Ensure we use a clean base URL without trailing slash
-                  // We use the dynamic baseUrl here to ensure the proxy is reachable from the current environment
                   const cleanBase = baseUrl.replace(/\/$/, '');
                   const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg`;
                   ogImage = escapeHtml(proxiedUrl);
+                } else if (resolvedImg) {
+                  // For LinkedIn or safe domains, use the original URL but ensure it's absolute
+                  if (!resolvedImg.startsWith('http')) {
+                    const cleanBase = finalBaseUrl.replace(/\/$/, '');
+                    resolvedImg = `${cleanBase}${resolvedImg.startsWith('/') ? '' : '/'}${resolvedImg}`;
+                  }
+                  ogImage = escapeHtml(resolvedImg);
                 }
               } catch (e) {
                 console.error("[DEBUG] Failed to resolve image URL:", img, e);
