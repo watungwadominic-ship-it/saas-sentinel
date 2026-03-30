@@ -572,15 +572,6 @@ app.use(async (req, res, next) => {
     else if (lowerImage.includes(".webp")) ogImageType = "image/webp";
     else if (lowerImage.includes(".svg")) ogImageType = "image/svg+xml";
 
-    // Always provide dimensions for LinkedIn to ensure proper layout
-    // Default to 1200x630 if we're not sure
-    
-    // Ensure ogImage is absolute
-    if (ogImage && !ogImage.startsWith('http')) {
-      const cleanBase = finalBaseUrl.replace(/\/$/, '');
-      ogImage = `${cleanBase}${ogImage.startsWith('/') ? '' : '/'}${ogImage}`;
-    }
-
     const metaTags = `
   <title>${ogTitle}</title>
   <meta name="description" content="${ogDescription}" />
@@ -607,6 +598,9 @@ app.use(async (req, res, next) => {
   <meta name="robots" content="index,follow,max-image-preview:large">
   <meta name="author" content="SaaS Sentinel">
   <meta name="publish_date" content="${new Date().toISOString()}">
+  <meta property="article:published_time" content="${new Date().toISOString()}">
+  <meta property="article:author" content="SaaS Sentinel">
+  <meta property="article:section" content="SaaS Intelligence">
 `;
 
     if (isBot) {
@@ -636,6 +630,10 @@ app.use(async (req, res, next) => {
     // that might confuse the scraper or lead it away from the OG tags.
     if (isBot && !isAISPreview) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      // Add no-cache for bots to ensure scrapers always get fresh metadata
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     }
 
     // Inject meta tags
