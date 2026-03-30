@@ -54,18 +54,15 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         
         # We explicitly include the 'content' block with 'article' source. 
         # This is the most reliable way to trigger a link preview.
-        # LinkedIn will scrape the image from the OG tags served by server.ts,
-        # but providing a thumbnail directly is even more robust.
+        # LinkedIn will scrape the image from the OG tags served by server.ts.
+        # Note: The 'thumbnail' field in the 'posts' API requires a URN, not a URL,
+        # so we omit it and rely on scraping for the image.
         article_content = {
             "source": url,
             "title": title,
             "description": str(summary or title)[:250]
         }
         
-        if thumbnail_url:
-            article_content["thumbnail"] = thumbnail_url
-            print(f"🖼️ Including thumbnail: {thumbnail_url}")
-
         post_data = {
             "author": author_urn,
             "commentary": text,
