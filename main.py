@@ -31,29 +31,19 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             "X-Restli-Protocol-Version": "2.0.0"
         }
         
-        # Using a query parameter for cache busting as it's more standard for scrapers
-        # and less likely to confuse path-based routing.
-        import time
-        from datetime import datetime
-        cache_buster = int(datetime.now().timestamp())
-        
-        # Ensure we don't have multiple question marks or malformed query strings
-        if "?" in url:
-            final_url = f"{url}&ls={cache_buster}&force_bot=true"
-        else:
-            final_url = f"{url}?ls={cache_buster}&force_bot=true"
-        
-        print(f"DEBUG: Final URL for LinkedIn: {final_url}")
-        
-        print(f"🔗 Sharing URL: {final_url}")
+        # Ensure the author is a proper URN
+        author_urn = str(LINKEDIN_PERSON_URN)
+        if not author_urn.startswith("urn:li:"):
+            author_urn = f"urn:li:person:{author_urn}"
+            
+        print(f"🔗 Sharing URL: {url}")
         
         # We explicitly include the 'content' block with 'article' source. 
         # This is the most reliable way to trigger a link preview with an image.
-        # We REMOVED force_bot=true because it was causing human users to see the bot fallback page.
-        # LinkedIn's crawler is automatically detected by its User-Agent in server.ts.
+        # We rely on server-side bot detection in server.ts to serve OG tags.
         post_data = {
-            "author": LINKEDIN_PERSON_URN,
-            "commentary": text, # Use the original text which contains the clean URL
+            "author": author_urn,
+            "commentary": text,
             "visibility": "PUBLIC",
             "distribution": {
                 "feedDistribution": "MAIN_FEED",
@@ -62,7 +52,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             },
             "content": {
                 "article": {
-                    "source": url, # Use the clean URL without force_bot=true
+                    "source": url,
                     "title": title,
                     "description": str(summary or title)[:250]
                 }
@@ -72,17 +62,11 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         }
         
         # Small delay to ensure Supabase is fully synced and server is ready
-        # Increased to 15s to handle Vercel cold starts and database sync better
         print(f"⏳ Waiting 15s for database sync and server readiness...")
         time.sleep(15)
         
         print(f"📡 Sending to LinkedIn: {title[:50]}...")
-        print(f"🔗 Final Sharing URL: {final_url}")
-        print(f"🖼️ Image URL being shared: {image_url}")
-        
-        # Log the full payload for debugging (masking the token)
-        debug_payload = post_data.copy()
-        print(f"📦 Payload: {json.dumps(debug_payload, indent=2)}")
+        print(f"📦 Payload: {json.dumps(post_data, indent=2)}")
         
         response = requests.post("https://api.linkedin.com/v2/posts", headers=headers, json=post_data)
         if response.status_code in [200, 201]:
