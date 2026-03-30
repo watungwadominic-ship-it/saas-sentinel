@@ -1067,6 +1067,14 @@ export default function App() {
           const found = articles.find(a => String(a.id) === String(articleId));
           if (found) {
             console.log(`[DEBUG-APP] Found article in current list: ${found.title}`);
+            
+            // Switch tab if needed to show the best view
+            if (found.category === 'Analysis' || found.category === 'Market' || found.sentinel_take || (found.breakdown && found.breakdown.length > 0)) {
+              setActiveTab('Market Analysis');
+            } else {
+              setActiveTab('Intelligence Feed');
+            }
+            
             setSelectedArticle(found);
             setShowAbout(false);
             setShowPrivacy(false);
@@ -1082,7 +1090,7 @@ export default function App() {
             console.log(`[DEBUG-APP] Fetched article for deep link: ${article.title}`);
             
             // Switch tab if needed to show the best view
-            if (article.category === 'Analysis' || article.category === 'Market') {
+            if (article.category === 'Analysis' || article.category === 'Market' || article.sentinel_take || (article.breakdown && article.breakdown.length > 0)) {
               setActiveTab('Market Analysis');
             } else {
               setActiveTab('Intelligence Feed');
