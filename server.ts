@@ -134,11 +134,13 @@ app.get("/api/og/article/:id", async (req, res, next) => {
   const userAgent = (req.headers["user-agent"] || "").toLowerCase();
   
   // Basic bot detection for the redirect logic
-  const isBotUA = /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent);
+  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|well-known|authorizedentity|authorized-entity|apache-httpclient|post-inspector|validator|scraper|preview|metadata|og-tag|social-share)\b/i.test(userAgent);
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
   
   // If it's a real browser, redirect to the actual article page
-  if (isRealBrowser && !req.query.force_bot) {
+  // We always redirect real browsers to the full app, even if force_bot is present,
+  // because real users should never see the minimal bot HTML.
+  if (isRealBrowser) {
     console.log(`[OG-REDIRECT] Redirecting real user from /api/og/article/${articleId} to /article/${articleId}`);
     return res.redirect(`/article/${articleId}`);
   }
@@ -211,6 +213,8 @@ app.use(async (req, res, next) => {
                      userAgent.includes('apache-httpclient') ||
                      userAgent.includes('linkedin-post-inspector') ||
                      userAgent.includes('linkedin') ||
+                     userAgent.includes('well-known') ||
+                     userAgent.includes('bot') ||
                      xLinkedInId !== undefined;
                      
   // AI Studio Preview detection - we should NOT treat this as a bot for script stripping
@@ -225,7 +229,7 @@ app.use(async (req, res, next) => {
                        xForwardedHost.startsWith('ais-pre-') ||
                        xHost.startsWith('ais-pre-');
 
-  const isBotUA = /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent);
+  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|well-known|authorizedentity|authorized-entity|apache-httpclient|post-inspector|validator|scraper|preview|metadata|og-tag|social-share)\b/i.test(userAgent);
   
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
   
@@ -362,7 +366,7 @@ app.use(async (req, res, next) => {
 
   // Skip static assets (requests with extensions) UNLESS it's a bot or a cookie check
   // Bots should get the HTML even if they hit a weird URL
-  const isCookieCheck = req.path === "/__cookie_check.html" || req.path.includes("cookie_check");
+  const isCookieCheck = req.path === "/__cookie_check.html" || req.path === "/_cookie_check.html" || req.path.includes("cookie_check");
   if (req.path.includes(".") && !isBot && !isCookieCheck) {
     return next();
   }
@@ -485,10 +489,11 @@ app.use(async (req, res, next) => {
     const cleanBaseUrl = finalBaseUrl.replace(/\/$/, '');
     const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
     
-    // CRITICAL: Do NOT include force_bot=true in the og:url. 
-    // This ensures that when a human clicks the link on LinkedIn, they are taken to the 
-    // clean URL which will serve the full React app (since they aren't a bot).
-    let ogUrl = `${cleanBaseUrl}${cleanPath}`;
+    // CRITICAL: Do NOT include force_bot=true in the og:url for real users,
+    // but for bots, we point them back to the bot-friendly route to ensure they stay on it.
+    let ogUrl = isBot 
+      ? `${cleanBaseUrl}/api/og/article/${articleId}?force_bot=true&v=${Date.now()}`
+      : `${cleanBaseUrl}${cleanPath}`;
     ogUrl = escapeHtml(ogUrl);
 
     if (isBot) {
