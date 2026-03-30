@@ -186,6 +186,7 @@ app.use(async (req, res, next) => {
                      userAgent.includes('authorized-entity') ||
                      userAgent.includes('apache-httpclient') ||
                      userAgent.includes('linkedin-post-inspector') ||
+                     userAgent.includes('linkedin') ||
                      xLinkedInId !== undefined;
                      
   // AI Studio Preview detection - we should NOT treat this as a bot for script stripping
@@ -337,13 +338,13 @@ app.use(async (req, res, next) => {
 
   // Skip static assets (requests with extensions) UNLESS it's a bot or a cookie check
   // Bots should get the HTML even if they hit a weird URL
-  const isCookieCheck = req.path === "/__cookie_check.html";
+  const isCookieCheck = req.path === "/__cookie_check.html" || req.path.includes("cookie_check");
   if (req.path.includes(".") && !isBot && !isCookieCheck) {
     return next();
   }
 
   // Handle HTML requests, bot requests, or any path without an extension
-  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot;
+  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot || isCookieCheck;
   
   // If it's not an HTML/bot request and not an article request, let it pass
   if (!isHtmlRequest && !articleId) {
@@ -355,8 +356,8 @@ app.use(async (req, res, next) => {
     
     // For bots or cookie check redirects, we prefer a clean, minimal HTML to avoid any "Cookie check" scripts
     // that might be present in the actual index.html file.
-    if (isBot || req.path.includes("cookie_check")) {
-      console.log(`[DEBUG-BOT] Generating clean HTML for bot or cookie check | Path: ${req.path} | Article: ${articleId}`);
+    if (isBot || isCookieCheck) {
+      console.log(`[DEBUG-BOT] Generating clean HTML for bot or cookie check | Path: ${req.path} | Article: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
       html = `<!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">
 <head>
@@ -654,13 +655,13 @@ app.use(async (req, res, next) => {
     html = html.replace(/<meta[^>]+name=["']title["'][^>]*>/gi, '');
     
     // Also remove any generic "Cookie check" content if it somehow leaked into the base HTML
-    html = html.replace(/<title[^>]*>Cookie check<\/title>/gi, '');
+    html = html.replace(/<title[^>]*>.*?Cookie check.*?<\/title>/gi, '');
     html = html.replace(/Cookie check/gi, 'SaaS Sentinel');
     html = html.replace(/Checking your browser/gi, 'SaaS Sentinel Intelligence');
     html = html.replace(/Please wait while your application starts/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/Please wait/gi, 'SaaS Sentinel Analysis');
     html = html.replace(/__cookie_check\.html/gi, 'index.html');
-    html = html.replace(/<meta[^>]+content=["']Cookie check["'][^>]*>/gi, '');
+    html = html.replace(/<meta[^>]+content=["'].*?Cookie check.*?["'][^>]*>/gi, '');
     
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
