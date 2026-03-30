@@ -1112,6 +1112,15 @@ export default function App() {
     }
 
     handleDeepLink();
+    
+    // Listen for URL changes (popstate handles back/forward, hashchange for hashes)
+    window.addEventListener('popstate', handleDeepLink);
+    window.addEventListener('hashchange', handleDeepLink);
+    
+    return () => {
+      window.removeEventListener('popstate', handleDeepLink);
+      window.removeEventListener('hashchange', handleDeepLink);
+    };
   }, [articles.length, window.location.pathname, window.location.search]); // Re-run when articles are loaded or if we navigate
 
   // Articles Listener (Supabase)
