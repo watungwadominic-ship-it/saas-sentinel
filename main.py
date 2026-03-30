@@ -38,27 +38,20 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             
         print(f"🔗 Sharing URL: {url}")
         
-        # Clean and ensure absolute image URL for LinkedIn thumbnail
-        thumbnail_url = None
-        if image_url:
-            thumbnail_url = str(image_url).strip()
-            if not thumbnail_url.startswith('http'):
-                # Use the app_url to make it absolute if it's a relative path
-                app_url_clean = str(os.getenv("SHARED_APP_URL", "")).rstrip('/')
-                if app_url_clean:
-                    thumbnail_url = f"{app_url_clean}{'/' if not thumbnail_url.startswith('/') else ''}{thumbnail_url}"
-            
-            # Force HTTPS for LinkedIn
-            if thumbnail_url.startswith('http://'):
-                thumbnail_url = thumbnail_url.replace('http://', 'https://')
+        # Small delay to ensure Supabase is fully synced and server is ready
+        # Increased to 25s to be extra safe for social media scrapers
+        print(f"⏳ Waiting 25s for database sync and server readiness...")
+        time.sleep(25)
         
-        # We explicitly include the 'content' block with 'article' source. 
-        # This is the most reliable way to trigger a link preview.
-        # LinkedIn will scrape the image from the OG tags served by server.ts.
-        # Note: The 'thumbnail' field in the 'posts' API requires a URN, not a URL,
-        # so we omit it and rely on scraping for the image.
+        # Add a cache-buster to the URL for LinkedIn to ensure it scrapes fresh metadata
+        # but keep the canonical URL in the OG tags clean.
+        cache_buster = int(time.time())
+        scraping_url = f"{url}{'&' if '?' in url else '?'}v={cache_buster}"
+        
+        print(f"📡 Sending to LinkedIn: {title[:50]}...")
+        
         article_content = {
-            "source": url,
+            "source": scraping_url,
             "title": title,
             "description": str(summary or title)[:250]
         }
@@ -79,11 +72,6 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             "isReshareDisabledByAuthor": False
         }
         
-        # Small delay to ensure Supabase is fully synced and server is ready
-        print(f"⏳ Waiting 15s for database sync and server readiness...")
-        time.sleep(15)
-        
-        print(f"📡 Sending to LinkedIn: {title[:50]}...")
         print(f"📦 Payload: {json.dumps(post_data, indent=2)}")
         
         response = requests.post("https://api.linkedin.com/v2/posts", headers=headers, json=post_data)
