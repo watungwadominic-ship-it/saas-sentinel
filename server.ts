@@ -126,6 +126,30 @@ app.get("/api/news/:id", async (req, res) => {
   }
 });
 
+// Dedicated OG Tag Route for Social Sharing
+// This route is intended to be used as the 'source' URL for LinkedIn/Twitter/FB
+// It serves minimal HTML with OG tags for bots, and redirects real users to the actual article page.
+app.get("/api/og/article/:id", async (req, res, next) => {
+  const articleId = req.params.id;
+  const userAgent = (req.headers["user-agent"] || "").toLowerCase();
+  
+  // Basic bot detection for the redirect logic
+  const isBotUA = /\b(bot|googlebot|baiduspider|bingbot|msnbot|duckduckbot|teoma|slurp|yandexbot|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|applebot|pinterestbot|redditbot|vkshare|archive.org_bot|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|mj12|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|linkedin|linkedinbot|linkedin-bot)\b/i.test(userAgent);
+  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
+  
+  // If it's a real browser, redirect to the actual article page
+  if (isRealBrowser && !req.query.force_bot) {
+    console.log(`[OG-REDIRECT] Redirecting real user from /api/og/article/${articleId} to /article/${articleId}`);
+    return res.redirect(`/article/${articleId}`);
+  }
+  
+  // Otherwise, let the OG tag injection middleware handle it
+  // We'll rewrite the URL to /article/:id internally so the middleware picks it up
+  req.url = `/article/${articleId}`;
+  (req as any).isOgApiRoute = true;
+  next();
+});
+
 // Cron Handlers
 app.all("/api/cron/fetch-news", async (req, res) => {
   try {
@@ -211,7 +235,7 @@ app.use(async (req, res, next) => {
                         (req.headers['x-linkedin-id'] !== undefined);
 
   // LinkedIn is ALWAYS a bot for us, even in AI Studio preview
-  const isBot = (isExplicitBot || isBotUA) && (!isAISPreview || isLinkedIn || forceBot);
+  const isBot = (isExplicitBot || isBotUA || (req as any).isOgApiRoute) && (!isAISPreview || isLinkedIn || forceBot);
 
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string) || (req.query.articleId as string);
@@ -356,7 +380,11 @@ app.use(async (req, res, next) => {
     
     // For bots or cookie check redirects, we prefer a clean, minimal HTML to avoid any "Cookie check" scripts
     // that might be present in the actual index.html file.
-    if (isBot || isCookieCheck) {
+    // CRITICAL: We ONLY serve minimal HTML if it's a bot AND NOT a real browser, OR if it's a cookie check.
+    // This prevents real users who hit a force_bot=true link from seeing a blank page.
+    const shouldServeMinimal = (isBot && !isRealBrowser) || isCookieCheck || (req as any).isOgApiRoute;
+    
+    if (shouldServeMinimal) {
       console.log(`[DEBUG-BOT] Generating clean HTML for bot or cookie check | Path: ${req.path} | Article: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
       html = `<!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">
@@ -364,10 +392,17 @@ app.use(async (req, res, next) => {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SaaS Sentinel Intelligence Report</title>
-  <!-- SaaS Sentinel Bot Fallback -->
+  <style>
+    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f9fafb; color: #374151; }
+    .container { text-align: center; padding: 2rem; }
+    .loading { font-size: 1.2rem; font-weight: 500; margin-bottom: 1rem; }
+  </style>
 </head>
 <body>
-  <div id="root">SaaS Sentinel Intelligence Report</div>
+  <div class="container">
+    <div class="loading">SaaS Sentinel Intelligence Analysis</div>
+    <p>Loading market intelligence report...</p>
+  </div>
 </body>
 </html>`;
     } else {
