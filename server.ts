@@ -40,25 +40,47 @@ app.get("/api/proxy-image", async (req, res) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) return res.status(400).send("Missing URL");
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
   try {
     console.log(`[PROXY] Fetching image: ${imageUrl}`);
     const response = await fetch(imageUrl, {
+      signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
       }
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
 
     const contentType = response.headers.get("content-type") || "image/jpeg";
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
+    res.setHeader("Access-Control-Allow-Origin", "*");
 
     const arrayBuffer = await response.arrayBuffer();
     res.send(Buffer.from(arrayBuffer));
-  } catch (error) {
-    console.error(`[PROXY-ERROR] ${error}`);
-    res.status(500).send("Error proxying image");
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    console.error(`[PROXY-ERROR] ${error.name === 'AbortError' ? 'Timeout' : error.message} for ${imageUrl}`);
+    
+    // Fallback to a neutral tech image instead of 500
+    try {
+      const fallbackUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630";
+      const fallbackResponse = await fetch(fallbackUrl);
+      if (fallbackResponse.ok) {
+        const contentType = fallbackResponse.headers.get("content-type") || "image/jpeg";
+        res.setHeader("Content-Type", contentType);
+        const arrayBuffer = await fallbackResponse.arrayBuffer();
+        return res.send(Buffer.from(arrayBuffer));
+      }
+    } catch (e) {}
+    
+    res.status(200).send(""); // Send empty response instead of error to avoid breaking scrapers
   }
 });
 
@@ -533,31 +555,34 @@ app.use(async (req, res, next) => {
                 console.log(`[DEBUG-OG] Final Resolved Image URL: ${resolvedImg}`);
                 
                 // Proxy third-party images to bypass social media crawler restrictions
-                // CRITICAL: LinkedIn's crawler (LinkedInBot) is often blocked by infrastructure cookie checks
-                // if we use the proxy URL. For LinkedIn, we'll try to provide the original URL if it's absolute.
+                // CRITICAL: We now use the proxy for LinkedIn as well, but we ensure it uses the absolute SHARED_APP_URL
+                // to avoid any relative path issues or internal host issues.
                 
                 const trustedSources = ['unsplash.com', 'images.unsplash.com', 'picsum.photos', 'cloudinary.com', 'imgix.net', 'supabase.co'];
                 const isTrusted = resolvedImg && trustedSources.some(source => resolvedImg.includes(source));
                 
-                if (resolvedImg && !isLinkedIn && !isTrusted && !resolvedImg.includes(finalBaseUrl)) {
+                if (resolvedImg && !isTrusted && !resolvedImg.includes(finalBaseUrl)) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
-                  const cleanBase = baseUrl.replace(/\/$/, '');
-                  const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg`;
+                  const cleanBase = cleanBaseUrl; // Use the reliable SHARED_APP_URL based base
+                  const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg&v=${Date.now()}`;
                   ogImage = escapeHtml(proxiedUrl);
                 } else if (resolvedImg) {
-                  // For LinkedIn or safe domains, use the original URL but ensure it's absolute
-                  if (!resolvedImg.startsWith('http')) {
-                    const cleanBase = finalBaseUrl.replace(/\/$/, '');
-                    resolvedImg = `${cleanBase}${resolvedImg.startsWith('/') ? '' : '/'}${resolvedImg}`;
+                  // For trusted domains or our own domain, use the original URL but ensure it's absolute
+                  let finalImg = resolvedImg;
+                  if (!finalImg.startsWith('http')) {
+                    const cleanBase = cleanBaseUrl;
+                    finalImg = `${cleanBase}${finalImg.startsWith('/') ? '' : '/'}${finalImg}`;
                   }
                   
                   // Force HTTPS for social crawlers to avoid mixed content issues
-                  if (resolvedImg.startsWith('http://')) {
-                    resolvedImg = resolvedImg.replace('http://', 'https://');
+                  if (finalImg.startsWith('http://')) {
+                    finalImg = finalImg.replace('http://', 'https://');
                   }
                   
-                  ogImage = escapeHtml(resolvedImg);
-                  console.log(`[DEBUG-OG] Using original/trusted image URL: ${resolvedImg}`);
+                  // Add cache buster to trusted images too
+                  const separator = finalImg.includes('?') ? '&' : '?';
+                  ogImage = escapeHtml(`${finalImg}${separator}v=${Date.now()}`);
+                  console.log(`[DEBUG-OG] Using original/trusted image URL with cache-buster: ${finalImg}`);
                 }
               } catch (e) {
                 console.error("[DEBUG] Failed to resolve image URL:", img, e);
@@ -605,6 +630,8 @@ app.use(async (req, res, next) => {
   <meta name="twitter:url" content="${ogUrl}" />
   <link rel="canonical" href="${ogUrl}" />
   <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="image" content="${ogImage}">
+  <meta name="thumbnail" content="${ogImage}">
   <meta name="author" content="SaaS Sentinel">
   <meta name="publish_date" content="${new Date().toISOString()}">
   <meta property="article:published_time" content="${new Date().toISOString()}">
