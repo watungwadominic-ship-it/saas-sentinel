@@ -536,7 +536,10 @@ app.use(async (req, res, next) => {
                 // CRITICAL: LinkedIn's crawler (LinkedInBot) is often blocked by infrastructure cookie checks
                 // if we use the proxy URL. For LinkedIn, we'll try to provide the original URL if it's absolute.
                 
-                if (resolvedImg && !isLinkedIn && !resolvedImg.includes(finalBaseUrl) && !resolvedImg.includes('picsum.photos') && !resolvedImg.includes('unsplash.com')) {
+                const trustedSources = ['unsplash.com', 'images.unsplash.com', 'picsum.photos', 'cloudinary.com', 'imgix.net', 'supabase.co'];
+                const isTrusted = resolvedImg && trustedSources.some(source => resolvedImg.includes(source));
+                
+                if (resolvedImg && !isLinkedIn && !isTrusted && !resolvedImg.includes(finalBaseUrl)) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
                   const cleanBase = baseUrl.replace(/\/$/, '');
                   const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&ext=.jpg`;
@@ -548,12 +551,13 @@ app.use(async (req, res, next) => {
                     resolvedImg = `${cleanBase}${resolvedImg.startsWith('/') ? '' : '/'}${resolvedImg}`;
                   }
                   
-                  // Force HTTPS for LinkedIn to avoid mixed content issues
+                  // Force HTTPS for social crawlers to avoid mixed content issues
                   if (resolvedImg.startsWith('http://')) {
                     resolvedImg = resolvedImg.replace('http://', 'https://');
                   }
                   
                   ogImage = escapeHtml(resolvedImg);
+                  console.log(`[DEBUG-OG] Using original/trusted image URL: ${resolvedImg}`);
                 }
               } catch (e) {
                 console.error("[DEBUG] Failed to resolve image URL:", img, e);
