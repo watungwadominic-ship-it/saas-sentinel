@@ -40,7 +40,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         
         # We explicitly include the 'content' block with 'article' source. 
         # This is the most reliable way to trigger a link preview with an image.
-        # We rely on server-side bot detection in server.ts to serve OG tags.
+        # We also provide a thumbnail to force LinkedIn to use our image.
         post_data = {
             "author": author_urn,
             "commentary": text,
@@ -54,7 +54,8 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
                 "article": {
                     "source": url,
                     "title": title,
-                    "description": str(summary or title)[:250]
+                    "description": str(summary or title)[:250],
+                    "thumbnail": image_url
                 }
             },
             "lifecycleState": "PUBLISHED",
@@ -152,7 +153,12 @@ def run_news_bot():
                             "content": (
                                 f"News: {title}\n"
                                 f"Context: {latest.get('description', '')}\n\n"
-                                "Return JSON with these keys: 'feed_summary' (100 words), 'strategic_analysis' (3 paragraphs), 'impact' (High/Medium/Low), 'sentiment' (BULLISH/BEARISH/NEUTRAL)."
+                                f"Return JSON with these keys: "
+                                f"'feed_summary' (string, 100 words), "
+                                f"'strategic_analysis' (string, 3 paragraphs), "
+                                f"'confidence_score' (integer, 0-100), "
+                                f"'strategic_impact' (string, High/Medium/Low), "
+                                f"'sentiment' (string, BULLISH/BEARISH/NEUTRAL)."
                             )
                         }
                     ],
@@ -171,17 +177,26 @@ def run_news_bot():
             continue
 
         # Clean and format the analysis content
-        raw_analysis = ai_data.get('strategic_analysis', "")
-        if isinstance(raw_analysis, dict):
-            # If the AI returns a dict instead of a string, join the values
-            clean_analysis = "\n\n".join([str(v) for v in raw_analysis.values()])
-        else:
-            clean_analysis = str(raw_analysis)
+        def clean_ai_text(text_data):
+            if not text_data:
+                return ""
+            if isinstance(text_data, list):
+                return " ".join([str(i) for i in text_data])
+            if isinstance(text_data, dict):
+                # If it's a dict, it might be the whole AI response or a nested field
+                # Try to find a string value within it
+                for key in ['feed_summary', 'strategic_analysis', 'summary', 'content', 'text', 'analysis']:
+                    if key in text_data and text_data[key]:
+                        return str(text_data[key])
+                # Fallback: join all values
+                return "\n\n".join([str(v) for v in text_data.values()])
+            return str(text_data)
 
+        clean_analysis = clean_ai_text(ai_data.get('strategic_analysis', ""))
+        summary_text = clean_ai_text(ai_data.get('feed_summary', ""))
+        
         # 4. Save to Supabase
         # Mapping the AI fields to the database schema
-        summary_text = str(ai_data.get('feed_summary', ""))
-        
         # Ensure image URL is absolute and has proper dimensions
         image_url = latest.get('urlToImage')
         if not image_url:
@@ -203,10 +218,15 @@ def run_news_bot():
             
         payload = {
             "title": title,
+            "summary": summary_text.strip(),
             "content": clean_analysis.strip(),
+            "analysis_content": clean_analysis.strip(),
             "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": image_url,
-            "created_at": latest.get('publishedAt') or datetime.now().isoformat()
+            "source_url": source_url,
+            "published_at": latest.get('publishedAt') or datetime.now().isoformat(),
+            "confidence_score": ai_data.get('confidence_score', 95),
+            "strategic_impact": ai_data.get('strategic_impact', 'High')
         }
         
         try:
