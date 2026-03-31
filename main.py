@@ -43,25 +43,18 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         print(f"⏳ Waiting 25s for database sync and server readiness...")
         time.sleep(25)
         
-        # Use a dedicated OG tag route for social sharing to bypass infrastructure cookie checks.
+        # Use a .well-known path which is often excluded from infrastructure cookie checks.
         # This route serves minimal HTML with OG tags for bots and redirects users to the real article.
         # We use a .html extension to trick some infrastructure into thinking it's a static file.
         cache_buster = int(time.time())
-        scraping_url = f"{url.replace('/article/', '/og-article-').replace('/api/og/article/', '/og-article-')}"
-        if not scraping_url.endswith('.html'):
-            scraping_url += '.html'
-        
-        # Add multiple bot bypass flags
-        separator = '&' if '?' in scraping_url else '?'
-        scraping_url += f"{separator}force_bot=true&ls=1&_bot=1&v={cache_buster}"
+        scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&v={cache_buster}"
         
         print(f"📡 Sending to LinkedIn: {title[:50]}...")
         
         article_content = {
             "source": scraping_url,
             "title": title,
-            "description": str(summary or title)[:250],
-            "thumbnail": image_url
+            "description": str(summary or title)[:250]
         }
         
         post_data = {
@@ -268,8 +261,8 @@ def run_news_bot():
             # Use the bot-friendly OG route for the main link too.
             # This helps bypass infrastructure cookie checks for the crawler when it follows the link in the text.
             # Real users will be redirected to the actual article page by our server.
-            # We use the .html extension to help bypass some infrastructure checks.
-            article_url = f"{app_url}/og-article-{article_id}.html" if article_id else f"{app_url}/"
+            # We use the .well-known path and .html extension to help bypass some infrastructure checks.
+            article_url = f"{app_url}/.well-known/og-article-{article_id}.html" if article_id else f"{app_url}/"
         
             display_summary = summary_text[:200] if summary_text else ""
             # Ensure there is a space after the URL to prevent social media scrapers from including trailing characters
