@@ -209,8 +209,11 @@ app.use(async (req, res, next) => {
   
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
   
+  const ls = String(req.query.ls || '');
+  const _bot = String(req.query._bot || '');
+  
   // Explicit signals that override browser detection
-  const isExplicitBot = forceBot || isLinkedIn || (req.query.ls !== undefined) || 
+  const isExplicitBot = forceBot || isLinkedIn || ls === '1' || _bot === '1' || 
                         (req.headers['x-fb-http-engine'] !== undefined) ||
                         (req.headers['x-linkedin-id'] !== undefined);
 
@@ -244,9 +247,15 @@ app.use(async (req, res, next) => {
     }
   }
 
-  // LinkedIn is ALWAYS a bot for us, even in AI Studio preview
-  const isBot = (isExplicitBot || isBotUA || (req as any).isOgApiRoute || req.path.includes('.well-known')) && 
-                (!isAISPreview || isLinkedIn || forceBot || (req as any).isOgApiRoute || req.path.includes('.well-known'));
+  // Bot detection logic
+  const isBotPath = (req as any).isOgApiRoute || req.path.includes('.well-known');
+  
+  // A request is a bot if:
+  // 1. It has explicit bot flags (forceBot, ls=1, _bot=1)
+  // 2. It has a bot User-Agent
+  // 3. It's on a bot-specific path (.well-known) AND it's not a real browser in preview
+  const isBot = (isExplicitBot || isBotUA || isBotPath) && 
+                (!isAISPreview || isLinkedIn || forceBot || isBotPath);
   
   if (isBotUA || isExplicitBot || forceBot || (req as any).isOgApiRoute) {
     console.log(`[BOT-CHECK] isBot: ${isBot} | isExplicitBot: ${isExplicitBot} | isBotUA: ${isBotUA} | isAISPreview: ${isAISPreview} | isLinkedIn: ${isLinkedIn} | forceBot: ${forceBot} | isOgApiRoute: ${(req as any).isOgApiRoute} | UA: ${userAgent.substring(0, 70)}`);
@@ -272,7 +281,9 @@ app.use(async (req, res, next) => {
       
       // Try to find ID in path of return_url
       if (!articleId) {
-        const pathM = decodedReturnUrl.match(/\/(?:article|news|api\/og\/article)\/([^\/?#\s\\]+)/i);
+        // Look for various article ID patterns in the path
+        const pathM = decodedReturnUrl.match(/\/(?:article|news|api\/og\/article|\.well-known\/og-article-|og-article-)\/([^\/?#\s\\]+)/i) ||
+                      decodedReturnUrl.match(/\/(?:article|news|api\/og\/article|\.well-known\/og-article-|og-article-)-([^\/?#\s\\]+)/i);
         if (pathM) {
           articleId = pathM[1].split(/[\/?#\s\\]/)[0];
         }
@@ -774,7 +785,8 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
     // LinkedIn is an exception: we ALWAYS strip scripts for LinkedIn to ensure it sees the OG tags clearly.
-    if (isBot && (!isAISPreview || isLinkedIn || forceBot)) {
+    // However, if it's a real browser hitting a .well-known path, we DON'T strip scripts so they can redirect.
+    if (isBot && (!isAISPreview || isLinkedIn || forceBot) && !(!isBotUA && req.path.includes('.well-known'))) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
       // Add no-cache for bots to ensure scrapers always get fresh metadata
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -782,6 +794,30 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       res.setHeader('Expires', '0');
       // Set Vary header to ensure caches distinguish between bot and non-bot responses
       res.setHeader('Vary', 'User-Agent');
+    }
+
+    // If it's a real user on a .well-known path, inject a redirect script to the real article page
+    if (!isBotUA && req.path.includes('.well-known') && articleId) {
+      const redirectScript = `
+        <script>
+          (function() {
+            var articleId = "${articleId}";
+            var currentUrl = window.location.href;
+            var targetUrl = "/article/" + articleId;
+            // Preserve query params if any
+            if (window.location.search) {
+              targetUrl += window.location.search;
+            }
+            console.log("Redirecting real user from .well-known to", targetUrl);
+            window.location.href = targetUrl;
+          })();
+        </script>
+      `;
+      if (/<head[^>]*>/i.test(html)) {
+        html = html.replace(/(<\/head>)/i, `${redirectScript}$1`);
+      } else {
+        html += redirectScript;
+      }
     }
 
     // Inject meta tags
