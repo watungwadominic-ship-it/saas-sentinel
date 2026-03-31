@@ -190,6 +190,7 @@ app.use(async (req, res, next) => {
                      userAgent.includes('whatsapp') ||
                      userAgent.includes('telegrambot') ||
                      userAgent.includes('discordbot') ||
+                     userAgent.includes('LinkedIn') ||
                      xLinkedInId !== undefined;
                      
   // AI Studio Preview detection - we should NOT treat this as a bot for script stripping
@@ -232,6 +233,10 @@ app.use(async (req, res, next) => {
       (req as any).isOgApiRoute = true;
       const match = req.path.match(/\/og-article-([^\.]+)\.html/);
       if (match) articleId = match[1];
+    } else if (req.path.startsWith("/.well-known/og-article-") && req.path.endsWith(".html")) {
+      (req as any).isOgApiRoute = true;
+      const match = req.path.match(/\/\.well-known\/og-article-([^\.]+)\.html/);
+      if (match) articleId = match[1];
     }
     
     if (articleId) {
@@ -240,7 +245,8 @@ app.use(async (req, res, next) => {
   }
 
   // LinkedIn is ALWAYS a bot for us, even in AI Studio preview
-  const isBot = (isExplicitBot || isBotUA || (req as any).isOgApiRoute) && (!isAISPreview || isLinkedIn || forceBot || (req as any).isOgApiRoute);
+  const isBot = (isExplicitBot || isBotUA || (req as any).isOgApiRoute || req.path.includes('.well-known')) && 
+                (!isAISPreview || isLinkedIn || forceBot || (req as any).isOgApiRoute || req.path.includes('.well-known'));
   
   if (isBotUA || isExplicitBot || forceBot || (req as any).isOgApiRoute) {
     console.log(`[BOT-CHECK] isBot: ${isBot} | isExplicitBot: ${isExplicitBot} | isBotUA: ${isBotUA} | isAISPreview: ${isAISPreview} | isLinkedIn: ${isLinkedIn} | forceBot: ${forceBot} | isOgApiRoute: ${(req as any).isOgApiRoute} | UA: ${userAgent.substring(0, 70)}`);
