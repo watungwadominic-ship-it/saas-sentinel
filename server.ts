@@ -21,7 +21,7 @@ app.get("/api/health-check", (req, res) => {
 });
 
 // Image Proxy to bypass social media crawler restrictions
-app.get("/api/proxy-image", async (req, res) => {
+app.get(["/api/proxy-image", "/api/proxy-image/:filename"], async (req, res) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) return res.status(400).send("Missing URL");
 
@@ -181,6 +181,15 @@ app.use(async (req, res, next) => {
                      userAgent.includes('crawler') ||
                      userAgent.includes('spider') ||
                      userAgent.includes('inspection') ||
+                     userAgent.includes('metadata') ||
+                     userAgent.includes('og-tag') ||
+                     userAgent.includes('social-share') ||
+                     userAgent.includes('facebookexternalhit') ||
+                     userAgent.includes('twitterbot') ||
+                     userAgent.includes('slackbot') ||
+                     userAgent.includes('whatsapp') ||
+                     userAgent.includes('telegrambot') ||
+                     userAgent.includes('discordbot') ||
                      xLinkedInId !== undefined;
                      
   // AI Studio Preview detection - we should NOT treat this as a bot for script stripping
@@ -207,19 +216,26 @@ app.use(async (req, res, next) => {
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string) || (req.query.articleId as string);
   
-  // Path-based extraction (e.g. /article/257 or /api/og/article/257)
+  // Path-based extraction (e.g. /article/257 or /api/og/article/257 or /og-article-257.html)
   if (!articleId) {
     const pathParts = req.path.split("/");
-    // Matches /article/ID or /news/ID or /api/og/article/ID
+    // Matches /article/ID or /news/ID or /api/og/article/ID or /og/article/ID
     if (pathParts[1] === "article" || pathParts[1] === "news") {
-      articleId = pathParts[2].split(/[\/?#\s\\]/)[0];
+      articleId = pathParts[2].split(/[\/?#\s\.\\]/)[0];
     } else if (pathParts[1] === "api" && pathParts[2] === "og" && pathParts[3] === "article") {
       (req as any).isOgApiRoute = true;
-      articleId = pathParts[4].split(/[\/?#\s\\]/)[0];
+      articleId = pathParts[4].split(/[\/?#\s\.\\]/)[0];
+    } else if (pathParts[1] === "og" && pathParts[2] === "article") {
+      (req as any).isOgApiRoute = true;
+      articleId = pathParts[3].split(/[\/?#\s\.\\]/)[0];
+    } else if (req.path.startsWith("/og-article-") && req.path.endsWith(".html")) {
+      (req as any).isOgApiRoute = true;
+      const match = req.path.match(/\/og-article-([^\.]+)\.html/);
+      if (match) articleId = match[1];
     }
     
     if (articleId) {
-      console.log(`[DEBUG-ID] Extracted ID from path: ${articleId}`);
+      console.log(`[DEBUG-ID] Extracted ID from path: ${articleId} | Path: ${req.path}`);
     }
   }
 
@@ -387,10 +403,14 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     if (isCookieCheck && isImageProxyInReturnUrl) {
       console.log(`[DEBUG-COOKIE] Redirecting image proxy cookie check back to proxy with force_bot=true | ReturnURL: ${returnUrl}`);
       let targetUrl = returnUrl;
-      if (!targetUrl.includes('force_bot=true')) {
-        const separator = targetUrl.includes('?') ? '&' : '?';
-        targetUrl += `${separator}force_bot=true`;
-      }
+      // Add multiple bot bypass flags to be safe
+      const bypassFlags = ['force_bot=true', 'ls=1', '_bot=1', 'bot=1'];
+      bypassFlags.forEach(flag => {
+        if (!targetUrl.includes(flag.split('=')[0])) {
+          const separator = targetUrl.includes('?') ? '&' : '?';
+          targetUrl += `${separator}${flag}`;
+        }
+      });
       return res.redirect(targetUrl);
     }
 
@@ -629,14 +649,25 @@ Sitemap: ${cleanBase}/sitemap.xml`);
                 // CRITICAL: We now use the proxy for LinkedIn as well, but we ensure it uses the absolute SHARED_APP_URL
                 // to avoid any relative path issues or internal host issues.
                 
-                const trustedSources = ['unsplash.com', 'images.unsplash.com', 'picsum.photos', 'cloudinary.com', 'imgix.net', 'supabase.co'];
+                const trustedSources = [
+                  'unsplash.com', 'images.unsplash.com', 'picsum.photos', 
+                  'cloudinary.com', 'imgix.net', 'supabase.co', 
+                  'wp.com', 'wordpress.com', 'googleusercontent.com',
+                  'fbcdn.net', 'twimg.com', 'akamaihd.net', 'fastly.net'
+                ];
                 const isTrusted = resolvedImg && trustedSources.some(source => resolvedImg.includes(source));
                 
-                if (resolvedImg && !isTrusted && !resolvedImg.includes(finalBaseUrl)) {
+                // If it's already HTTPS and from a reasonably well-known domain, try to use it directly
+                // to avoid the cookie check loop on our own domain.
+                const isSafeDirect = resolvedImg && resolvedImg.startsWith('https://') && 
+                                   (isTrusted || resolvedImg.length < 150);
+
+                if (resolvedImg && !isSafeDirect && !resolvedImg.includes(finalBaseUrl)) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
                   const cleanBase = cleanBaseUrl; // Use the reliable SHARED_APP_URL based base
-                  // Simplify proxy URL to be more crawler-friendly and include force_bot to bypass infrastructure checks
-                  const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&force_bot=true&v=${articleId || Date.now()}`;
+                  // Simplify proxy URL to be more crawler-friendly and include multiple bot bypass flags
+                  // Use a .jpg extension to help bypass some infrastructure checks
+                  const proxiedUrl = `${cleanBase}/api/proxy-image/${articleId || Date.now()}.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1&_bot=1`;
                   ogImage = escapeHtml(proxiedUrl);
                 } else if (resolvedImg) {
                   // For trusted domains or our own domain, use the original URL but ensure it's absolute
