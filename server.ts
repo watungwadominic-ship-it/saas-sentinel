@@ -29,7 +29,7 @@ app.get("/api/proxy-image", async (req, res) => {
   const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
 
   try {
-    console.log(`[PROXY] Fetching image: ${imageUrl}`);
+    console.log(`[PROXY] Fetching image: ${imageUrl} | force_bot: ${req.query.force_bot}`);
     const response = await fetch(imageUrl, {
       signal: controller.signal,
       headers: {
@@ -224,7 +224,11 @@ app.use(async (req, res, next) => {
   }
 
   // LinkedIn is ALWAYS a bot for us, even in AI Studio preview
-  const isBot = (isExplicitBot || isBotUA || (req as any).isOgApiRoute) && (!isAISPreview || isLinkedIn || forceBot);
+  const isBot = (isExplicitBot || isBotUA || (req as any).isOgApiRoute) && (!isAISPreview || isLinkedIn || forceBot || (req as any).isOgApiRoute);
+  
+  if (isBotUA || isExplicitBot || forceBot || (req as any).isOgApiRoute) {
+    console.log(`[BOT-CHECK] isBot: ${isBot} | isExplicitBot: ${isExplicitBot} | isBotUA: ${isBotUA} | isAISPreview: ${isAISPreview} | isLinkedIn: ${isLinkedIn} | forceBot: ${forceBot} | isOgApiRoute: ${(req as any).isOgApiRoute} | UA: ${userAgent.substring(0, 70)}`);
+  }
 
   // Extract from return_url if present (infrastructure cookie checks)
   const returnUrl = req.query.return_url as string;
@@ -282,6 +286,7 @@ app.use(async (req, res, next) => {
   }
 
   // Skip API routes unless it's our OG route
+  // CRITICAL: We MUST skip the image proxy here to avoid serving HTML for image requests
   if (req.path.startsWith("/api/") && !(req as any).isOgApiRoute) {
     return next();
   }
@@ -371,9 +376,29 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     
     // For bots or cookie check redirects, we prefer a clean, minimal HTML to avoid any "Cookie check" scripts
     // that might be present in the actual index.html file.
-    // CRITICAL: We ONLY serve minimal HTML if it's a bot AND NOT a real browser, OR if it's a cookie check for a bot.
-    // This prevents real users who hit a force_bot=true link or cookie check from seeing a blank page.
-    const shouldServeMinimal = (isBot && !isRealBrowser) || (isCookieCheck && isBot) || ((req as any).isOgApiRoute && isBot);
+    // CRITICAL: We serve minimal HTML if it's a bot, OR if it's a cookie check, OR if it's our OG API route.
+    // BUT we must NOT serve HTML if the original request was for an image or other non-HTML asset.
+    const returnUrl = req.query.return_url as string;
+    const isImageProxyInReturnUrl = typeof returnUrl === "string" && returnUrl.includes("/api/proxy-image");
+    
+    // If it's a cookie check for an image proxy, we MUST NOT serve HTML.
+    // Instead, we should try to redirect back to the image proxy with force_bot=true
+    // to break out of the cookie check loop for the image asset.
+    if (isCookieCheck && isImageProxyInReturnUrl) {
+      console.log(`[DEBUG-COOKIE] Redirecting image proxy cookie check back to proxy with force_bot=true | ReturnURL: ${returnUrl}`);
+      let targetUrl = returnUrl;
+      if (!targetUrl.includes('force_bot=true')) {
+        const separator = targetUrl.includes('?') ? '&' : '?';
+        targetUrl += `${separator}force_bot=true`;
+      }
+      return res.redirect(targetUrl);
+    }
+
+    const shouldServeMinimal = ((isBot && !isRealBrowser) || isCookieCheck || (req as any).isOgApiRoute) && !isImageProxyInReturnUrl;
+    
+    if (shouldServeMinimal || isCookieCheck) {
+      console.log(`[DEBUG-MINIMAL] shouldServeMinimal: ${shouldServeMinimal} | isBot: ${isBot} | isRealBrowser: ${isRealBrowser} | isCookieCheck: ${isCookieCheck} | isOgApiRoute: ${(req as any).isOgApiRoute} | isImageProxyInReturnUrl: ${isImageProxyInReturnUrl}`);
+    }
     
     if (shouldServeMinimal) {
       console.log(`[DEBUG-BOT] Generating clean HTML for bot or cookie check | Path: ${req.path} | Article: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
@@ -552,6 +577,10 @@ Sitemap: ${cleanBase}/sitemap.xml`);
                   if (img.startsWith('/')) {
                     const cleanBase = finalBaseUrl.replace(/\/$/, '');
                     resolvedImg = `${cleanBase}${img}`;
+                  } else if (!img.includes('://')) {
+                    // If it's a relative path without a leading slash
+                    const cleanBase = finalBaseUrl.replace(/\/$/, '');
+                    resolvedImg = `${cleanBase}/${img}`;
                   } else {
                     resolvedImg = img;
                   }
@@ -606,8 +635,8 @@ Sitemap: ${cleanBase}/sitemap.xml`);
                 if (resolvedImg && !isTrusted && !resolvedImg.includes(finalBaseUrl)) {
                   console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
                   const cleanBase = cleanBaseUrl; // Use the reliable SHARED_APP_URL based base
-                  // Simplify proxy URL to be more crawler-friendly
-                  const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}`;
+                  // Simplify proxy URL to be more crawler-friendly and include force_bot to bypass infrastructure checks
+                  const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&force_bot=true&v=${articleId || Date.now()}`;
                   ogImage = escapeHtml(proxiedUrl);
                 } else if (resolvedImg) {
                   // For trusted domains or our own domain, use the original URL but ensure it's absolute
@@ -746,7 +775,7 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       res.setHeader('Expires', '0');
       res.setHeader('X-Robots-Tag', 'index, follow, max-image-preview:large');
       
-      console.log(`[BOT-RESPONSE] Sent OG-enriched HTML for ${articleId || 'home'} | isBot: ${isBot}`);
+      console.log(`[BOT-RESPONSE] Sent OG-enriched HTML for ${articleId || 'home'} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck} | UA: ${userAgent.substring(0, 70)}`);
     } else {
       res.setHeader('Cache-Control', 'public, max-age=3600');
     }
