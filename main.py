@@ -43,11 +43,10 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         print(f"⏳ Waiting 25s for database sync and server readiness...")
         time.sleep(25)
         
-        # Use a .well-known path which is often excluded from infrastructure cookie checks.
-        # This route serves minimal HTML with OG tags for bots and redirects users to the real article.
-        # We use a .html extension to trick some infrastructure into thinking it's a static file.
+        # Use the passed URL as the source for scraping.
+        # It already contains the .well-known path and bot bypass flags from the caller.
         cache_buster = int(time.time())
-        scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&v={cache_buster}"
+        scraping_url = f"{url}?force_bot=true&ls=1&_bot=1&v={cache_buster}" if "?" not in url else f"{url}&v={cache_buster}"
         
         print(f"📡 Sending to LinkedIn: {title[:50]}...")
         
