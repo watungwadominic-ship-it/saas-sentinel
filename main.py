@@ -45,8 +45,11 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         
         # Use the passed URL as the source for scraping.
         # It already contains the .well-known path and bot bypass flags from the caller.
-        cache_buster = int(time.time())
-        scraping_url = f"{url}?force_bot=true&ls=1&_bot=1&v={cache_buster}" if "?" not in url else f"{url}&v={cache_buster}"
+        # We ensure the URL is clean and only has one set of bot-bypass flags.
+        scraping_url = url
+        if "v=" not in scraping_url:
+            cache_buster = int(time.time())
+            scraping_url = f"{url}&v={cache_buster}" if "?" in url else f"{url}?v={cache_buster}"
         
         print(f"📡 Sending to LinkedIn: {title[:50]}...")
         
@@ -55,10 +58,6 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             "title": title,
             "description": str(summary or title)[:250]
         }
-        
-        # Add thumbnail as a fallback if scraping fails
-        if image_url:
-            article_content["thumbnail"] = image_url
         
         post_data = {
             "author": author_urn,
