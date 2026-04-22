@@ -23,54 +23,7 @@ app.get("/api/health-check", (req, res) => {
 // Image Proxy to bypass social media crawler restrictions
 app.get(["/api/proxy-image", "/api/proxy-image/:filename"], async (req, res) => {
   const imageUrl = req.query.url as string;
-  if (!imageUrl) return res.status(400).send("Missing URL");
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
-
-  try {
-    console.log(`[PROXY] Fetching image: ${imageUrl} | force_bot: ${req.query.force_bot}`);
-    const response = await fetch(imageUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
-      }
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
-
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-
-    const arrayBuffer = await response.arrayBuffer();
-    res.send(Buffer.from(arrayBuffer));
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    console.error(`[PROXY-ERROR] ${error.name === 'AbortError' ? 'Timeout' : error.message} for ${imageUrl}`);
-    
-    // Fallback to a neutral tech image instead of 500
-    try {
-      const fallbackUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630";
-      const fallbackResponse = await fetch(fallbackUrl);
-      if (fallbackResponse.ok) {
-        const contentType = fallbackResponse.headers.get("content-type") || "image/jpeg";
-        res.setHeader("Content-Type", contentType);
-        res.setHeader("Cache-Control", "public, max-age=3600");
-        const arrayBuffer = await fallbackResponse.arrayBuffer();
-        return res.send(Buffer.from(arrayBuffer));
-      }
-    } catch (e) {}
-    
-    // Last resort: 1x1 transparent pixel
-    res.setHeader("Content-Type", "image/png");
-    res.send(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
-  }
+  return fetchAndSendImage(imageUrl, res);
 });
 
 // API Routes
@@ -144,6 +97,56 @@ app.all("/api/cron/fetch-news", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// Shared Image Proxy Helper
+const fetchAndSendImage = async (imageUrl: string, res: any) => {
+  if (!imageUrl) return res.status(400).send("Missing URL");
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
+  try {
+    console.log(`[PROXY-HELPER] Fetching: ${imageUrl}`);
+    const response = await fetch(imageUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+      }
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+
+    const arrayBuffer = await response.arrayBuffer();
+    return res.send(Buffer.from(arrayBuffer));
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    console.error(`[PROXY-HELPER-ERROR] ${error.name === 'AbortError' ? 'Timeout' : error.message} for ${imageUrl}`);
+    
+    // Fallback logic
+    try {
+      const fallbackUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630";
+      const fallbackResponse = await fetch(fallbackUrl);
+      if (fallbackResponse.ok) {
+        const contentType = fallbackResponse.headers.get("content-type") || "image/jpeg";
+        res.setHeader("Content-Type", contentType);
+        const arrayBuffer = await fallbackResponse.arrayBuffer();
+        return res.send(Buffer.from(arrayBuffer));
+      }
+    } catch (e) {}
+    
+    res.setHeader("Content-Type", "image/png");
+    return res.send(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
+  }
+};
 
 // OG Tag Injection Middleware
 app.use(async (req, res, next) => {
@@ -383,6 +386,24 @@ Sitemap: ${cleanBase}/sitemap.xml`);
 
     const isImageProxyInReturnUrl = typeof returnUrl === "string" && returnUrl.includes("/api/proxy-image");
     
+    const isActuallyBotAccessing = isActuallyBot || isBotPath || isBotUA;
+
+    // If we're in a cookie check and it's a proxy image request, serve the image directly!
+    // This bypasses the infrastructure's attempt to force a cookie check on the image for recognized bots.
+    if (isCookieCheck && isImageProxyInReturnUrl && isActuallyBotAccessing) {
+      try {
+        const decodedReturnUrl = decodeURIComponent(req.query.return_url as string);
+        const urlMatch = decodedReturnUrl.match(/url=([^&]+)/);
+        if (urlMatch) {
+           const actualImageUrl = decodeURIComponent(urlMatch[1]);
+           console.log(`[DEBUG-COOKIE] Serving image DIRECTLY from cookie check for bot: ${actualImageUrl}`);
+           return fetchAndSendImage(actualImageUrl, res);
+        }
+      } catch (e) {
+        console.error("[DEBUG-COOKIE] Failed to extract image URL from return_url:", e);
+      }
+    }
+
     // Redirect image proxy cookie checks back to the proxy with bot bypass flags
     if (isCookieCheck && isImageProxyInReturnUrl) {
       console.log(`[DEBUG-COOKIE] Redirecting image proxy cookie check back to proxy with force_bot=true | ReturnURL: ${returnUrl}`);
@@ -396,7 +417,6 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       return res.redirect(targetUrl);
     }
 
-    const isActuallyBotAccessing = isActuallyBot || isBotPath || isBotUA;
     const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && isActuallyBotAccessing;
     const shouldServeMinimal = (isActuallyBot || isBot) && !isRealBrowser && (!isAISPreview || isLinkedIn || forceBot || isBotPath) && !isImageProxyInReturnUrl;
 
