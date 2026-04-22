@@ -194,14 +194,17 @@ app.use(async (req, res, next) => {
                        isAISDomain;
 
   // Unified Bot Detection
-  const isBotUA = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|well-known|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|metadata|og-tag|social-share|inspection|prefetch|bot|externalhit|preview|embed)\b/i.test(userAgent) || isLinkedIn;
+  const botRegex = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|well-known|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|metadata|og-tag|social-share|inspection|prefetch|bot|externalhit|preview|embed|inspection|phantomjs|headless|screenshot|link-preview)\b/i;
+  const isBotUA = botRegex.test(userAgent) || isLinkedIn;
   
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|google-cloud-preview)\b/i.test(userAgent) && !isBotUA;
   
-  // AIS PREVIEW FIX: If it's a real browser in AIS preview, let Vite handle it immediately (fixes white screen)
-  if (isAISPreview && isRealBrowser && !req.path.includes('.well-known')) {
-    if (process.env.NODE_ENV !== "production") {
-      return next();
+  // AIS PREVIEW FIX: If it's a real browser and not a bot, let Vite handle it immediately (fixes white screen)
+  if (!isRealBrowser || isBotUA || isLinkedIn || req.path.includes('.well-known')) {
+    // Keep processing for bots
+  } else {
+    if (process.env.NODE_ENV !== "production" || !req.path.includes('/article/')) {
+        return next();
     }
   }
   
@@ -213,7 +216,8 @@ app.use(async (req, res, next) => {
   const isExplicitBot = forceBot || isLinkedIn || ls === '1' || _bot === '1' || botParam === '1' ||
                         (req.headers['x-fb-http-engine'] !== undefined) ||
                         (req.headers['x-linkedin-id'] !== undefined) ||
-                        (req.headers['x-force-bot'] === 'true');
+                        (req.headers['x-force-bot'] === 'true') ||
+                        req.path.includes('.well-known');
 
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string) || (req.query.articleId as string);
@@ -392,10 +396,27 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       return res.redirect(targetUrl);
     }
 
-    const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && (isActuallyBot || isBotPath || isBotUA);
+    const isActuallyBotAccessing = isActuallyBot || isBotPath || isBotUA;
+    const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && isActuallyBotAccessing;
     const shouldServeMinimal = (isActuallyBot || isBot) && !isRealBrowser && (!isAISPreview || isLinkedIn || forceBot || isBotPath) && !isImageProxyInReturnUrl;
 
     if (shouldServeMinimal || isBotAccessingOg) {
+      // Refresh OG tags data if it's a bot request
+      if (articleId && articleId !== "undefined") {
+         try {
+           const { supabase } = await import("./src/services/supabase.js");
+           const { data: art } = await supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
+           if (art) {
+             ogTitle = art.title;
+             ogDescription = (art.summary || art.content || "").substring(0, 200);
+             if (art.image_url) ogImage = art.image_url.trim();
+             console.log(`[BOT-DATA-REFRESH] Success for ${articleId}: ${ogTitle}`);
+           }
+         } catch (e) {
+           console.error("[BOT-DATA-REFRESH] Error:", e);
+         }
+      }
+      
       // Escape for minimal HTML
       const escapedTitle = ogTitle.replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m] || m));
       const escapedDesc = ogDescription.replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m] || m));
@@ -432,7 +453,28 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       return res.redirect(`/article/${articleId || ''}`);
     } else {
       try {
-        html = fs.readFileSync(path.join(process.cwd(), "dist", "index.html"), "utf-8");
+        const rootPath = process.cwd();
+        const possibleIndexPaths = [
+          path.join(rootPath, "dist", "index.html"),
+          path.join(rootPath, "index.html"),
+          path.join(__dirname, "dist", "index.html"),
+          path.join(__dirname, "index.html")
+        ];
+        
+        let foundPath = null;
+        for (const p of possibleIndexPaths) {
+          if (fs.existsSync(p)) {
+            foundPath = p;
+            break;
+          }
+        }
+        
+        if (foundPath) {
+          html = fs.readFileSync(foundPath, "utf-8");
+        } else {
+          // Fallback to a functional (though minimal) HTML that can still load the app if served correctly
+          html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root">Loading...</div></body></html>`;
+        }
       } catch (e) {
         html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"></head><body><div id="root"></div></body></html>`;
       }
@@ -447,6 +489,10 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.get('host');
     const baseUrl = `${protocol}://${host}`;
+    
+    // Explicitly check SHARED_APP_URL - if it's set, we should definitely use it for OG tags
+    const envSharedUrl = process.env.SHARED_APP_URL || "";
+    const finalBaseUrl = envSharedUrl.length > 10 ? envSharedUrl : baseUrl;
     
     const escapeHtml = (str: string) => {
       if (!str) return "";
@@ -477,7 +523,7 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
     // We prefer the dynamic baseUrl for dev environments to ensure proxying works correctly
-    const finalBaseUrl = process.env.SHARED_APP_URL || baseUrl;
+    // But for SHARED_APP_URL we want consistent results
     
     // Use the articleId and returnUrl extracted earlier in the middleware
     let canonicalPath = req.path;
