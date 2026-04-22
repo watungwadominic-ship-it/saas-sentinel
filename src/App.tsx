@@ -578,17 +578,30 @@ function AnalysisImage({ src, alt, className = "", rounded = "rounded-[2.5rem]" 
   const [error, setError] = useState(false);
   const fallbackImage = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2426'; // Tech Abstract
 
+  // Use our proxy for all external images to bypass hotlink protection and AIS restrictions
+  const getProxiedUrl = (url?: string) => {
+    if (!url) return fallbackImage;
+    if (url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co')) return url;
+    
+    // Add cache buster and force_bot=true to help bypass some intermediary caches
+    const cacheBuster = Date.now();
+    return `/api/proxy-image?url=${encodeURIComponent(url)}&v=${cacheBuster}&force_bot=true&ls=1&_bot=1`;
+  };
+
+  const imageUrl = error || !src ? fallbackImage : getProxiedUrl(src);
+
   return (
     <div className={`relative w-full aspect-video overflow-hidden bg-[#1e293b] ${rounded} border border-white/20 shadow-2xl ${className}`}>
       {loading && (
         <div className="absolute inset-0 z-10 animate-shimmer" />
       )}
       <img
-        src={error || !src ? fallbackImage : src}
+        src={imageUrl}
         alt={alt}
         className={`w-full h-full object-cover transition-opacity duration-700 ${loading ? 'opacity-0' : 'opacity-100'}`}
         onLoad={() => setLoading(false)}
         onError={() => {
+          console.error(`[IMAGE-ERROR] Failed to load: ${src}`);
           setError(true);
           setLoading(false);
         }}
