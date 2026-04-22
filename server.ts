@@ -175,22 +175,26 @@ app.use(async (req, res, next) => {
                      userAgent.includes('apache-httpclient') ||
                      userAgent.includes('linkedin-post-inspector') ||
                      userAgent.includes('post-inspector') ||
+                     userAgent.includes('ms-office') ||
+                     userAgent.includes('office-collaboration') ||
+                     userAgent.includes('microsoft-link-preview') ||
                      xLinkedInId !== undefined;
                      
   const xForwardedHost = req.get('x-forwarded-host') || '';
   const xHost = req.get('host') || '';
   const referer = req.get('referer') || '';
+  const isAISDomain = xForwardedHost.startsWith('ais-dev-') ||
+                      xHost.startsWith('ais-dev-') ||
+                      xForwardedHost.startsWith('ais-pre-') ||
+                      xHost.startsWith('ais-pre-');
   
   const isAISPreview = xPurpose === 'preview' || 
                        referer.includes('aistudio.google.com') ||
                        referer.includes('localhost:3000') ||
-                       xForwardedHost.startsWith('ais-dev-') ||
-                       xHost.startsWith('ais-dev-') ||
-                       xForwardedHost.startsWith('ais-pre-') ||
-                       xHost.startsWith('ais-pre-');
+                       isAISDomain;
 
   // Unified Bot Detection
-  const isBotUA = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|well-known|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|metadata|og-tag|social-share|inspection|prefetch)\b/i.test(userAgent) || isLinkedIn;
+  const isBotUA = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|well-known|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|metadata|og-tag|social-share|inspection|prefetch|bot|externalhit|preview|embed)\b/i.test(userAgent) || isLinkedIn;
   
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|google-cloud-preview)\b/i.test(userAgent) && !isBotUA;
   
@@ -256,7 +260,12 @@ app.use(async (req, res, next) => {
   const isBotPath = (req as any).isOgApiRoute || req.path.includes('.well-known');
   const isCookieCheck = req.path === "/__cookie_check.html" || req.path === "/_cookie_check.html" || req.path.includes("cookie_check");
   const isActuallyBot = isBotUA || isExplicitBot || (isBotPath && !isRealBrowser);
-  const isBot = isActuallyBot && (!isAISPreview || isLinkedIn || forceBot || isBotPath);
+  // LinkedIn and explicit bots should bypass pre-deployment domain restrictions
+  const isBot = isActuallyBot && (!isAISDomain || isLinkedIn || forceBot || isBotPath || isExplicitBot);
+  
+  if (isBot) {
+    console.log(`[BOT-DETECTED] Path: ${req.path} | UA: ${userAgent.substring(0, 70)} | isLinkedIn: ${isLinkedIn} | isBotPath: ${isBotPath}`);
+  }
   
   if (isBotUA || isExplicitBot || forceBot || (req as any).isOgApiRoute) {
     console.log(`[BOT-CHECK] isBot: ${isBot} | isExplicitBot: ${isExplicitBot} | isBotUA: ${isBotUA} | isAISPreview: ${isAISPreview} | isLinkedIn: ${isLinkedIn} | forceBot: ${forceBot} | isOgApiRoute: ${(req as any).isOgApiRoute} | UA: ${userAgent.substring(0, 70)}`);
@@ -383,32 +392,38 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       return res.redirect(targetUrl);
     }
 
-    const shouldServeMinimal = (isActuallyBot || isBot) && !isRealBrowser && !isAISPreview && !isImageProxyInReturnUrl;
     const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && (isActuallyBot || isBotPath || isBotUA);
+    const shouldServeMinimal = (isActuallyBot || isBot) && !isRealBrowser && (!isAISPreview || isLinkedIn || forceBot || isBotPath) && !isImageProxyInReturnUrl;
 
     if (shouldServeMinimal || isBotAccessingOg) {
-      console.log(`[DEBUG-BOT] Minimal Path: ${req.path} | Article: ${articleId} | isBot: ${isBot}`);
+      // Escape for minimal HTML
+      const escapedTitle = ogTitle.replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m] || m));
+      const escapedDesc = ogDescription.replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m] || m));
+
+      console.log(`[DEBUG-BOT] Serving Minimal: ${req.path} | Article: ${articleId} | isBot: ${isBot}`);
       html = `<!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">
 <head>
   <meta charset="utf-8">
-  <title>${ogTitle}</title>
+  <title>${escapedTitle}</title>
   <style>
-    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #000; color: #fff; }
-    .container { text-align: center; padding: 2rem; border-left: 4px solid #3b82f6; border-radius: 8px; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 600px; }
-    h1 { margin-top: 0; font-size: 1.5rem; color: #3b82f6; }
-    p { line-height: 1.6; opacity: 0.8; }
+    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #0a0a0a; color: #fff; }
+    .container { text-align: center; padding: 3rem; border-left: 6px solid #f08924; border-radius: 12px; background: #111; box-shadow: 0 20px 50px rgba(0,0,0,0.8); max-width: 700px; border: 1px solid rgba(255,255,255,0.05); }
+    h1 { margin-top: 0; font-size: 2rem; color: #f08924; text-transform: uppercase; letter-spacing: -0.02em; }
+    p { line-height: 1.8; opacity: 0.8; font-size: 1.1rem; }
+    .redirect { margin-top: 2rem; font-size: 0.8rem; opacity: 0.4; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; }
   </style>
   <script>
-    if (!/bot|linkedin|google|facebook|twitter|crawler|spider/i.test(navigator.userAgent)) {
+    if (!/bot|linkedin|google|facebook|twitter|crawler|spider|slack|whatsapp|telegram/i.test(navigator.userAgent)) {
       window.location.href = "/article/${articleId || ''}" + window.location.search;
     }
   </script>
 </head>
 <body>
   <div class="container">
-    <h1>${ogTitle}</h1>
-    <p>${ogDescription}</p>
+    <h1>${escapedTitle}</h1>
+    <p>${escapedDesc}</p>
+    <div class="redirect">SaaS Sentinel Intelligence Analysis Loading...</div>
   </div>
 </body>
 </html>`;
@@ -736,17 +751,16 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     html = html.replace(/__cookie_check\.html/gi, 'index.html');
     html = html.replace(/<meta[^>]+content=["'].*?Cookie check.*?["'][^>]*>/gi, '');
     
-    // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
-    // that might confuse the scraper or lead it away from the OG tags.
+    // If it's a bot (and NOT the AI Studio preview browser), strip all scripts
     // LinkedIn is an exception: we ALWAYS strip scripts for LinkedIn to ensure it sees the OG tags clearly.
     // However, if it's a real browser or AI Studio preview hitting a .well-known path, we DON'T strip scripts.
-    if (isBot && !isAISPreview && !(!isBotUA && req.path.includes('.well-known'))) {
+    if (isBot && (!isAISPreview || isLinkedIn || forceBot) && !(!isBotUA && req.path.includes('.well-known'))) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-      // Add no-cache for bots to ensure scrapers always get fresh metadata
+      // Add no-cache for bots and dummy cookie to help bypass some LBs
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      // Set Vary header to ensure caches distinguish between bot and non-bot responses
+      res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure');
       res.setHeader('Vary', 'User-Agent');
     }
 
