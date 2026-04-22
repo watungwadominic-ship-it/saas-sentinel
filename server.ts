@@ -183,30 +183,40 @@ app.use(async (req, res, next) => {
   
   const isAISPreview = xPurpose === 'preview' || 
                        referer.includes('aistudio.google.com') ||
+                       referer.includes('localhost:3000') ||
                        xForwardedHost.startsWith('ais-dev-') ||
                        xHost.startsWith('ais-dev-') ||
                        xForwardedHost.startsWith('ais-pre-') ||
                        xHost.startsWith('ais-pre-');
 
-  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|metadata|og-tag|social-share|inspection|prefetch)\b/i.test(userAgent) || isLinkedIn;
+  // Unified Bot Detection
+  const isBotUA = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|well-known|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|metadata|og-tag|social-share|inspection|prefetch)\b/i.test(userAgent) || isLinkedIn;
   
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|google-cloud-preview)\b/i.test(userAgent) && !isBotUA;
   
+  // AIS PREVIEW FIX: If it's a real browser in AIS preview, let Vite handle it immediately (fixes white screen)
+  if (isAISPreview && isRealBrowser && !req.path.includes('.well-known')) {
+    if (process.env.NODE_ENV !== "production") {
+      return next();
+    }
+  }
+  
   const ls = String(req.query.ls || '');
   const _bot = String(req.query._bot || '');
+  const botParam = String(req.query.bot || '');
   
   // Explicit signals that override browser detection
-  const isExplicitBot = forceBot || isLinkedIn || ls === '1' || _bot === '1' || 
+  const isExplicitBot = forceBot || isLinkedIn || ls === '1' || _bot === '1' || botParam === '1' ||
                         (req.headers['x-fb-http-engine'] !== undefined) ||
-                        (req.headers['x-linkedin-id'] !== undefined);
+                        (req.headers['x-linkedin-id'] !== undefined) ||
+                        (req.headers['x-force-bot'] === 'true');
 
   // Extract article ID from query or path
   let articleId = (req.query.article as string) || (req.query.article_id as string) || (req.query.id as string) || (req.query.articleId as string);
   
-  // Path-based extraction (e.g. /article/257 or /api/og/article/257 or /og-article-257.html)
+  // Path-based extraction
   if (!articleId) {
     const pathParts = req.path.split("/");
-    // Matches /article/ID or /news/ID or /api/og/article/ID or /og/article/ID
     if (pathParts[1] === "article" || pathParts[1] === "news") {
       articleId = pathParts[2].split(/[\/?#\s\.\\]/)[0];
     } else if (pathParts[1] === "api" && pathParts[2] === "og" && pathParts[3] === "article") {
@@ -224,68 +234,32 @@ app.use(async (req, res, next) => {
       const match = req.path.match(/\/\.well-known\/og-article-([^\.]+)\.html/);
       if (match) articleId = match[1];
     }
-    
-    if (articleId) {
-      console.log(`[DEBUG-ID] Extracted ID from path: ${articleId} | Path: ${req.path}`);
-    }
   }
 
-  // Bot detection logic
-  const isBotPath = (req as any).isOgApiRoute || req.path.includes('.well-known');
-  
-  // A request is a bot if:
-  // 1. It has explicit bot flags (forceBot, ls=1, _bot=1)
-  // 2. It has a bot User-Agent
-  // 3. It's on a bot-specific path (.well-known) AND it's not a real browser in preview
-  const isBot = (isExplicitBot || isBotUA || isBotPath) && 
-                (!isAISPreview || isLinkedIn || forceBot || isBotPath);
-  
-  if (isBotUA || isExplicitBot || forceBot || (req as any).isOgApiRoute) {
-    console.log(`[BOT-CHECK] isBot: ${isBot} | isExplicitBot: ${isExplicitBot} | isBotUA: ${isBotUA} | isAISPreview: ${isAISPreview} | isLinkedIn: ${isLinkedIn} | forceBot: ${forceBot} | isOgApiRoute: ${(req as any).isOgApiRoute} | UA: ${userAgent.substring(0, 70)}`);
-  }
-
-  // Extract from return_url if present (infrastructure cookie checks)
+  // Handle return_url early for bot identification
   const returnUrl = req.query.return_url as string;
   if (!articleId && returnUrl) {
     try {
-      let decodedReturnUrl = returnUrl;
-      // Multi-pass decode to handle nested encoding
-      for (let i = 0; i < 3; i++) {
-        const next = decodeURIComponent(decodedReturnUrl);
-        if (next === decodedReturnUrl) break;
-        decodedReturnUrl = next;
-      }
+      const decodedReturnUrl = decodeURIComponent(decodeURIComponent(returnUrl));
+      if (decodedReturnUrl.includes('force_bot=true')) forceBot = true;
       
-      // Try to find ID in query params of return_url
-      const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id|id|articleId)=([^&]+)/i);
-      if (queryMatch) {
-        articleId = queryMatch[1].split(/[\/?#\s\.\\]/)[0];
+      const idMatch = decodedReturnUrl.match(/og-article-(\d+)/i) || 
+                      decodedReturnUrl.match(/\/(?:article|news)\/(\d+)/i) ||
+                      decodedReturnUrl.match(/\/(?:article|news|api\/og\/article|\.well-known\/og-article-|og-article-)\/([^\/?#\s\.\\]+)/i);
+      if (idMatch) {
+        articleId = idMatch[1].split(/[\/?#\s\.\\]/)[0];
       }
-      
-      // Try to find ID in path of return_url
-      if (!articleId) {
-        // Find digits that follow specific patterns in the URL
-        const idMatch = decodedReturnUrl.match(/og-article-(\d+)/i) || 
-                        decodedReturnUrl.match(/\/(?:article|news)\/(\d+)/i) ||
-                        decodedReturnUrl.match(/\/(?:article|news|api\/og\/article|\.well-known\/og-article-|og-article-)\/([^\/?#\s\.\\]+)/i);
-        if (idMatch) {
-          articleId = idMatch[1].split(/[\/?#\s\.\\]/)[0];
-        }
-      }
-      
-      if (articleId) {
-        console.log(`[DEBUG-COOKIE] Extracted ArticleID ${articleId} from return_url: ${returnUrl}`);
-      } else {
-        // Last ditch effort: look for any 3-digit or longer number in the URL which might be the ID
-        const genericIdMatch = decodedReturnUrl.match(/(\d{3,})/);
-        if (genericIdMatch) {
-          articleId = genericIdMatch[1];
-          console.log(`[DEBUG-COOKIE] Generic ID extraction from return_url: ${articleId}`);
-        }
-      }
-    } catch (e) {
-      console.error(`[DEBUG-ERR] Failed to parse return_url: ${e}`);
-    }
+    } catch (e) {}
+  }
+
+  // Final Bot Verdict
+  const isBotPath = (req as any).isOgApiRoute || req.path.includes('.well-known');
+  const isCookieCheck = req.path === "/__cookie_check.html" || req.path === "/_cookie_check.html" || req.path.includes("cookie_check");
+  const isActuallyBot = isBotUA || isExplicitBot || (isBotPath && !isRealBrowser);
+  const isBot = isActuallyBot && (!isAISPreview || isLinkedIn || forceBot || isBotPath);
+  
+  if (isBotUA || isExplicitBot || forceBot || (req as any).isOgApiRoute) {
+    console.log(`[BOT-CHECK] isBot: ${isBot} | isExplicitBot: ${isExplicitBot} | isBotUA: ${isBotUA} | isAISPreview: ${isAISPreview} | isLinkedIn: ${isLinkedIn} | forceBot: ${forceBot} | isOgApiRoute: ${(req as any).isOgApiRoute} | UA: ${userAgent.substring(0, 70)}`);
   }
 
   // Detailed logging for all non-static requests to debug bot traffic
@@ -302,11 +276,19 @@ app.use(async (req, res, next) => {
     return next();
   }
 
+  // AIS PREVIEW FIX: If it's a real browser and not a bot, let Vite handle it immediately (fixes white screen)
+  if (!isBot && !isCookieCheck && !req.path.startsWith("/api/")) {
+    if (process.env.NODE_ENV !== "production") {
+      return next();
+    }
+  }
+
   // Skip API routes unless it's our OG route
-  // CRITICAL: We MUST skip the image proxy here to avoid serving HTML for image requests
   if (req.path.startsWith("/api/") && !(req as any).isOgApiRoute) {
     return next();
   }
+
+  // Handle robots.txt
 
   if (isBot) {
     console.log(`[BOT-TRAFFIC] [${new Date().toISOString()}] ${req.method} ${req.path} | Bot: ${isBot} | LinkedIn: ${isLinkedIn} | Article: ${articleId} | Agent: ${userAgent}`);
@@ -363,101 +345,70 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     }
   }
 
-  // Only handle GET and HEAD requests for HTML/OG tags
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    return next();
-  }
-
-  // Skip API routes (except for our internal OG route)
-  if (req.path.startsWith("/api/") && !(req as any).isOgApiRoute) {
-    return next();
-  }
-
-  // Skip static assets (requests with extensions) UNLESS it's a bot or a cookie check
-  // Bots should get the HTML even if they hit a weird URL
-  const isCookieCheck = req.path === "/__cookie_check.html" || req.path === "/_cookie_check.html" || req.path.includes("cookie_check");
-  if (req.path.includes(".") && !isBot && !isCookieCheck) {
-    return next();
-  }
-
-  // Handle HTML requests, bot requests, or any path without an extension
-  const isHtmlRequest = accept.includes("text/html") || !req.path.includes(".") || isBot || isCookieCheck;
-  
-  // If it's not an HTML/bot request and not an article request, let it pass
-  if (!isHtmlRequest && !articleId) {
-    return next();
-  }
-
   try {
     let html = "";
+    let ogTitle = "SaaS Sentinel: AI-Powered Market Intelligence";
+    let ogDescription = "Elite intelligence analysis of the SaaS and enterprise AI landscape. Stay ahead of market shifts with SaaS Sentinel's clean, actionable insights.";
+    let ogImage = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630";
     
-    // For bots or cookie check redirects, we prefer a clean, minimal HTML to avoid any "Cookie check" scripts
-    // that might be present in the actual index.html file.
-    // CRITICAL: We serve minimal HTML if it's a bot, OR if it's a cookie check, OR if it's our OG API route.
-    // BUT we must NOT serve HTML if the original request was for an image or other non-HTML asset.
-    const returnUrl = req.query.return_url as string;
+    // Fetch article data EARLY so we can use it in minimal HTML
+    if (articleId && articleId !== "undefined" && articleId !== "null") {
+      try {
+        const { supabase } = await import("./src/services/supabase.js").catch(() => import("./src/services/supabase.js"));
+        const { data: article } = await supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
+        if (article) {
+          ogTitle = article.title;
+          const summary = article.summary || (article.content ? article.content.substring(0, 200) : "");
+          ogDescription = summary.substring(0, 250);
+          if (article.image_url) {
+            let img = article.image_url.trim();
+            if (img.startsWith('http')) ogImage = img;
+          }
+        }
+      } catch (e) {}
+    }
+
     const isImageProxyInReturnUrl = typeof returnUrl === "string" && returnUrl.includes("/api/proxy-image");
     
-    // If it's a cookie check for an image proxy, we MUST NOT serve HTML.
-    // Instead, we should try to redirect back to the image proxy with force_bot=true
-    // to break out of the cookie check loop for the image asset.
+    // Redirect image proxy cookie checks back to the proxy with bot bypass flags
     if (isCookieCheck && isImageProxyInReturnUrl) {
       console.log(`[DEBUG-COOKIE] Redirecting image proxy cookie check back to proxy with force_bot=true | ReturnURL: ${returnUrl}`);
       let targetUrl = returnUrl;
-      // Add multiple bot bypass flags to be safe
       const bypassFlags = ['force_bot=true', 'ls=1', '_bot=1', 'bot=1'];
       bypassFlags.forEach(flag => {
         if (!targetUrl.includes(flag.split('=')[0])) {
-          const separator = targetUrl.includes('?') ? '&' : '?';
-          targetUrl += `${separator}${flag}`;
+          targetUrl += (targetUrl.includes('?') ? '&' : '?') + flag;
         }
       });
       return res.redirect(targetUrl);
     }
 
-    const isActuallyBot = isBotUA || forceBot || isLinkedIn || xLinkedInId !== undefined;
-    const shouldServeMinimal = (isActuallyBot || isBot) && 
-                               !isRealBrowser && 
-                               !isAISPreview &&
-                               !isImageProxyInReturnUrl;
-    
-    // Always serve minimal for true cookie check paths or OG API routes if it's an explicit bot
-    // We use isActuallyBot (explicit flags) OR isBotUA to ensure crawlers get the minimal page
+    const shouldServeMinimal = (isActuallyBot || isBot) && !isRealBrowser && !isAISPreview && !isImageProxyInReturnUrl;
     const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && (isActuallyBot || isBotPath || isBotUA);
 
-    if (isBotAccessingOg || shouldServeMinimal) {
-      console.log(`[DEBUG-MINIMAL] Serve Minimal: ${shouldServeMinimal} | IsBotAccessingOg: ${isBotAccessingOg} | isBot: ${isBot} | isRealBrowser: ${isRealBrowser} | isCookieCheck: ${isCookieCheck} | UA: ${userAgent.substring(0, 50)}`);
-    }
-    
     if (shouldServeMinimal || isBotAccessingOg) {
-      console.log(`[DEBUG-BOT] Generating clean HTML for bot or cookie check | Path: ${req.path} | Article: ${articleId} | isBot: ${isBot} | isCookieCheck: ${isCookieCheck}`);
+      console.log(`[DEBUG-BOT] Minimal Path: ${req.path} | Article: ${articleId} | isBot: ${isBot}`);
       html = `<!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SaaS Sentinel Market Intelligence | [B]</title>
+  <title>${ogTitle}</title>
   <style>
-    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f9fafb; color: #374151; }
-    .container { text-align: center; padding: 2rem; }
-    .loading { font-size: 1.2rem; font-weight: 500; margin-bottom: 1rem; }
+    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #000; color: #fff; }
+    .container { text-align: center; padding: 2rem; border-left: 4px solid #3b82f6; border-radius: 8px; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 600px; }
+    h1 { margin-top: 0; font-size: 1.5rem; color: #3b82f6; }
+    p { line-height: 1.6; opacity: 0.8; }
   </style>
   <script>
-    // If a real human somehow lands on a bot-only minimal page, redirect them to the real content
     if (!/bot|linkedin|google|facebook|twitter|crawler|spider/i.test(navigator.userAgent)) {
-      const articleId = "${articleId || ''}";
-      if (articleId && articleId !== 'undefined' && articleId !== 'null') {
-        window.location.href = "/article/" + articleId;
-      } else {
-        window.location.href = "/";
-      }
+      window.location.href = "/article/${articleId || ''}" + window.location.search;
     }
   </script>
 </head>
 <body>
   <div class="container">
-    <div class="loading">SaaS Sentinel Intelligence Analysis</div>
-    <p>Loading market intelligence report...</p>
+    <h1>${ogTitle}</h1>
+    <p>${ogDescription}</p>
   </div>
 </body>
 </html>`;
@@ -492,8 +443,8 @@ Sitemap: ${cleanBase}/sitemap.xml`);
         .replace(/'/g, "&#39;");
     };
 
-    let ogTitle = escapeHtml("SaaS Sentinel | Elite B2B Market Intelligence");
-    let ogDescription = escapeHtml("Tracking high-growth software ecosystems with AI-driven precision. Strategic insights for founders, investors, and developers.");
+    ogTitle = escapeHtml(ogTitle);
+    ogDescription = escapeHtml(ogDescription);
     
     const FALLBACK_IMAGES = [
       "https://images.unsplash.com/photo-1510511459019-5dee997dd1db?q=80&w=1200&h=630&auto=format&fit=crop",
@@ -501,7 +452,13 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1200&h=630&auto=format&fit=crop",
       "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1200&h=630&auto=format&fit=crop"
     ];
-    let ogImage = escapeHtml(FALLBACK_IMAGES[0]);
+    
+    // Use early fetched image if available, else fallback
+    if (!ogImage || ogImage.includes('unsplash.com') && !ogImage.includes('w=')) {
+        const base = (ogImage || FALLBACK_IMAGES[0]).split('?')[0];
+        ogImage = `${base}?auto=format&fit=crop&q=80&w=1200&h=630`;
+    }
+    ogImage = escapeHtml(ogImage);
     
     // Use the shared app url for OG tags if available, otherwise fallback to dynamic
     // We prefer the dynamic baseUrl for dev environments to ensure proxying works correctly
