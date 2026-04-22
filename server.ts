@@ -274,16 +274,17 @@ app.use(async (req, res, next) => {
       // Try to find ID in query params of return_url
       const queryMatch = decodedReturnUrl.match(/[?&](?:article|article_id|id|articleId)=([^&]+)/i);
       if (queryMatch) {
-        articleId = queryMatch[1].split(/[\/?#\s\\]/)[0];
+        articleId = queryMatch[1].split(/[\/?#\s\.\\]/)[0];
       }
       
       // Try to find ID in path of return_url
       if (!articleId) {
-        // Look for various article ID patterns in the path
-        const pathM = decodedReturnUrl.match(/\/(?:article|news|api\/og\/article|\.well-known\/og-article-|og-article-)\/([^\/?#\s\\]+)/i) ||
-                      decodedReturnUrl.match(/\/(?:article|news|api\/og\/article|\.well-known\/og-article-|og-article-)-([^\/?#\s\\]+)/i);
-        if (pathM) {
-          articleId = pathM[1].split(/[\/?#\s\\]/)[0];
+        // Find digits that follow specific patterns in the URL
+        const idMatch = decodedReturnUrl.match(/og-article-(\d+)/i) || 
+                        decodedReturnUrl.match(/\/(?:article|news)\/(\d+)/i) ||
+                        decodedReturnUrl.match(/\/(?:article|news|api\/og\/article|\.well-known\/og-article-|og-article-)\/([^\/?#\s\.\\]+)/i);
+        if (idMatch) {
+          articleId = idMatch[1].split(/[\/?#\s\.\\]/)[0];
         }
       }
       
@@ -429,12 +430,13 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       return res.redirect(targetUrl);
     }
 
-    const shouldServeMinimal = (isBotUA || forceBot || xLinkedInId !== undefined || isBot) && 
+    const isActuallyBot = isBotUA || forceBot || isLinkedIn || xLinkedInId !== undefined;
+    const shouldServeMinimal = (isActuallyBot || isBot) && 
                                !isRealBrowser && 
                                !isImageProxyInReturnUrl;
     
-    // Always serve minimal for true cookie check paths or OG API routes if it's a bot
-    const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && (isBotUA || forceBot || isLinkedIn);
+    // Ensure bots get OG tags even on cookie check pages
+    const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && (isActuallyBot || isBotPath);
 
     if (isBotAccessingOg || shouldServeMinimal) {
       console.log(`[DEBUG-MINIMAL] Serve Minimal: ${shouldServeMinimal} | IsBotAccessingOg: ${isBotAccessingOg} | isBot: ${isBot} | isRealBrowser: ${isRealBrowser} | isCookieCheck: ${isCookieCheck} | UA: ${userAgent.substring(0, 50)}`);
@@ -555,11 +557,16 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     const cleanBaseUrl = finalBaseUrl.replace(/\/$/, '');
     const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
     
-    // CRITICAL: Do NOT include force_bot=true in the og:url for real users,
-    // but for bots, we point them back to the bot-friendly route to ensure they stay on it.
-    let ogUrl = isBot 
-      ? `${cleanBaseUrl}/api/og/article/${articleId}?force_bot=true&v=${Date.now()}`
-      : `${cleanBaseUrl}${cleanPath}`;
+    // CRITICAL: For og:url, we should point to the cleanest representation possible.
+    // Social crawlers like stable URLs. For bots, we point to the article page BUT 
+    // include the bot bypass flags to ensure any sub-scrapers (like LinkedIn's image crawler) 
+    // also bypass the cookie check.
+    let ogUrl = `${cleanBaseUrl}/article/${articleId}`;
+    if (isBot) {
+      ogUrl = `${cleanBaseUrl}/api/og/article/${articleId}?force_bot=true&ls=1&_bot=1`;
+    } else if (!articleId) {
+      ogUrl = `${cleanBaseUrl}${cleanPath}`;
+    }
     ogUrl = escapeHtml(ogUrl);
 
     if (isBot) {
