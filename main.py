@@ -264,10 +264,16 @@ def run_news_bot():
             article_url = f"{app_url}/.well-known/og-article-{article_id}.html" if article_id else f"{app_url}/"
         
             display_summary = summary_text[:200] if summary_text else ""
-            # Use the clean URL for the text shown to users to avoid bot flags
-            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url} \n\n#SaaS #AI #MarketIntel"
+            # Clean URL for commentary (real users)
+            display_url = f"{app_url}/article/{article_id}" if article_id else app_url
+            # Scraping URL for LinkedIn crawler (with bypass flags)
+            cache_buster = int(time.time())
+            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&v={cache_buster}"
+        
+            display_summary = summary_text[:200] if summary_text else ""
+            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
-            post_to_linkedin(social_text, title, article_url, summary_text, image_url)
+            post_to_linkedin(social_text, title, scraping_url, summary_text, image_url)
 
             processed_count += 1
         except Exception as e:
