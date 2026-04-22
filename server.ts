@@ -175,21 +175,6 @@ app.use(async (req, res, next) => {
                      userAgent.includes('apache-httpclient') ||
                      userAgent.includes('linkedin-post-inspector') ||
                      userAgent.includes('post-inspector') ||
-                     userAgent.includes('linkedin') ||
-                     userAgent.includes('well-known') ||
-                     userAgent.includes('bot') ||
-                     userAgent.includes('crawler') ||
-                     userAgent.includes('spider') ||
-                     userAgent.includes('inspection') ||
-                     userAgent.includes('metadata') ||
-                     userAgent.includes('og-tag') ||
-                     userAgent.includes('social-share') ||
-                     userAgent.includes('facebookexternalhit') ||
-                     userAgent.includes('twitterbot') ||
-                     userAgent.includes('slackbot') ||
-                     userAgent.includes('whatsapp') ||
-                     userAgent.includes('telegrambot') ||
-                     userAgent.includes('discordbot') ||
                      xLinkedInId !== undefined;
                      
   const xForwardedHost = req.get('x-forwarded-host') || '';
@@ -203,9 +188,9 @@ app.use(async (req, res, next) => {
                        xForwardedHost.startsWith('ais-pre-') ||
                        xHost.startsWith('ais-pre-');
 
-  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|well-known|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|preview|metadata|og-tag|social-share|inspection|prefetch)\b/i.test(userAgent) || isLinkedIn;
+  const isBotUA = /\b(bot|google|baidu|bing|msn|duckduck|teoma|slurp|yandex|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|http-client|embedly|quora|outbrain|validator|skype|bitly|ahrefs|semrush|dotbot|headless|selenium|puppeteer|lighthouse|gtmetrix|pingdom|uptimerobot|monitoring|statuscake|uptimer|monitis|uptrends|site24x7|nagios|zabbix|datadog|newrelic|appdynamics|dynatrace|instana|sentry|honeycomb|loggly|sumologic|splunk|graylog|elk|kibana|grafana|prometheus|influxdb|telegraf|kapacitor|chronograf|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|metadata|og-tag|social-share|inspection|prefetch)\b/i.test(userAgent) || isLinkedIn;
   
-  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr)\b/i.test(userAgent) && !isBotUA;
+  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|google-cloud-preview)\b/i.test(userAgent) && !isBotUA;
   
   const ls = String(req.query.ls || '');
   const _bot = String(req.query._bot || '');
@@ -433,10 +418,12 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     const isActuallyBot = isBotUA || forceBot || isLinkedIn || xLinkedInId !== undefined;
     const shouldServeMinimal = (isActuallyBot || isBot) && 
                                !isRealBrowser && 
+                               !isAISPreview &&
                                !isImageProxyInReturnUrl;
     
-    // Ensure bots get OG tags even on cookie check pages
-    const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && (isActuallyBot || isBotPath);
+    // Always serve minimal for true cookie check paths or OG API routes if it's an explicit bot
+    // We use isActuallyBot (explicit flags) OR isBotUA to ensure crawlers get the minimal page
+    const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && (isActuallyBot || isBotPath || isBotUA);
 
     if (isBotAccessingOg || shouldServeMinimal) {
       console.log(`[DEBUG-MINIMAL] Serve Minimal: ${shouldServeMinimal} | IsBotAccessingOg: ${isBotAccessingOg} | isBot: ${isBot} | isRealBrowser: ${isRealBrowser} | isCookieCheck: ${isCookieCheck} | UA: ${userAgent.substring(0, 50)}`);
@@ -795,8 +782,8 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     // If it's a bot (and NOT the AI Studio preview), strip all scripts to prevent client-side redirects or logic
     // that might confuse the scraper or lead it away from the OG tags.
     // LinkedIn is an exception: we ALWAYS strip scripts for LinkedIn to ensure it sees the OG tags clearly.
-    // However, if it's a real browser hitting a .well-known path, we DON'T strip scripts so they can redirect.
-    if (isBot && (!isAISPreview || isLinkedIn || forceBot) && !(!isBotUA && req.path.includes('.well-known'))) {
+    // However, if it's a real browser or AI Studio preview hitting a .well-known path, we DON'T strip scripts.
+    if (isBot && !isAISPreview && !(!isBotUA && req.path.includes('.well-known'))) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
       // Add no-cache for bots to ensure scrapers always get fresh metadata
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -853,7 +840,7 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     res.setHeader('X-SaaS-Sentinel-Article', articleId || 'none');
     
     if (isLinkedIn || forceBot) {
-      console.log(`[BOT-FINAL] Responding to LinkedIn/ForceBot: path=${req.path}, title=${ogTitle}, isLinkedIn=${isLinkedIn}, forceBot=${forceBot}`);
+      console.log(`[BOT-FINAL] Responding to LinkedIn/ForceBot: path=${req.path}, title=${ogTitle}, isLinkedIn=${isLinkedIn}, forceBot=${forceBot}, image=${ogImage}`);
     }
     
     if (isBot) {
