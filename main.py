@@ -264,10 +264,8 @@ def run_news_bot():
             article_url = f"{app_url}/.well-known/og-article-{article_id}.html" if article_id else f"{app_url}/"
         
             display_summary = summary_text[:200] if summary_text else ""
-            # Ensure there is a space after the URL to prevent social media scrapers from including trailing characters
-            # Add bypass flags to the URL in the post text as well
-            article_url_with_flags = f"{article_url}?force_bot=true&ls=1&_bot=1"
-            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url_with_flags} \n\n#SaaS #AI #MarketIntel"
+            # Use the clean URL for the text shown to users to avoid bot flags
+            social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {article_url} \n\n#SaaS #AI #MarketIntel"
             
             post_to_linkedin(social_text, title, article_url, summary_text, image_url)
 
