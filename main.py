@@ -212,13 +212,19 @@ def run_news_bot():
             image_url = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630"
         
         source_url = latest.get('url', '')
-        if image_url and not image_url.startswith('http'):
-            if image_url.startswith('//'):
+        if image_url:
+            if image_url.startswith('http://'):
+                image_url = image_url.replace('http://', 'https://')
+            elif image_url.startswith('//'):
                 image_url = f"https:{image_url}"
-            elif source_url:
-                from urllib.parse import urljoin
-                image_url = urljoin(source_url, image_url)
-        
+            elif not image_url.startswith('http') and image_url:
+                if source_url:
+                    from urllib.parse import urljoin
+                    image_url = urljoin(source_url, image_url)
+                if not image_url.startswith('http'):
+                    # Last fallback if still not absolute
+                    image_url = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630"
+
         # If it's an Unsplash URL, ensure it has the right dimensions
         if "unsplash.com" in image_url and ("w=" not in image_url or "h=" not in image_url):
             base_img = image_url.split('?')[0]
@@ -256,8 +262,13 @@ def run_news_bot():
             
             # Use path-based URLs which are less likely to trigger infrastructure cookie checks
             # than query-parameter based URLs.
+            # PRIMARY FALLBACK: The current AI Studio preview URL
             shared_url = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app"
             env_url = os.getenv("SHARED_APP_URL")
+            if not env_url:
+                print(f"⚠️ Warning: SHARED_APP_URL not found in environment. Using fallback: {shared_url}")
+                print(f"💡 Suggestion: Add SHARED_APP_URL to your GitHub secrets for better control.")
+            
             app_url = str(env_url if env_url else shared_url).rstrip('/')
             
             # Use the bot-friendly OG route for the main link too.
