@@ -56,6 +56,10 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
             "description": str(summary or title)[:250]
         }
         
+        # Add thumbnail as a fallback if scraping fails
+        if image_url:
+            article_content["thumbnail"] = image_url
+        
         post_data = {
             "author": author_urn,
             "commentary": text,
