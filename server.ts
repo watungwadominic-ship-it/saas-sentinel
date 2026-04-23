@@ -182,13 +182,13 @@ app.use(async (req, res, next) => {
       const { data: article } = await supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
       if (article) {
         ogTitle = article.title;
-        ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/(\r\n|\n|\r)/gm, " ");
+        ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/[\r\n\t]/gm, " ").trim();
         if (article.image_url) {
           let resolvedImg = article.image_url.trim();
           if (resolvedImg.startsWith('http')) {
             const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-            // Using v14 for total fresh purge
-            ogImage = `${cleanBase}/api/proxy-image/v14/intel-preview.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1`;
+            // Simple path-based URL for maximum compatibility
+            ogImage = `${cleanBase}/api/proxy-image/intel-${articleId}.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ref=v15`;
           }
         }
       }
@@ -201,7 +201,7 @@ app.use(async (req, res, next) => {
   const escapedImage = escapeHtml(ogImage);
   const ogUrl = escapeHtml(`${(process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '')}${req.originalUrl}`);
 
-  const metaTags = `<title>${escapedTitle}</title><meta name="description" content="${escapedDesc}"/><meta property="og:title" content="${escapedTitle}"/><meta property="og:description" content="${escapedDesc}"/><meta property="og:image" content="${escapedImage}"/><meta property="og:image:url" content="${escapedImage}"/><meta property="og:image:secure_url" content="${escapedImage}"/><meta property="og:image:alt" content="${escapedTitle}"/><meta property="og:url" content="${ogUrl}"/><meta property="og:type" content="article"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="${escapedTitle}"/><meta name="twitter:description" content="${escapedDesc}"/><meta name="twitter:image" content="${escapedImage}"/><meta name="twitter:image:src" content="${escapedImage}"/><meta name="robots" content="index, follow, max-image-preview:large"><link rel="image_src" href="${escapedImage}" />`;
+  const metaTags = `<title>${escapedTitle}</title><meta name="description" content="${escapedDesc}"/><meta property="og:title" content="${escapedTitle}"/><meta property="og:description" content="${escapedDesc}"/><meta property="og:image" content="${escapedImage}"/><meta property="og:image:url" content="${escapedImage}"/><meta property="og:image:secure_url" content="${escapedImage}"/><meta property="og:image:type" content="image/jpeg"/><meta property="og:image:alt" content="${escapedTitle}"/><meta property="og:url" content="${ogUrl}"/><meta property="og:type" content="article"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="${escapedTitle}"/><meta name="twitter:description" content="${escapedDesc}"/><meta name="twitter:image" content="${escapedImage}"/><meta name="twitter:image:src" content="${escapedImage}"/><meta name="robots" content="index, follow, max-image-preview:large"><link rel="image_src" href="${escapedImage}" />`;
 
   // 5. BOT RESPONSE: Minimal HTML
   if (isBot && !isRealBrowser && !req.path.includes('proxy-image')) {
@@ -240,8 +240,9 @@ app.use(async (req, res, next) => {
 // --- CORE MIDDLEWARE END ---
 
 // ROUTES (Simplified & Grouped)
-app.get(["/api/proxy-image", "/api/proxy-image/:filename"], (req, res) => {
-  return fetchAndSendImage(req.query.url as string, res, req.headers['user-agent'] as string);
+app.get("/api/proxy-image*", (req, res) => {
+  const imageUrl = (req.query.url || req.params[0]) as string;
+  return fetchAndSendImage(imageUrl, res, req.headers['user-agent'] as string);
 });
 
 app.get("/api/news", async (req, res) => {
