@@ -52,7 +52,6 @@ def post_to_linkedin(text, title, url, summary=None, thumbnail_url=None):
         
         article_content = {
             "source": scraping_url,
-            "thumbnail": thumbnail_url,
             "title": title,
             "description": str(summary or title)[:250]
         }
@@ -287,11 +286,11 @@ def run_news_bot():
             # Real users will be redirected to the actual article page by our server.
             display_url = f"{app_url}/.well-known/og-article-{article_id}.html" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v26)
-            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v26"
+            # Scraping URL for LinkedIn crawler (v27)
+            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v27"
             
-            # Proxied Image URL for LinkedIn thumbnail (v26)
-            proxied_image_url = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v26"
+            # Proxied Image URL for LinkedIn cache busting (v27)
+            proxied_image_url = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v27"
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
