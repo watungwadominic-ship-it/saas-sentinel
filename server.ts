@@ -64,6 +64,12 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
 
 // --- CORE MIDDLEWARE START (CRITICAL ORDER) ---
 
+// 0. STATIC ASSETS & IMAGE PROXIES (Bypass EVERYTHING for high performance and crawler safety)
+app.use(['/api/static-preview', '/api/proxy-image', '/assets', '/favicon.ico'], (req, res, next) => {
+  // These routes MUST bypass the OG middleware to ensure bots get BINARY data, not HTML metadata
+  next();
+});
+
 app.get("/api/health-check", (req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
@@ -77,7 +83,7 @@ app.use(async (req, res, next) => {
   let forceBot = forceBotQuery.includes('true') || req.headers['x-force-bot'] === 'true';
   const returnUrl = req.query.return_url as string;
 
-  // 1. PARANOID BOT DETECTION (v22 - Absolute Priority)
+  // 1. PARANOID BOT DETECTION (v23 - Absolute Priority)
   // We include every possible LinkedIn crawler signature, including the ones they use during redirects.
   const botSignatures = [
     'linkedin', 'authorizedentity', 'post-inspector', 'image-fetcher', 'share-preview', 'media-fetcher',
@@ -91,8 +97,18 @@ app.use(async (req, res, next) => {
   const isCookieCheck = req.path.includes("cookie_check");
   const isBotQuery = req.query.bot === '1' || req.query._bot === '1' || forceBotQuery.includes('true');
   
-  // THE MASTER BOT FLAG (v22)
-  const isBot = isBotUA || isLinkedInHeaders || isBotPath || isBotQuery || forceBot;
+  // 0. BINARY IMMUNITY (v23)
+  // Ensure image routes NEVER run through the bot HTML metadata logic.
+  const isImageRequest = req.path.includes('/api/static-preview') || req.path.includes('/api/proxy-image') || req.path.includes('/assets');
+  if (isImageRequest && !isCookieCheck) return next();
+
+  // THE MASTER BOT FLAG (v24)
+  const isBotRaw = isBotUA || isLinkedInHeaders || isBotPath || isBotQuery || forceBot;
+  
+  // Rescue bots trapped in cookie checks
+  const isBotInRescue = isCookieCheck && (isBotUA || isLinkedInHeaders || (returnUrl && (returnUrl.includes('bot') || returnUrl.includes('.well-known'))));
+  
+  const isBot = isBotRaw || isBotInRescue;
 
   // Real browser check - MUST NOT match if it's already a bot.
   // We exclude common bot patterns from the browser check to be safe.
@@ -107,28 +123,22 @@ app.use(async (req, res, next) => {
     if (idMatch) articleId = idMatch[1];
   }
 
-  // 2. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots (v22 Enhanced)
+  // 2. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots (v24 Enhanced)
   if (isCookieCheck && isBot) {
     try {
       const decodedReturnUrl = decodeURIComponent(decodeURIComponent(returnUrl || ""));
-      console.log(`[BYPASS-V22] Cookie-check Intercept for Bot! ReturnURL: ${decodedReturnUrl}`);
+      console.log(`[BYPASS-V24] Cookie-check Rescue for Bot! ReturnURL: ${decodedReturnUrl}`);
       
-      // Handle Image Proxy Case (LinkedIn often prepends cookie check to image URLs too)
-      if (decodedReturnUrl.includes("/api/proxy-image") || decodedReturnUrl.includes("og-image") || decodedReturnUrl.includes(".jpg") || decodedReturnUrl.includes(".png")) {
-        let actualImageUrl = null;
-        const match = decodedReturnUrl.match(/[?&]url=([^&]+)/) || decodedReturnUrl.match(/[\/?&]url=([^&]+)/) || decodedReturnUrl.match(/=([^&]+)/);
-        if (match) actualImageUrl = decodeURIComponent(match[1]);
-        if (actualImageUrl) return fetchAndSendImage(actualImageUrl, res, userAgent);
-      }
-
-      // Handle Article Case
+      // Article ID Recovery (Hardened)
       const idMatch = decodedReturnUrl.match(/\/(?:article|news|og-article-)\/([^\/?#.]+)/i) || 
                       decodedReturnUrl.match(/\/.well-known\/og-article-([^\/?#.]+)/i) ||
                       decodedReturnUrl.match(/article%2F(\d+)/) ||
+                      decodedReturnUrl.match(/%2F(\d+)(?:%3F|$)/) ||
+                      decodedReturnUrl.match(/article_id=(\d+)/) ||
                       decodedReturnUrl.match(/\/(\d+)$/);
       if (idMatch) {
         articleId = idMatch[1];
-        console.log(`[BYPASS-V22] Article ID captured: ${articleId}`);
+        console.log(`[BYPASS-V24] Article ID captured: ${articleId}`);
       }
     } catch (e) {}
   }
@@ -159,8 +169,8 @@ app.use(async (req, res, next) => {
         ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/[\r\n\t]/gm, " ").trim();
         if (article.image_url) {
           const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-          // NEW CLEAN STATIC PROXY URL (v22 reset)
-          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v22`;
+          // NEW CLEAN STATIC PROXY URL (v24 reset)
+          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v24`;
         }
       }
     } catch (e) {}
@@ -175,10 +185,10 @@ app.use(async (req, res, next) => {
 
   const metaTags = `<title>${escapedTitle}</title><meta name="description" content="${escapedDesc}"/><meta property="og:title" content="${escapedTitle}"/><meta property="og:description" content="${escapedDesc}"/><meta property="og:image" content="${escapedImage}"/><meta property="og:image:url" content="${escapedImage}"/><meta property="og:image:secure_url" content="${escapedImage}"/><meta property="og:image:type" content="image/jpeg"/><meta property="og:image:alt" content="${escapedTitle}"/><meta property="og:url" content="${ogUrl}"/><meta property="og:type" content="article"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="${escapedTitle}"/><meta name="twitter:description" content="${escapedDesc}"/><meta name="twitter:image" content="${escapedImage}"/><meta name="twitter:image:src" content="${escapedImage}"/><meta name="robots" content="index, follow, max-image-preview:large"><link rel="image_src" href="${escapedImage}" />`;
 
-  // 5. BOT RESPONSE (v22 Hardened Exit)
+  // 5. BOT RESPONSE (v24 Hardened Exit)
   if (isBot) {
-    const botHtml = `<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}"/></article></body></html>`;
-    console.log(`[BOT-FINAL-V22] Responding to Bot | Path: ${req.path} | Article: ${articleId}`);
+    const botHtml = `<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}<meta itemprop="image" content="${escapedImage}"/></head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}"/></article></body></html>`;
+    console.log(`[BOT-FINAL-V24] Responding to Bot | Path: ${req.path} | Article: ${articleId}`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
