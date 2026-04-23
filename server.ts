@@ -29,7 +29,8 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
       headers: {
         'User-Agent': userAgentHint || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'Referer': 'https://www.linkedin.com/'
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache'
       }
     });
 
@@ -188,7 +189,7 @@ app.use(async (req, res, next) => {
           if (resolvedImg.startsWith('http')) {
             const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
             // Simple path-based URL for maximum compatibility
-            ogImage = `${cleanBase}/api/proxy-image/intel-${articleId}.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ref=v15`;
+            ogImage = `${cleanBase}/api/proxy-image/intel-${articleId}.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ref=v16`;
           }
         }
       }
@@ -241,7 +242,17 @@ app.use(async (req, res, next) => {
 
 // ROUTES (Simplified & Grouped)
 app.get("/api/proxy-image*", (req, res) => {
-  const imageUrl = (req.query.url || req.params[0]) as string;
+  let imageUrl = req.query.url as string;
+  
+  // If ?url= is missing, try to get it from the path if it looks like a URL
+  if (!imageUrl && req.params[0]) {
+    const pathPart = req.params[0].replace(/^\//, '');
+    if (pathPart.startsWith('http')) imageUrl = pathPart;
+  }
+
+  // Fallback to a placeholder if everything fails
+  if (!imageUrl) imageUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&h=630&auto=format&fit=crop";
+
   return fetchAndSendImage(imageUrl, res, req.headers['user-agent'] as string);
 });
 
