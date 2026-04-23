@@ -176,8 +176,8 @@ app.use(async (req, res, next) => {
         ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/[\r\n\t]/gm, " ").trim();
         if (article.image_url) {
           const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-          // NEW CLEAN STATIC PROXY URL (v17 reset)
-          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v17`;
+          // NEW CLEAN STATIC PROXY URL (v19 reset)
+          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v19`;
         }
       }
     } catch (e) {}
@@ -192,7 +192,9 @@ app.use(async (req, res, next) => {
   const metaTags = `<title>${escapedTitle}</title><meta name="description" content="${escapedDesc}"/><meta property="og:title" content="${escapedTitle}"/><meta property="og:description" content="${escapedDesc}"/><meta property="og:image" content="${escapedImage}"/><meta property="og:image:url" content="${escapedImage}"/><meta property="og:image:secure_url" content="${escapedImage}"/><meta property="og:image:type" content="image/jpeg"/><meta property="og:image:alt" content="${escapedTitle}"/><meta property="og:url" content="${ogUrl}"/><meta property="og:type" content="article"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="${escapedTitle}"/><meta name="twitter:description" content="${escapedDesc}"/><meta name="twitter:image" content="${escapedImage}"/><meta name="twitter:image:src" content="${escapedImage}"/><meta name="robots" content="index, follow, max-image-preview:large"><link rel="image_src" href="${escapedImage}" />`;
 
   // 5. BOT RESPONSE: Minimal HTML
-  if (isBot && !isRealBrowser && !req.path.includes('proxy-image')) {
+  // CRITICAL: We MUST exclude static-preview and proxy-image from the bot HTML response
+  // otherwise bots will receive HTML tags when they expect a binary image!
+  if (isBot && !isRealBrowser && !req.path.includes('proxy-image') && !req.path.includes('static-preview')) {
     const botHtml = `<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}"/></article></body></html>`;
     console.log(`[BOT-FINAL] Responding to Bot | Path: ${req.path} | Article: ${articleId}`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
