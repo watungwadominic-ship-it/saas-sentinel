@@ -53,12 +53,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         article_content = {
             "source": scraping_url,
             "title": title,
-            "description": str(summary or title)[:250],
-            "thumbnails": [
-                {
-                    "resolvedUrl": image_url
-                }
-            ]
+            "description": str(summary or title)[:250]
         }
         
         post_data = {
@@ -291,7 +286,7 @@ def run_news_bot():
             # Scraping URL for LinkedIn crawler (with stable bypass flags)
             # Use article_id as a stable version to help LinkedIn's cache while still bypassing LB
             # We add a 'ref' parameter to force a fresh scrape while keeping the URL stable for retries
-            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v16"
+            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v17"
         
             display_summary = summary_text[:200] if summary_text else ""
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
