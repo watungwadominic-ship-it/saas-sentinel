@@ -101,6 +101,14 @@ app.use(async (req, res, next) => {
                      userAgent.includes('microsoft-link-preview') ||
                      userAgent.includes('bingbot') ||
                      userAgent.includes('googlebot') ||
+                     userAgent.includes('slurp') ||
+                     userAgent.includes('duckduckbot') ||
+                     userAgent.includes('baiduspider') ||
+                     userAgent.includes('yandexbot') ||
+                     userAgent.includes('sogou') ||
+                     userAgent.includes('exabot') ||
+                     userAgent.includes('facebot') ||
+                     userAgent.includes('ia_archiver') ||
                      xLinkedInId !== undefined;
 
   const botRegex = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|crawler|spider|archiver|curl|wget|bot|preview|embed)\b/i;
@@ -115,6 +123,14 @@ app.use(async (req, res, next) => {
   const isCookieCheck = req.path.includes("cookie_check");
   const isActuallyBot = isBotUA || forceBot;
   const isBot = isActuallyBot && (!isAISDomain || isLinkedIn || forceBot || isBotPath);
+
+  // 4. PREPARE OG DATA
+  let articleId = (req.query.article || req.query.id || req.query.article_id) as string;
+  if (!articleId) {
+    const idMatch = req.path.match(/\/(?:article|news|og-article-)\/([^\/?#.]+)/i) || 
+                    req.path.match(/\/.well-known\/og-article-([^\/?#.]+)/i);
+    if (idMatch) articleId = idMatch[1];
+  }
 
   // 1. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots
   if (isCookieCheck && (isLinkedIn || isActuallyBot)) {
@@ -153,13 +169,6 @@ app.use(async (req, res, next) => {
   }
 
   // 4. PREPARE OG DATA
-  let articleId = (req.query.article || req.query.id || req.query.article_id) as string;
-  if (!articleId) {
-    const idMatch = req.path.match(/\/(?:article|news|og-article-)\/([^\/?#.]+)/i) || 
-                    req.path.match(/\/.well-known\/og-article-([^\/?#.]+)/i);
-    if (idMatch) articleId = idMatch[1];
-  }
-
   let ogTitle = "SaaS Sentinel: AI Market Intelligence";
   let ogDesc = "Elite intelligence analysis of the SaaS landscape.";
   let ogImage = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&h=630&auto=format&fit=crop";
