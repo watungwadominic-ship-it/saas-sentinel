@@ -132,9 +132,11 @@ app.use(async (req, res, next) => {
     } catch (e) {}
   }
 
-  // 2. SKIP FOR STATIC ASSETS (EXCEPT COOKIE CHECKS)
+  // 2. SKIP FOR STATIC ASSETS (EXCEPT COOKIE CHECKS OR PROXIED IMAGES)
   const isStatic = /\.(jpg|jpeg|png|gif|svg|webp|css|js|ico|woff|woff2|ttf|otf|map|json)$/i.test(req.path);
-  if (isStatic && !isCookieCheck) return next();
+  const isProxyPath = req.path.includes('/api/proxy-image');
+  
+  if (isStatic && !isCookieCheck && !isProxyPath) return next();
 
   // 3. HUMAN REDIRECT: If a human hits a bot path, send them to the real UI
   if (isRealBrowser && (isBotPath || req.path.includes('.well-known'))) {
@@ -160,13 +162,13 @@ app.use(async (req, res, next) => {
       const { data: article } = await supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
       if (article) {
         ogTitle = article.title;
-        ogDesc = (article.summary || article.content || "").substring(0, 200);
+        ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/(\r\n|\n|\r)/gm, " ");
         if (article.image_url) {
           let resolvedImg = article.image_url.trim();
           if (resolvedImg.startsWith('http')) {
             const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-            // Path-based URL with .jpg extension helps scrapers identify the content as an image
-            ogImage = `${cleanBase}/api/proxy-image/v9/intel-preview.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true`;
+            // Path-based URL with .jpg extension helping crawlers identify content as an image
+            ogImage = `${cleanBase}/api/proxy-image/v11/analyst-intel.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1`;
           }
         }
       }
