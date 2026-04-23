@@ -77,46 +77,29 @@ app.use(async (req, res, next) => {
   let forceBot = forceBotQuery.includes('true') || req.headers['x-force-bot'] === 'true';
   const returnUrl = req.query.return_url as string;
 
-  if (!forceBot && returnUrl) {
-    try {
-      const decoded = decodeURIComponent(returnUrl);
-      if (decoded.includes('force_bot=true')) forceBot = true;
-    } catch (e) {}
-  }
-
+  // 1. AGGRESSIVE BOT DETECTION (CRITICAL for LinkedIn Bypass)
   const isLinkedIn = /linkedin/i.test(userAgent) || 
                      userAgent.includes('authorizedentity') || 
                      userAgent.includes('linkedinbot') ||
                      userAgent.includes('linkedin-bot') ||
-                     userAgent.includes('linkedin-post-inspector') ||
                      userAgent.includes('post-inspector') ||
                      userAgent.includes('image-fetcher') ||
                      userAgent.includes('share-preview') ||
                      userAgent.includes('media-fetcher') ||
                      userAgent.includes('linkedin-share') ||
                      userAgent.includes('pro-bot') ||
-                     userAgent.includes('long-reader') ||
-                     userAgent.includes('chrome-lighthouse') ||
-                     userAgent.includes('google-structured-data-testing-tool') ||
-                     userAgent.includes('link-preview') ||
-                     userAgent.includes('bingpreview') ||
+                     userAgent.includes('bot') ||
+                     userAgent.includes('crawler') ||
+                     userAgent.includes('spider') ||
                      xLinkedInId !== undefined;
 
   const botRegex = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|crawler|spider|archiver|curl|wget|bot|preview|embed)\b/i;
   const isBotUA = botRegex.test(userAgent) || isLinkedIn;
-  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|mobile|android|iphone|ipad)\b/i.test(userAgent) && !isLinkedIn && !/linkedinbot/i.test(userAgent);
+  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|mobile|android|iphone|ipad)\b/i.test(userAgent) && !isLinkedIn && !/authorizedentity/i.test(userAgent);
   
-  const xHost = req.get('host') || '';
-  const isAISDomain = xHost.includes('ais-dev-') || xHost.includes('ais-pre-');
-  const isAISPreview = xPurpose === 'preview' || (req.get('referer') || '').includes('aistudio.google.com') || isAISDomain;
-
   const isBotPath = req.path.includes('.well-known') || req.path.startsWith('/og-article-');
   const isCookieCheck = req.path.includes("cookie_check");
-  const isActuallyBot = isBotUA || forceBot;
-  
-  // CRITICAL: LinkedIn bots must ALWAYS be treated as bots 
-  // bypassing the infra AISDomain check.
-  const isBot = isActuallyBot || isLinkedIn || isBotPath || forceBot;
+  const isBot = isBotUA || forceBot || isBotPath || isLinkedIn;
 
   // 4. PREPARE OG DATA
   let articleId = (req.query.article || req.query.id || req.query.article_id) as string;
@@ -126,14 +109,14 @@ app.use(async (req, res, next) => {
     if (idMatch) articleId = idMatch[1];
   }
 
-  // 1. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots
+  // 2. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots
   if (isCookieCheck && isBot) {
     try {
       const decodedReturnUrl = decodeURIComponent(decodeURIComponent(returnUrl || ""));
-      console.log(`[BYPASS-CRITICAL] Cookie-check Intercept for Bot! ReturnURL: ${decodedReturnUrl}`);
+      console.log(`[BYPASS-V20] Cookie-check Intercept for Bot! ReturnURL: ${decodedReturnUrl}`);
       
       // Handle Image Proxy Case
-      if (decodedReturnUrl.includes("/api/proxy-image")) {
+      if (decodedReturnUrl.includes("/api/proxy-image") || decodedReturnUrl.includes("og-image")) {
         let actualImageUrl = null;
         const match = decodedReturnUrl.match(/[?&]url=([^&]+)/);
         if (match) actualImageUrl = decodeURIComponent(match[1]);
@@ -145,7 +128,7 @@ app.use(async (req, res, next) => {
                       decodedReturnUrl.match(/\/.well-known\/og-article-([^\/?#.]+)/i);
       if (idMatch) {
         articleId = idMatch[1];
-        console.log(`[BYPASS] Article ID captured: ${articleId}`);
+        console.log(`[BYPASS-V20] Article ID captured: ${articleId}`);
       }
     } catch (e) {}
   }
@@ -176,8 +159,8 @@ app.use(async (req, res, next) => {
         ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/[\r\n\t]/gm, " ").trim();
         if (article.image_url) {
           const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-          // NEW CLEAN STATIC PROXY URL (v19 reset)
-          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v19`;
+          // NEW CLEAN STATIC PROXY URL (v20 reset)
+          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v20`;
         }
       }
     } catch (e) {}
@@ -187,7 +170,8 @@ app.use(async (req, res, next) => {
   const escapedTitle = escapeHtml(ogTitle);
   const escapedDesc = escapeHtml(ogDesc);
   const escapedImage = escapeHtml(ogImage);
-  const ogUrl = escapeHtml(`${(process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '')}${req.originalUrl}`);
+  const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+  const ogUrl = escapeHtml(articleId ? `${cleanBase}/article/${articleId}` : `${cleanBase}${req.originalUrl}`);
 
   const metaTags = `<title>${escapedTitle}</title><meta name="description" content="${escapedDesc}"/><meta property="og:title" content="${escapedTitle}"/><meta property="og:description" content="${escapedDesc}"/><meta property="og:image" content="${escapedImage}"/><meta property="og:image:url" content="${escapedImage}"/><meta property="og:image:secure_url" content="${escapedImage}"/><meta property="og:image:type" content="image/jpeg"/><meta property="og:image:alt" content="${escapedTitle}"/><meta property="og:url" content="${ogUrl}"/><meta property="og:type" content="article"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="${escapedTitle}"/><meta name="twitter:description" content="${escapedDesc}"/><meta name="twitter:image" content="${escapedImage}"/><meta name="twitter:image:src" content="${escapedImage}"/><meta name="robots" content="index, follow, max-image-preview:large"><link rel="image_src" href="${escapedImage}" />`;
 
