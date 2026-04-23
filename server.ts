@@ -392,15 +392,15 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     
     const isActuallyBotAccessing = isActuallyBot || isBotPath || isBotUA;
 
-    // If we're in a cookie check and it's a proxy image request, serve the image directly!
-    // This bypasses the infrastructure's attempt to force a cookie check on the image for recognized bots.
-    if (isCookieCheck && isImageProxyInReturnUrl && isActuallyBotAccessing) {
+    if (isCookieCheck && isImageProxyInReturnUrl) {
       try {
         const decodedReturnUrl = decodeURIComponent(req.query.return_url as string);
-        const urlMatch = decodedReturnUrl.match(/url=([^&]+)/);
-        if (urlMatch) {
-           const actualImageUrl = decodeURIComponent(urlMatch[1]);
-           console.log(`[DEBUG-COOKIE] Serving image DIRECTLY from cookie check for bot: ${actualImageUrl}`);
+        // Using URL constructor to safely extract the nested 'url' parameter
+        const urlObj = new URL(decodedReturnUrl.startsWith('http') ? decodedReturnUrl : `https://${req.get('host')}${decodedReturnUrl}`);
+        const actualImageUrl = urlObj.searchParams.get("url");
+        
+        if (actualImageUrl) {
+           console.log(`[DEBUG-COOKIE] Serving image DIRECTLY from cookie check (URL API Mode): ${actualImageUrl}`);
            return fetchAndSendImage(actualImageUrl, res);
         }
       } catch (e) {
@@ -408,18 +408,7 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       }
     }
 
-    // Redirect image proxy cookie checks back to the proxy with bot bypass flags
-    if (isCookieCheck && isImageProxyInReturnUrl) {
-      console.log(`[DEBUG-COOKIE] Redirecting image proxy cookie check back to proxy with force_bot=true | ReturnURL: ${returnUrl}`);
-      let targetUrl = returnUrl;
-      const bypassFlags = ['force_bot=true', 'ls=1', '_bot=1', 'bot=1'];
-      bypassFlags.forEach(flag => {
-        if (!targetUrl.includes(flag.split('=')[0])) {
-          targetUrl += (targetUrl.includes('?') ? '&' : '?') + flag;
-        }
-      });
-      return res.redirect(targetUrl);
-    }
+    // Redundant redirect block removed - combined with direct serving above
 
     const isBotAccessingOg = ((req as any).isOgApiRoute || isCookieCheck) && isActuallyBotAccessing;
     const shouldServeMinimal = (isActuallyBot || isBot) && !isRealBrowser && (!isAISPreview || isLinkedIn || forceBot || isBotPath) && !isImageProxyInReturnUrl;
@@ -715,9 +704,9 @@ Sitemap: ${cleanBase}/sitemap.xml`);
                                   !resolvedImg.includes('cloudinary.com');
 
     // BOT vs USER Decision:
-    // If it's a bot, only proxy if it's strictly necessary (not HTTPS or specific restrictive source).
-    // This reduces the chances of the crawler getting stuck in our infrastructure's cookie check.
-    const shouldProxyForBot = isRestrictive || (resolvedImg && !resolvedImg.startsWith('https://'));
+    // With our Aggressive Mode for proxy bypass in cookie checks, we can safely
+    // use the proxy for bots too. This helps bypass THIRD-PARTY hotlink protection.
+    const shouldProxyForBot = isRestrictive || isLikelyHotlinkBlocked || (resolvedImg && !resolvedImg.startsWith('https://'));
     
     // If it's a real user (or we're not sure), use the proxy for everything third-party
     // to ensure the image definitely shows up in the UI.
