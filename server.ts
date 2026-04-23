@@ -165,7 +165,8 @@ app.use(async (req, res, next) => {
           let resolvedImg = article.image_url.trim();
           if (resolvedImg.startsWith('http')) {
             const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-            ogImage = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&force_bot=true`;
+            // Path-based URL with .jpg extension helps scrapers identify the content as an image
+            ogImage = `${cleanBase}/api/proxy-image/v9/intel-preview.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true`;
           }
         }
       }
@@ -186,13 +187,18 @@ app.use(async (req, res, next) => {
     <meta property="og:image" content="${escapedImage}" />
     <meta property="og:image:url" content="${escapedImage}" />
     <meta property="og:image:secure_url" content="${escapedImage}" />
+    <meta property="og:image:alt" content="${escapedTitle}" />
     <meta property="og:url" content="${ogUrl}" />
     <meta property="og:type" content="article" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapedTitle}" />
+    <meta name="twitter:description" content="${escapedDesc}" />
     <meta name="twitter:image" content="${escapedImage}" />
+    <meta name="twitter:image:src" content="${escapedImage}" />
     <meta name="robots" content="index, follow, max-image-preview:large">
+    <link rel="image_src" href="${escapedImage}" />
   `;
 
   // 5. BOT RESPONSE: Minimal HTML
@@ -200,7 +206,7 @@ app.use(async (req, res, next) => {
   if (isBot && !isRealBrowser && !req.path.includes('proxy-image')) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure; Max-Age=3600');
-    return res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" /></article></body></html>`);
+    return res.send(`<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}" /></article></body></html>`);
   }
 
   // 6. HUMAN RESPONSE: Inject Tags into index.html
