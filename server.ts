@@ -178,6 +178,10 @@ app.use(async (req, res, next) => {
                      userAgent.includes('apache-httpclient') ||
                      userAgent.includes('linkedin-post-inspector') ||
                      userAgent.includes('post-inspector') ||
+                     userAgent.includes('linkedin-image-fetcher') ||
+                     userAgent.includes('image-fetcher') ||
+                     userAgent.includes('linkedin-share') ||
+                     userAgent.includes('linkedin-reader') ||
                      userAgent.includes('ms-office') ||
                      userAgent.includes('office-collaboration') ||
                      userAgent.includes('microsoft-link-preview') ||
@@ -694,51 +698,54 @@ Sitemap: ${cleanBase}/sitemap.xml`);
                   console.warn("[DEBUG] Could not parse URL for cleaning:", resolvedImg);
                 }
 
-                ogImage = escapeHtml(resolvedImg);
                 console.log(`[DEBUG-OG] Final Resolved Image URL: ${resolvedImg}`);
                 
-                // Proxy third-party images to bypass social media crawler restrictions
-                // CRITICAL: We now use the proxy for LinkedIn as well, but we ensure it uses the absolute SHARED_APP_URL
-                // to avoid any relative path issues or internal host issues.
-                
-                const trustedSources = [
-                  'unsplash.com', 'images.unsplash.com', 'picsum.photos', 
-                  'cloudinary.com', 'imgix.net', 'supabase.co', 
-                  'wp.com', 'wordpress.com', 'googleusercontent.com',
-                  'fbcdn.net', 'twimg.com', 'akamaihd.net', 'fastly.net'
-                ];
-                const isTrusted = resolvedImg && trustedSources.some(source => resolvedImg.includes(source));
-                
-                // If it's already HTTPS and from a reasonably well-known domain, try to use it directly
-                // to avoid the cookie check loop on our own domain.
-                const isSafeDirect = resolvedImg && resolvedImg.startsWith('https://') && 
-                                   (isTrusted || resolvedImg.length < 150);
+    // Proxy third-party images to bypass social media crawler restrictions
+    // CRITICAL: For social media crawlers (LinkedIn), they usually have their own proxy/CDN
+    // that handles hotlink protection better than our small proxy.
+    // We only use the proxy for bots if the original URL is NOT HTTPS
+    // or if it's from a known-restrictive source.
+    
+    const restrictiveSources = [
+      'wsj.com', 'nytimes.com', 'bloomberg.com', 'ft.com'
+    ];
+    const isRestrictive = resolvedImg && restrictiveSources.some(source => resolvedImg.includes(source));
+    const isLikelyHotlinkBlocked = resolvedImg && !resolvedImg.includes('unsplash.com') && 
+                                  !resolvedImg.includes('supabase.co') && 
+                                  !resolvedImg.includes('cloudinary.com');
 
-                if (resolvedImg && !isSafeDirect && !resolvedImg.includes(finalBaseUrl)) {
-                  console.log(`[DEBUG-OG] Proxying third-party image: ${resolvedImg}`);
-                  const cleanBase = cleanBaseUrl; // Use the reliable SHARED_APP_URL based base
-                  // Simplify proxy URL to be more crawler-friendly and include multiple bot bypass flags
-                  // Use a .jpg extension to help bypass some infrastructure checks
-                  const proxiedUrl = `${cleanBase}/api/proxy-image/${articleId || Date.now()}.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1&_bot=1`;
-                  ogImage = escapeHtml(proxiedUrl);
-                } else if (resolvedImg) {
-                  // For trusted domains or our own domain, use the original URL but ensure it's absolute
-                  let finalImg = resolvedImg;
-                  if (!finalImg.startsWith('http')) {
-                    const cleanBase = cleanBaseUrl;
-                    finalImg = `${cleanBase}${finalImg.startsWith('/') ? '' : '/'}${finalImg}`;
-                  }
-                  
-                  // Force HTTPS for social crawlers to avoid mixed content issues
-                  if (finalImg.startsWith('http://')) {
-                    finalImg = finalImg.replace('http://', 'https://');
-                  }
-                  
-                  // Add stable cache buster to trusted images
-                  const separator = finalImg.includes('?') ? '&' : '?';
-                  ogImage = escapeHtml(`${finalImg}${separator}v=${articleId || '1'}`);
-                  console.log(`[DEBUG-OG] Using original/trusted image URL with stable buster: ${finalImg}`);
-                }
+    // BOT vs USER Decision:
+    // If it's a bot, only proxy if it's strictly necessary (not HTTPS or specific restrictive source).
+    // This reduces the chances of the crawler getting stuck in our infrastructure's cookie check.
+    const shouldProxyForBot = isRestrictive || (resolvedImg && !resolvedImg.startsWith('https://'));
+    
+    // If it's a real user (or we're not sure), use the proxy for everything third-party
+    // to ensure the image definitely shows up in the UI.
+    const shouldProxyForUser = resolvedImg && !resolvedImg.includes(finalBaseUrl) && 
+                              !resolvedImg.includes('unsplash.com') && 
+                              !resolvedImg.includes('supabase.co');
+
+    if (resolvedImg && ((isBot && shouldProxyForBot) || (!isBot && shouldProxyForUser))) {
+      console.log(`[DEBUG-OG] Proxying image (isBot: ${isBot}): ${resolvedImg}`);
+      const cleanBase = cleanBaseUrl;
+      const proxiedUrl = `${cleanBase}/api/proxy-image/${articleId || Date.now()}.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1&_bot=1`;
+      ogImage = escapeHtml(proxiedUrl);
+    } else if (resolvedImg) {
+      // Use original URL
+      let finalImg = resolvedImg;
+      if (!finalImg.startsWith('http')) {
+        const cleanBase = cleanBaseUrl;
+        finalImg = `${cleanBase}${finalImg.startsWith('/') ? '' : '/'}${finalImg}`;
+      }
+      
+      if (finalImg.startsWith('http://')) {
+        finalImg = finalImg.replace('http://', 'https://');
+      }
+      
+      const separator = finalImg.includes('?') ? '&' : '?';
+      ogImage = escapeHtml(`${finalImg}${separator}v=${articleId || '1'}`);
+      console.log(`[DEBUG-OG] Using original image URL (isBot: ${isBot}): ${finalImg}`);
+    }
               } catch (e) {
                 console.error("[DEBUG] Failed to resolve image URL:", img, e);
               }
@@ -875,6 +882,11 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     res.setHeader('Accept-Ranges', 'none');
     res.setHeader('X-SaaS-Sentinel-Bot', isBot ? 'true' : 'false');
     res.setHeader('X-SaaS-Sentinel-Article', articleId || 'none');
+    
+    // Add bot bypass cookie for infrastructure
+    if (isBot) {
+      res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure; Max-Age=3600');
+    }
     
     if (isLinkedIn || forceBot) {
       console.log(`[BOT-FINAL] Responding to LinkedIn/ForceBot: path=${req.path}, title=${ogTitle}, isLinkedIn=${isLinkedIn}, forceBot=${forceBot}, image=${ogImage}`);
