@@ -126,7 +126,11 @@ const fetchAndSendImage = async (imageUrl: string, res: any) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Robots-Tag", "noindex, nofollow"); // Don't index proxied images
-    res.setHeader("X-LinkedIn-Ready", "true"); // Hint for LinkedIn
+    // LinkedIn-specific headers for images
+    if (isBotUA && req.path.includes('proxy-image')) {
+      res.setHeader("X-LinkedIn-Ready", "true");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+    }
 
     const arrayBuffer = await response.arrayBuffer();
     return res.send(Buffer.from(arrayBuffer));
@@ -724,21 +728,19 @@ Sitemap: ${cleanBase}/sitemap.xml`);
                                   !resolvedImg.includes('techcrunch.com');
 
     // BOT vs USER Decision:
-    // Crawlers like LinkedIn usually have excellent CDN support for hotlinking.
-    // We ONLY proxy for bots if it's strictly not HTTPS. This is the safest way to avoid
-    // infrastructure cookie challenges on the image resource.
-    const shouldProxyForBot = (resolvedImg && !resolvedImg.startsWith('https://'));
-    
-    // If it's a real user (or we're not sure), use the proxy for everything third-party
-    // to ensure the image definitely shows up in the UI.
-    const shouldProxyForUser = resolvedImg && !resolvedImg.includes(finalBaseUrl) && 
-                              !resolvedImg.includes('unsplash.com') && 
-                              !resolvedImg.includes('supabase.co');
+    // With our Aggressive Mode for proxy bypass in cookie checks (URL API Mode),
+    // we can SAFELY use the proxy for bots too.
+    // Proxying is better because our server bypasses the source's hotlink protection
+    // which might be blocking the generic LinkedIn crawler (e.g. regmedia.co.uk).
+    const isThirdParty = resolvedImg && !resolvedImg.includes(finalBaseUrl) && 
+                        !resolvedImg.includes('localhost') && 
+                        !resolvedImg.includes('google-cloud-preview');
 
-    if (resolvedImg && ((isBot && shouldProxyForBot) || (!isBot && shouldProxyForUser))) {
-      console.log(`[DEBUG-OG] Proxying image (isBot: ${isBot}): ${resolvedImg}`);
+    if (resolvedImg && isThirdParty) {
+      console.log(`[DEBUG-OG] Proxying third-party image (isBot: ${isBot}): ${resolvedImg}`);
       const cleanBase = cleanBaseUrl;
-      const proxiedUrl = `${cleanBase}/api/proxy-image/${articleId || Date.now()}.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1&_bot=1`;
+      // Use the simplest possible proxy URL for bots to avoid any crawler issues
+      const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1`;
       ogImage = escapeHtml(proxiedUrl);
     } else if (resolvedImg) {
       // Use original URL
