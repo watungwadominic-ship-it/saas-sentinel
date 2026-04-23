@@ -111,7 +111,8 @@ const fetchAndSendImage = async (imageUrl: string, res: any) => {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Referer': 'https://www.linkedin.com/' // Mimic LinkedIn referer
       }
     });
 
@@ -124,6 +125,8 @@ const fetchAndSendImage = async (imageUrl: string, res: any) => {
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Robots-Tag", "noindex, nofollow"); // Don't index proxied images
+    res.setHeader("X-LinkedIn-Ready", "true"); // Hint for LinkedIn
 
     const arrayBuffer = await response.arrayBuffer();
     return res.send(Buffer.from(arrayBuffer));
@@ -701,12 +704,17 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     const isRestrictive = resolvedImg && restrictiveSources.some(source => resolvedImg.includes(source));
     const isLikelyHotlinkBlocked = resolvedImg && !resolvedImg.includes('unsplash.com') && 
                                   !resolvedImg.includes('supabase.co') && 
-                                  !resolvedImg.includes('cloudinary.com');
+                                  !resolvedImg.includes('cloudinary.com') &&
+                                  !resolvedImg.includes('marketingprofs.com') &&
+                                  !resolvedImg.includes('deadline.com') &&
+                                  !resolvedImg.includes('theverge.com') &&
+                                  !resolvedImg.includes('techcrunch.com');
 
     // BOT vs USER Decision:
-    // With our Aggressive Mode for proxy bypass in cookie checks, we can safely
-    // use the proxy for bots too. This helps bypass THIRD-PARTY hotlink protection.
-    const shouldProxyForBot = isRestrictive || isLikelyHotlinkBlocked || (resolvedImg && !resolvedImg.startsWith('https://'));
+    // Crawlers like LinkedIn usually have excellent CDN support for hotlinking.
+    // We ONLY proxy for bots if it's strictly not HTTPS. This is the safest way to avoid
+    // infrastructure cookie challenges on the image resource.
+    const shouldProxyForBot = (resolvedImg && !resolvedImg.startsWith('https://'));
     
     // If it's a real user (or we're not sure), use the proxy for everything third-party
     // to ensure the image definitely shows up in the UI.
