@@ -402,12 +402,21 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     if (isCookieCheck && isImageProxyInReturnUrl) {
       try {
         const decodedReturnUrl = decodeURIComponent(req.query.return_url as string);
-        // Using URL constructor to safely extract the nested 'url' parameter
-        const urlObj = new URL(decodedReturnUrl.startsWith('http') ? decodedReturnUrl : `https://${req.get('host')}${decodedReturnUrl}`);
-        const actualImageUrl = urlObj.searchParams.get("url");
+        console.log(`[DEBUG-COOKIE] Processing image proxy cookie check. ReturnURL: ${decodedReturnUrl}`);
+        
+        let actualImageUrl = null;
+        try {
+          const urlObj = new URL(decodedReturnUrl.startsWith('http') ? decodedReturnUrl : `https://${req.get('host')}${decodedReturnUrl}`);
+          actualImageUrl = urlObj.searchParams.get("url");
+        } catch (e) {
+          // Fallback regex if URL constructor fails
+          const match = decodedReturnUrl.match(/[?&]url=([^&]+)/);
+          if (match) actualImageUrl = decodeURIComponent(match[1]);
+        }
         
         if (actualImageUrl) {
-           console.log(`[DEBUG-COOKIE] Serving image DIRECTLY from cookie check (URL API Mode): ${actualImageUrl}`);
+           console.log(`[DEBUG-COOKIE] Serving image DIRECTLY from cookie check (Failsafe Mode): ${actualImageUrl}`);
+           // Force bot-like headers for the internal fetch to ensure we get the image
            return fetchAndSendImage(actualImageUrl, res);
         }
       } catch (e) {
@@ -815,11 +824,35 @@ Sitemap: ${cleanBase}/sitemap.xml`);
   <meta property="article:section" content="SaaS Intelligence">
 `;
 
+    // If it's a bot, serve a CLEAN, MINIMAL HTML response.
+    // This removes ALL layout complexity, scripts, and possible crawler obstacles.
     if (isBot) {
-      console.log(`[BOT-META] Generated Tags for ${articleId || 'home'}: Title="${ogTitle}", Image="${ogImage}"`);
+        const minimalHtml = `<!DOCTYPE html>
+<html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    ${metaTags}
+</head>
+<body>
+    <article>
+        <h1>${ogTitle}</h1>
+        <p>${ogDescription}</p>
+        <img src="${ogImage}" alt="${ogTitle}" />
+    </article>
+</body>
+</html>`;
+        
+        console.log(`[BOT-FINAL] Responding with MINIMAL HTML to ${userAgent.substring(0, 50)} | Article: ${articleId}`);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('X-Robots-Tag', 'index, follow, max-image-preview:large');
+        return res.status(200).send(minimalHtml);
     }
 
-    // Aggressive removal of existing tags (handles both property and name)
+    // Aggressive removal of existing tags for real users (handles both property and name)
     html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
     html = html.replace(/<meta[^>]+(?:property|name)=["']og:[^"']+["'][^>]*>/gi, '');
     html = html.replace(/<meta[^>]+(?:property|name)=["']twitter:[^"']+["'][^>]*>/gi, '');
