@@ -1,3 +1,4 @@
+
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -77,29 +78,21 @@ app.use(async (req, res, next) => {
   let forceBot = forceBotQuery.includes('true') || req.headers['x-force-bot'] === 'true';
   const returnUrl = req.query.return_url as string;
 
-  // 1. AGGRESSIVE BOT DETECTION (CRITICAL for LinkedIn Bypass)
-  const isLinkedIn = /linkedin/i.test(userAgent) || 
-                     userAgent.includes('authorizedentity') || 
-                     userAgent.includes('linkedinbot') ||
-                     userAgent.includes('linkedin-bot') ||
-                     userAgent.includes('post-inspector') ||
-                     userAgent.includes('image-fetcher') ||
-                     userAgent.includes('share-preview') ||
-                     userAgent.includes('media-fetcher') ||
-                     userAgent.includes('linkedin-share') ||
-                     userAgent.includes('pro-bot') ||
-                     userAgent.includes('bot') ||
-                     userAgent.includes('crawler') ||
-                     userAgent.includes('spider') ||
-                     xLinkedInId !== undefined;
-
-  const botRegex = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|crawler|spider|archiver|curl|wget|bot|preview|embed)\b/i;
-  const isBotUA = botRegex.test(userAgent) || isLinkedIn;
-  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|mobile|android|iphone|ipad)\b/i.test(userAgent) && !isLinkedIn && !/authorizedentity/i.test(userAgent);
+  // 1. ULTRA-AGGRESSIVE BOT DETECTION
+  // We prioritize this signature list to stay ahead of LinkedIn's evolving crawler fleet.
+  const isBotUA = /(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|crawler|spider|archiver|curl|wget|bot|preview|embed|authorizedentity|post-inspector|image-fetcher|share-preview|media-fetcher|pro-bot|long-reader|chrome-lighthouse|google-structured-data-testing-tool|link-preview|bingpreview)/i.test(userAgent);
   
-  const isBotPath = req.path.includes('.well-known') || req.path.startsWith('/og-article-');
+  // LinkedIn-specific headers
+  const isLinkedInHeaders = xLinkedInId !== undefined || (userAgent.includes('linkedin') && !userAgent.includes('realbrowser'));
+  
+  const isBotPath = req.path.includes('.well-known') || req.path.includes('/og-article-');
   const isCookieCheck = req.path.includes("cookie_check");
-  const isBot = isBotUA || forceBot || isBotPath || isLinkedIn;
+  
+  // The master Bot flag. If this is true, we serve RAW HTML only.
+  const isBot = isBotUA || forceBot || isBotPath || isLinkedInHeaders;
+
+  // Real browser check - MUST NOT match if it's already a bot.
+  const isRealBrowser = !isBot && /\b(chrome|safari|firefox|edg|opera|opr|mobile|android|iphone|ipad)\b/i.test(userAgent);
 
   // 4. PREPARE OG DATA
   let articleId = (req.query.article || req.query.id || req.query.article_id) as string;
@@ -113,22 +106,23 @@ app.use(async (req, res, next) => {
   if (isCookieCheck && isBot) {
     try {
       const decodedReturnUrl = decodeURIComponent(decodeURIComponent(returnUrl || ""));
-      console.log(`[BYPASS-V20] Cookie-check Intercept for Bot! ReturnURL: ${decodedReturnUrl}`);
+      console.log(`[BYPASS-V21] Cookie-check Intercept for Bot! ReturnURL: ${decodedReturnUrl}`);
       
-      // Handle Image Proxy Case
-      if (decodedReturnUrl.includes("/api/proxy-image") || decodedReturnUrl.includes("og-image")) {
+      // Handle Image Proxy Case (LinkedIn often prepends cookie check to image URLs too)
+      if (decodedReturnUrl.includes("/api/proxy-image") || decodedReturnUrl.includes("og-image") || decodedReturnUrl.includes(".jpg") || decodedReturnUrl.includes(".png")) {
         let actualImageUrl = null;
-        const match = decodedReturnUrl.match(/[?&]url=([^&]+)/);
+        const match = decodedReturnUrl.match(/[?&]url=([^&]+)/) || decodedReturnUrl.match(/=(http.+)/);
         if (match) actualImageUrl = decodeURIComponent(match[1]);
         if (actualImageUrl) return fetchAndSendImage(actualImageUrl, res, userAgent);
       }
 
       // Handle Article Case
       const idMatch = decodedReturnUrl.match(/\/(?:article|news|og-article-)\/([^\/?#.]+)/i) || 
-                      decodedReturnUrl.match(/\/.well-known\/og-article-([^\/?#.]+)/i);
+                      decodedReturnUrl.match(/\/.well-known\/og-article-([^\/?#.]+)/i) ||
+                      decodedReturnUrl.match(/article%2F(\d+)/);
       if (idMatch) {
         articleId = idMatch[1];
-        console.log(`[BYPASS-V20] Article ID captured: ${articleId}`);
+        console.log(`[BYPASS-V21] Article ID captured: ${articleId}`);
       }
     } catch (e) {}
   }
@@ -159,8 +153,8 @@ app.use(async (req, res, next) => {
         ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/[\r\n\t]/gm, " ").trim();
         if (article.image_url) {
           const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-          // NEW CLEAN STATIC PROXY URL (v20 reset)
-          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v20`;
+          // NEW CLEAN STATIC PROXY URL (v21 reset)
+          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v21`;
         }
       }
     } catch (e) {}
@@ -176,23 +170,14 @@ app.use(async (req, res, next) => {
   const metaTags = `<title>${escapedTitle}</title><meta name="description" content="${escapedDesc}"/><meta property="og:title" content="${escapedTitle}"/><meta property="og:description" content="${escapedDesc}"/><meta property="og:image" content="${escapedImage}"/><meta property="og:image:url" content="${escapedImage}"/><meta property="og:image:secure_url" content="${escapedImage}"/><meta property="og:image:type" content="image/jpeg"/><meta property="og:image:alt" content="${escapedTitle}"/><meta property="og:url" content="${ogUrl}"/><meta property="og:type" content="article"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="${escapedTitle}"/><meta name="twitter:description" content="${escapedDesc}"/><meta name="twitter:image" content="${escapedImage}"/><meta name="twitter:image:src" content="${escapedImage}"/><meta name="robots" content="index, follow, max-image-preview:large"><link rel="image_src" href="${escapedImage}" />`;
 
   // 5. BOT RESPONSE: Minimal HTML
-  // CRITICAL: We MUST exclude static-preview and proxy-image from the bot HTML response
-  // otherwise bots will receive HTML tags when they expect a binary image!
-  if (isBot && !isRealBrowser && !req.path.includes('proxy-image') && !req.path.includes('static-preview')) {
+  // If we are here and it's a bot (even via cookie check), we MUST return HTML.
+  if (isBot) {
     const botHtml = `<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}"/></article></body></html>`;
-    console.log(`[BOT-FINAL] Responding to Bot | Path: ${req.path} | Article: ${articleId}`);
+    console.log(`[BOT-FINAL-V21] Responding to Bot | Path: ${req.path} | Article: ${articleId}`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure; Max-Age=3600');
     return res.status(200).send(botHtml);
-  }
-  
-  // EXTRA: If we are in cookie_check but it's a bot, we MUST return HTML now 
-  // instead of letting it fall through to human UI.
-  if (isCookieCheck && isBot) {
-     const botHtml = `<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}"/></article></body></html>`;
-     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-     return res.status(200).send(botHtml);
   }
 
   // 6. HUMAN RESPONSE: Inject Tags into index.html
