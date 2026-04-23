@@ -99,8 +99,8 @@ def run_news_bot():
     start_date = (now - timedelta(days=2)).strftime('%Y-%m-%d')
 
     # 2. Fetch News
-    # Broad query for SaaS and Enterprise AI
-    search_query = 'B2B SaaS OR "Enterprise AI" OR "SaaS Architecture" OR "Cloud Infrastructure"'
+    # Tighter query for B2B SaaS and Enterprise Software
+    search_query = '("B2B SaaS" OR "Enterprise software" OR "SaaS metrics" OR "Cloud infrastructure" OR "Enterprise AI")'
     params = {
         "q": search_query, 
         "from": start_date, 
@@ -154,14 +154,16 @@ def run_news_bot():
                     messages=[
                         {
                             "role": "system", 
-                            "content": "You are a SaaS Strategy Consultant. Return ONLY a valid JSON object."
+                            "content": "You are a strict SaaS Intelligence Agent. You only analyze B2B SaaS, Cloud infrastructure, and Enterprise Tech news. Ignore consumer tech, entertainment, or general economy unless it directly impacts the B2B tech sector. Return ONLY a valid JSON object."
                         },
                         {
                             "role": "user", 
                             "content": (
-                                f"News: {title}\n"
+                                f"News Title: {title}\n"
                                 f"Context: {latest.get('description', '')}\n\n"
+                                "If this news is NOT about B2B SaaS, Enterprise Software, or Cloud Infrastructure, set 'is_relevant' to false.\n\n"
                                 f"Return JSON with these keys: "
+                                f"'is_relevant' (boolean), "
                                 f"'feed_summary' (string, 100 words), "
                                 f"'strategic_analysis' (string, 3 paragraphs), "
                                 f"'confidence_score' (integer, 0-100), "
@@ -174,6 +176,10 @@ def run_news_bot():
                 )
                 
                 ai_data = json.loads(completion.choices[0].message.content)
+                if ai_data.get('is_relevant') is False:
+                    print(f"⏭️ Skipping (Not Relevant): {title[:50]}...")
+                    ai_data = None
+                    break
                 break 
                 
             except Exception as e:
