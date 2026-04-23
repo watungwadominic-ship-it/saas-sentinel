@@ -47,6 +47,9 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
     if (userAgentHint && userAgentHint.toLowerCase().includes('linkedin')) {
       res.setHeader("X-LinkedIn-Ready", "true");
     }
+    
+    // Add bot bypass cookie even for image requests
+    res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure; Max-Age=3600');
 
     const arrayBuffer = await response.arrayBuffer();
     return res.send(Buffer.from(arrayBuffer));
@@ -161,15 +164,8 @@ app.use(async (req, res, next) => {
         if (article.image_url) {
           let resolvedImg = article.image_url.trim();
           if (resolvedImg.startsWith('http')) {
-            // Resolution Logic
-            if (isLinkedIn) {
-              // Direct URL for LinkedIn to avoid local infra issues
-              ogImage = resolvedImg;
-            } else {
-              // Proxy for others to avoid hotlink blocks
-              const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-              ogImage = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&force_bot=true`;
-            }
+            const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+            ogImage = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&force_bot=true`;
           }
         }
       }
@@ -188,6 +184,8 @@ app.use(async (req, res, next) => {
     <meta property="og:title" content="${escapedTitle}" />
     <meta property="og:description" content="${escapedDesc}" />
     <meta property="og:image" content="${escapedImage}" />
+    <meta property="og:image:url" content="${escapedImage}" />
+    <meta property="og:image:secure_url" content="${escapedImage}" />
     <meta property="og:url" content="${ogUrl}" />
     <meta property="og:type" content="article" />
     <meta property="og:image:width" content="1200" />
