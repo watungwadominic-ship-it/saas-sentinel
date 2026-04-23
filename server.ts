@@ -99,6 +99,8 @@ app.use(async (req, res, next) => {
                      userAgent.includes('ms-office') ||
                      userAgent.includes('office-collaboration') ||
                      userAgent.includes('microsoft-link-preview') ||
+                     userAgent.includes('bingbot') ||
+                     userAgent.includes('googlebot') ||
                      xLinkedInId !== undefined;
 
   const botRegex = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|crawler|spider|archiver|curl|wget|bot|preview|embed)\b/i;
@@ -114,20 +116,26 @@ app.use(async (req, res, next) => {
   const isActuallyBot = isBotUA || forceBot;
   const isBot = isActuallyBot && (!isAISDomain || isLinkedIn || forceBot || isBotPath);
 
-  // 1. INFRASTRUCTURE BYPASS: Intercept cookie checks for images
-  const isImageProxyInReturnUrl = typeof returnUrl === "string" && returnUrl.includes("/api/proxy-image");
-  if (isCookieCheck && isImageProxyInReturnUrl) {
+  // 1. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots
+  if (isCookieCheck && (isLinkedIn || isActuallyBot)) {
     try {
       const decodedReturnUrl = decodeURIComponent(decodeURIComponent(returnUrl));
-      console.log(`[BYPASS] Double-decoded ReturnURL: ${decodedReturnUrl}`);
+      console.log(`[BYPASS] Cookie-check Intercept for Bot! ReturnURL: ${decodedReturnUrl}`);
       
-      let actualImageUrl = null;
-      const match = decodedReturnUrl.match(/[?&]url=([^&]+)/);
-      if (match) actualImageUrl = decodeURIComponent(match[1]);
-      
-      if (actualImageUrl) {
-         console.log(`[BYPASS] Serving proxied image via cookie-check: ${actualImageUrl}`);
-         return fetchAndSendImage(actualImageUrl, res, userAgent);
+      // Handle Image Proxy Case
+      if (decodedReturnUrl.includes("/api/proxy-image")) {
+        let actualImageUrl = null;
+        const match = decodedReturnUrl.match(/[?&]url=([^&]+)/);
+        if (match) actualImageUrl = decodeURIComponent(match[1]);
+        if (actualImageUrl) return fetchAndSendImage(actualImageUrl, res, userAgent);
+      }
+
+      // Handle Article Case
+      const idMatch = decodedReturnUrl.match(/\/(?:article|news|og-article-)\/([^\/?#.]+)/i) || 
+                      decodedReturnUrl.match(/\/.well-known\/og-article-([^\/?#.]+)/i);
+      if (idMatch) {
+        articleId = idMatch[1];
+        console.log(`[BYPASS] Overriding articleId from returnUrl: ${articleId}`);
       }
     } catch (e) {}
   }
