@@ -18,7 +18,7 @@ NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
 LINKEDIN_PERSON_URN = os.environ.get("LINKEDIN_PERSON_URN")
 
-def post_to_linkedin(text, title, url, summary=None, image_url=None):
+def post_to_linkedin(text, title, url, summary=None, thumbnail_url=None):
     if not all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]):
         print("⏭️ Skipping LinkedIn: Credentials missing.")
         return
@@ -52,6 +52,7 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         
         article_content = {
             "source": scraping_url,
+            "thumbnail": thumbnail_url,
             "title": title,
             "description": str(summary or title)[:250]
         }
@@ -286,12 +287,15 @@ def run_news_bot():
             # Real users will be redirected to the actual article page by our server.
             display_url = f"{app_url}/.well-known/og-article-{article_id}.html" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v24)
-            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v24"
+            # Scraping URL for LinkedIn crawler (v26)
+            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v26"
+            
+            # Proxied Image URL for LinkedIn thumbnail (v26)
+            proxied_image_url = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v26"
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
-            post_to_linkedin(social_text, title, scraping_url, summary_text, image_url)
+            post_to_linkedin(social_text, title, scraping_url, summary_text, proxied_image_url)
 
             processed_count += 1
         except Exception as e:
