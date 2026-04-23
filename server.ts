@@ -99,20 +99,20 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 });
 
 // Shared Image Proxy Helper
-const fetchAndSendImage = async (imageUrl: string, res: any) => {
+const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: string = "") => {
   if (!imageUrl) return res.status(400).send("Missing URL");
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
   try {
     console.log(`[PROXY-HELPER] Fetching: ${imageUrl}`);
     const response = await fetch(imageUrl, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': userAgentHint || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'Referer': 'https://www.linkedin.com/' // Mimic LinkedIn referer
+        'Referer': 'https://www.linkedin.com/'
       }
     });
 
@@ -126,10 +126,10 @@ const fetchAndSendImage = async (imageUrl: string, res: any) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Robots-Tag", "noindex, nofollow"); // Don't index proxied images
-    // LinkedIn-specific headers for images
-    if (isBotUA && req.path.includes('proxy-image')) {
+    
+    // Add LinkedIn specific headers if hint provided
+    if (userAgentHint && userAgentHint.toLowerCase().includes('linkedin')) {
       res.setHeader("X-LinkedIn-Ready", "true");
-      res.setHeader("X-Content-Type-Options", "nosniff");
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -138,18 +138,7 @@ const fetchAndSendImage = async (imageUrl: string, res: any) => {
     clearTimeout(timeoutId);
     console.error(`[PROXY-HELPER-ERROR] ${error.name === 'AbortError' ? 'Timeout' : error.message} for ${imageUrl}`);
     
-    // Fallback logic
-    try {
-      const fallbackUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630";
-      const fallbackResponse = await fetch(fallbackUrl);
-      if (fallbackResponse.ok) {
-        const contentType = fallbackResponse.headers.get("content-type") || "image/jpeg";
-        res.setHeader("Content-Type", contentType);
-        const arrayBuffer = await fallbackResponse.arrayBuffer();
-        return res.send(Buffer.from(arrayBuffer));
-      }
-    } catch (e) {}
-    
+    // Fallback image (1x1 transparent pixel)
     res.setHeader("Content-Type", "image/png");
     return res.send(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
   }
@@ -211,10 +200,10 @@ app.use(async (req, res, next) => {
   const botRegex = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|apple|pinterest|reddit|vk|archive|crawler|spider|archiver|curl|wget|well-known|authorizedentity|authorized-entity|apache-httpclient|validator|scraper|metadata|og-tag|social-share|inspection|prefetch|bot|externalhit|preview|embed|inspection|phantomjs|headless|screenshot|link-preview)\b/i;
   const isBotUA = botRegex.test(userAgent) || isLinkedIn;
   
-  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|google-cloud-preview)\b/i.test(userAgent) && !isBotUA;
+  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|google-cloud-preview|mobile|android|iphone|ipad)\b/i.test(userAgent) && !isLinkedIn && !/linkedinbot/i.test(userAgent);
   
   // AIS PREVIEW FIX: If it's a real browser and not a bot, let Vite handle it immediately (fixes white screen)
-  if (!isRealBrowser || isBotUA || isLinkedIn || req.path.includes('.well-known')) {
+  if (!isRealBrowser || isLinkedIn || req.path.includes('.well-known') || forceBot) {
     // Keep processing for bots
   } else {
     if (process.env.NODE_ENV !== "production" || !req.path.includes('/article/')) {
@@ -416,8 +405,7 @@ Sitemap: ${cleanBase}/sitemap.xml`);
         
         if (actualImageUrl) {
            console.log(`[DEBUG-COOKIE] Serving image DIRECTLY from cookie check (Failsafe Mode): ${actualImageUrl}`);
-           // Force bot-like headers for the internal fetch to ensure we get the image
-           return fetchAndSendImage(actualImageUrl, res);
+           return fetchAndSendImage(actualImageUrl, res, userAgent);
         }
       } catch (e) {
         console.error("[DEBUG-COOKIE] Failed to extract image URL from return_url:", e);
@@ -736,19 +724,18 @@ Sitemap: ${cleanBase}/sitemap.xml`);
                                   !resolvedImg.includes('theverge.com') &&
                                   !resolvedImg.includes('techcrunch.com');
 
-    // BOT vs USER Decision:
-    // With our Aggressive Mode for proxy bypass in cookie checks (URL API Mode),
-    // we can SAFELY use the proxy for bots too.
-    // Proxying is better because our server bypasses the source's hotlink protection
-    // which might be blocking the generic LinkedIn crawler (e.g. regmedia.co.uk).
-    const isThirdParty = resolvedImg && !resolvedImg.includes(finalBaseUrl) && 
-                        !resolvedImg.includes('localhost') && 
-                        !resolvedImg.includes('google-cloud-preview');
-
-    if (resolvedImg && isThirdParty) {
-      console.log(`[DEBUG-OG] Proxying third-party image (isBot: ${isBot}): ${resolvedImg}`);
+    // BOT vs USER Decision for Images:
+    // Crawlers like LinkedIn usually have excellent CDN support for hotlinking.
+    // Infrastructure challenges (cookie checks) are the biggest threat.
+    // For LinkedIn, we deliver the ORIGINAL HTTPS URL if possible.
+    const isSafeHttps = resolvedImg && resolvedImg.startsWith('https://');
+    
+    if (isLinkedIn && isSafeHttps) {
+      console.log(`[DEBUG-OG] Delivering direct HTTPS URL for LinkedIn bot: ${resolvedImg}`);
+      ogImage = escapeHtml(resolvedImg);
+    } else if (resolvedImg && isThirdParty) {
+      console.log(`[DEBUG-OG] Proxying image (isBot: ${isBot}): ${resolvedImg}`);
       const cleanBase = cleanBaseUrl;
-      // Use the simplest possible proxy URL for bots to avoid any crawler issues
       const proxiedUrl = `${cleanBase}/api/proxy-image?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1`;
       ogImage = escapeHtml(proxiedUrl);
     } else if (resolvedImg) {
@@ -826,7 +813,7 @@ Sitemap: ${cleanBase}/sitemap.xml`);
 
     // If it's a bot, serve a CLEAN, MINIMAL HTML response.
     // This removes ALL layout complexity, scripts, and possible crawler obstacles.
-    if (isBot) {
+    if (isBot && !isRealBrowser) {
         const minimalHtml = `<!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#">
 <head>
@@ -850,6 +837,12 @@ Sitemap: ${cleanBase}/sitemap.xml`);
         res.setHeader('Expires', '0');
         res.setHeader('X-Robots-Tag', 'index, follow, max-image-preview:large');
         return res.status(200).send(minimalHtml);
+    }
+
+    // HUMAN REDIRECT: If a human hits a bot-targeted path, redirect them to the real article.
+    if (isRealBrowser && (isBotPath || req.path.includes('.well-known')) && articleId) {
+      console.log(`[HUMAN-REDIRECT] Redirecting from ${req.path} to /article/${articleId}`);
+      return res.redirect(`/article/${articleId}`);
     }
 
     // Aggressive removal of existing tags for real users (handles both property and name)
