@@ -579,15 +579,28 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
     
     // CRITICAL: For og:url, we should point to the cleanest representation possible.
-    // Social crawlers like stable URLs. For bots, we point to the article page BUT 
-    // include the bot bypass flags to ensure any sub-scrapers (like LinkedIn's image crawler) 
-    // also bypass the cookie check.
-    let ogUrl = `${cleanBaseUrl}/article/${articleId}`;
-    if (isBot) {
-      ogUrl = `${cleanBaseUrl}/api/og/article/${articleId}?force_bot=true&ls=1&_bot=1`;
-    } else if (!articleId) {
+    // For bots, og:url SHOULD match the URL we gave them to scrape (the .well-known path if used).
+    // This prevents LinkedIn from trying to perform a second "canonical" scrape on a different URL
+    // which might trigger more security gates.
+    let ogUrl = `${cleanBaseUrl}${req.path}`;
+    
+    // Ensure it's absolute and includes query params if they are bypass flags
+    const bypassParams = [];
+    if (forceBot) bypassParams.push('force_bot=true');
+    if (req.query.ls === '1') bypassParams.push('ls=1');
+    if (req.query._bot === '1') bypassParams.push('_bot=1');
+    if (req.query.bot === '1') bypassParams.push('bot=1');
+    
+    if (bypassParams.length > 0) {
+      ogUrl += (ogUrl.includes('?') ? '&' : '?') + bypassParams.join('&');
+    }
+    
+    if (!isBot && articleId && articleId !== "undefined" && articleId !== "null") {
+      ogUrl = `${cleanBaseUrl}/article/${articleId}`;
+    } else if (!isBot && !articleId) {
       ogUrl = `${cleanBaseUrl}${cleanPath}`;
     }
+    
     ogUrl = escapeHtml(ogUrl);
 
     if (isBot) {
@@ -740,7 +753,9 @@ Sitemap: ${cleanBase}/sitemap.xml`);
       }
       
       const separator = finalImg.includes('?') ? '&' : '?';
-      ogImage = escapeHtml(`${finalImg}${separator}v=${articleId || '1'}`);
+      // For bots, don't add the cache buster to original URLs unless strictly needed, 
+      // as some scrapers (LinkedIn) can be picky about unusual query params on images.
+      ogImage = escapeHtml(finalImg);
       console.log(`[DEBUG-OG] Using original image URL (isBot: ${isBot}): ${finalImg}`);
     }
               } catch (e) {
@@ -826,11 +841,11 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     // However, if it's a real browser or AI Studio preview hitting a .well-known path, we DON'T strip scripts.
     if (isBot && (!isAISPreview || isLinkedIn || forceBot) && !(!isBotUA && req.path.includes('.well-known'))) {
       html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-      // Add no-cache for bots and dummy cookie to help bypass some LBs
+      // Add no-cache for bots
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure');
+      // Consolidated bot cookie at the end
       res.setHeader('Vary', 'User-Agent');
     }
 
@@ -883,6 +898,10 @@ Sitemap: ${cleanBase}/sitemap.xml`);
     // Add bot bypass cookie for infrastructure
     if (isBot) {
       res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure; Max-Age=3600');
+      // Preload hint for the image to help scrapers find it faster
+      if (ogImage && ogImage.startsWith('http')) {
+        res.setHeader('Link', `<${ogImage}>; rel=preload; as=image`);
+      }
     }
     
     if (isLinkedIn || forceBot) {
