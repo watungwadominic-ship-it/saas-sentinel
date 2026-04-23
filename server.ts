@@ -88,28 +88,18 @@ app.use(async (req, res, next) => {
                      userAgent.includes('authorizedentity') || 
                      userAgent.includes('linkedinbot') ||
                      userAgent.includes('linkedin-bot') ||
-                     userAgent.includes('authorized-entity') ||
-                     userAgent.includes('apache-httpclient') ||
                      userAgent.includes('linkedin-post-inspector') ||
                      userAgent.includes('post-inspector') ||
-                     userAgent.includes('linkedin-image-fetcher') ||
                      userAgent.includes('image-fetcher') ||
+                     userAgent.includes('share-preview') ||
+                     userAgent.includes('media-fetcher') ||
                      userAgent.includes('linkedin-share') ||
-                     userAgent.includes('linkedin-reader') ||
-                     userAgent.includes('linkedin-media-fetcher') ||
-                     userAgent.includes('ms-office') ||
-                     userAgent.includes('office-collaboration') ||
-                     userAgent.includes('microsoft-link-preview') ||
-                     userAgent.includes('bingbot') ||
-                     userAgent.includes('googlebot') ||
-                     userAgent.includes('slurp') ||
-                     userAgent.includes('duckduckbot') ||
-                     userAgent.includes('baiduspider') ||
-                     userAgent.includes('yandexbot') ||
-                     userAgent.includes('sogou') ||
-                     userAgent.includes('exabot') ||
-                     userAgent.includes('facebot') ||
-                     userAgent.includes('ia_archiver') ||
+                     userAgent.includes('pro-bot') ||
+                     userAgent.includes('long-reader') ||
+                     userAgent.includes('chrome-lighthouse') ||
+                     userAgent.includes('google-structured-data-testing-tool') ||
+                     userAgent.includes('link-preview') ||
+                     userAgent.includes('bingpreview') ||
                      xLinkedInId !== undefined;
 
   const botRegex = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|crawler|spider|archiver|curl|wget|bot|preview|embed)\b/i;
@@ -185,12 +175,9 @@ app.use(async (req, res, next) => {
         ogTitle = article.title;
         ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/[\r\n\t]/gm, " ").trim();
         if (article.image_url) {
-          let resolvedImg = article.image_url.trim();
-          if (resolvedImg.startsWith('http')) {
-            const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-            // Simple path-based URL for maximum compatibility
-            ogImage = `${cleanBase}/api/proxy-image/intel-${articleId}.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ref=v16`;
-          }
+          const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+          // NEW CLEAN STATIC PROXY URL (v17 reset)
+          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v17`;
         }
       }
     } catch (e) {}
@@ -241,6 +228,19 @@ app.use(async (req, res, next) => {
 // --- CORE MIDDLEWARE END ---
 
 // ROUTES (Simplified & Grouped)
+app.get("/api/static-preview/:articleId/og-image.jpg", async (req, res) => {
+  const { articleId } = req.params;
+  try {
+    const { supabase } = await import("./src/services/supabase.js");
+    const { data: article } = await supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
+    if (article?.image_url) {
+      return fetchAndSendImage(article.image_url, res, req.headers['user-agent'] as string);
+    }
+  } catch (e) {}
+  // Default fallback image
+  return fetchAndSendImage("https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&h=630&auto=format&fit=crop", res);
+});
+
 app.get("/api/proxy-image*", (req, res) => {
   let imageUrl = req.query.url as string;
   
