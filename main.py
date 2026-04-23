@@ -286,15 +286,17 @@ def run_news_bot():
             # Real users will be redirected to the actual article page by our server.
             display_url = f"{app_url}/.well-known/og-article-{article_id}.html" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v27)
-            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v27"
+            # Scraping URL for LinkedIn crawler (v28)
+            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v28"
             
-            # Proxied Image URL for LinkedIn cache busting (v27)
-            proxied_image_url = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v27"
+            # Proxied Image URL for LinkedIn cache busting (v28)
+            proxied_image_url = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v28"
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
-            post_to_linkedin(social_text, title, scraping_url, summary_text, proxied_image_url)
+            # Note: We send None for image_url here because LinkedIn's API prefers to scrape the image 
+            # from the portal tags rather than receiving a raw URL in the thumbnail field.
+            post_to_linkedin(social_text, title, scraping_url, summary_text, None)
 
             processed_count += 1
         except Exception as e:
