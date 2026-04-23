@@ -263,16 +263,16 @@ def run_news_bot():
             print(f"🖼️ Image URL: {image_url}")
             print(f"🆔 Article ID: {article_id}")
             
-            # Use path-based URLs which are less likely to trigger infrastructure cookie checks
-            # than query-parameter based URLs.
-            # PRIMARY FALLBACK: The current AI Studio preview URL
-            shared_url = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app"
+            # CRITICAL: Ensure app_url is absolute. LinkedIn will NOT scrape relative URLs.
+            default_url = "https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app"
             env_url = os.getenv("SHARED_APP_URL")
-            if not env_url:
-                print(f"⚠️ Warning: SHARED_APP_URL not found in environment. Using fallback: {shared_url}")
-                print(f"💡 Suggestion: Add SHARED_APP_URL to your GitHub secrets for better control.")
             
-            app_url = str(env_url if env_url else shared_url).rstrip('/')
+            if env_url and env_url.startswith('http'):
+                app_url = env_url.rstrip('/')
+            else:
+                app_url = default_url.rstrip('/')
+                
+            print(f"🌍 Using App URL: {app_url}")
             
             # Use the bot-friendly OG route for the main link too.
             # This helps bypass infrastructure cookie checks for the crawler when it follows the link in the text.
@@ -286,7 +286,7 @@ def run_news_bot():
             # Scraping URL for LinkedIn crawler (with stable bypass flags)
             # Use article_id as a stable version to help LinkedIn's cache while still bypassing LB
             # We add a 'ref' parameter to force a fresh scrape while keeping the URL stable for retries
-            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v17"
+            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&ref=v19"
         
             display_summary = summary_text[:200] if summary_text else ""
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
