@@ -286,9 +286,9 @@ def run_news_bot():
             display_summary = summary_text[:200] if summary_text else ""
             # Clean URL for commentary (real users)
             display_url = f"{app_url}/article/{article_id}" if article_id else app_url
-            # Scraping URL for LinkedIn crawler (with bypass flags)
-            cache_buster = int(time.time())
-            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1&v={cache_buster}"
+            # Scraping URL for LinkedIn crawler (with stable bypass flags)
+            # Use article_id as a stable version to help LinkedIn's cache while still bypassing LB
+            scraping_url = f"{app_url}/.well-known/og-article-{article_id}.html?force_bot=true&ls=1&_bot=1&bot=1"
         
             display_summary = summary_text[:200] if summary_text else ""
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
