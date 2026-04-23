@@ -122,7 +122,10 @@ app.use(async (req, res, next) => {
   const isBotPath = req.path.includes('.well-known') || req.path.startsWith('/og-article-');
   const isCookieCheck = req.path.includes("cookie_check");
   const isActuallyBot = isBotUA || forceBot;
-  const isBot = isActuallyBot && (!isAISDomain || isLinkedIn || forceBot || isBotPath);
+  
+  // CRITICAL: LinkedIn bots must ALWAYS be treated as bots 
+  // bypassing the infra AISDomain check.
+  const isBot = isActuallyBot || isLinkedIn || isBotPath || forceBot;
 
   // 4. PREPARE OG DATA
   let articleId = (req.query.article || req.query.id || req.query.article_id) as string;
@@ -133,10 +136,10 @@ app.use(async (req, res, next) => {
   }
 
   // 1. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots
-  if (isCookieCheck && (isLinkedIn || isActuallyBot)) {
+  if (isCookieCheck && isBot) {
     try {
-      const decodedReturnUrl = decodeURIComponent(decodeURIComponent(returnUrl));
-      console.log(`[BYPASS] Cookie-check Intercept for Bot! ReturnURL: ${decodedReturnUrl}`);
+      const decodedReturnUrl = decodeURIComponent(decodeURIComponent(returnUrl || ""));
+      console.log(`[BYPASS-CRITICAL] Cookie-check Intercept for Bot! ReturnURL: ${decodedReturnUrl}`);
       
       // Handle Image Proxy Case
       if (decodedReturnUrl.includes("/api/proxy-image")) {
@@ -151,7 +154,7 @@ app.use(async (req, res, next) => {
                       decodedReturnUrl.match(/\/.well-known\/og-article-([^\/?#.]+)/i);
       if (idMatch) {
         articleId = idMatch[1];
-        console.log(`[BYPASS] Overriding articleId from returnUrl: ${articleId}`);
+        console.log(`[BYPASS] Article ID captured: ${articleId}`);
       }
     } catch (e) {}
   }
@@ -184,8 +187,8 @@ app.use(async (req, res, next) => {
           let resolvedImg = article.image_url.trim();
           if (resolvedImg.startsWith('http')) {
             const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-            // Path-based URL with .jpg extension helping crawlers identify content as an image
-            ogImage = `${cleanBase}/api/proxy-image/v11/analyst-intel.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1`;
+            // Using v14 for total fresh purge
+            ogImage = `${cleanBase}/api/proxy-image/v14/intel-preview.jpg?url=${encodeURIComponent(resolvedImg)}&force_bot=true&ls=1`;
           }
         }
       }
@@ -203,14 +206,19 @@ app.use(async (req, res, next) => {
   // 5. BOT RESPONSE: Minimal HTML
   if (isBot && !isRealBrowser && !req.path.includes('proxy-image')) {
     const botHtml = `<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}"/></article></body></html>`;
-    console.log(`[BOT-FINAL] Responding to ${userAgent.substring(0, 50)} | Article: ${articleId} | Image: ${ogImage.substring(0, 50)}`);
+    console.log(`[BOT-FINAL] Responding to Bot | Path: ${req.path} | Article: ${articleId}`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Content-Length', Buffer.byteLength(botHtml).toString());
     res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure; Max-Age=3600');
     return res.status(200).send(botHtml);
+  }
+  
+  // EXTRA: If we are in cookie_check but it's a bot, we MUST return HTML now 
+  // instead of letting it fall through to human UI.
+  if (isCookieCheck && isBot) {
+     const botHtml = `<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}"/></article></body></html>`;
+     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+     return res.status(200).send(botHtml);
   }
 
   // 6. HUMAN RESPONSE: Inject Tags into index.html
