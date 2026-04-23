@@ -129,28 +129,30 @@ app.use(async (req, res, next) => {
     if (idMatch) articleId = idMatch[1];
   }
 
-  // 2. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots (v25 Ultra Rescue)
+  // 2. INFRASTRUCTURE BYPASS: Intercept cookie checks for bots (v26 Titan)
   if (isCookieCheck && isBot) {
     try {
       const decodedReturnUrl = decodeURIComponent(decodeURIComponent(returnUrl || ""));
-      console.log(`[BYPASS-V25] Cookie-check Rescue for Bot! ReturnURL: ${decodedReturnUrl}`);
+      console.log(`[BYPASS-V26] Cookie-check Absolute Rescue! ReturnURL: ${decodedReturnUrl}`);
       
-      // Article ID Recovery (Hardened v25)
+      // Article ID Recovery (Super-Hardened v26)
       const idMatch = decodedReturnUrl.match(/\/(?:article|news|og-article-|static-preview)\/([^\/?#.]+)/i) || 
                       decodedReturnUrl.match(/\/.well-known\/og-article-([^\/?#.]+)/i) ||
                       decodedReturnUrl.match(/article%2F(\d+)/) ||
                       decodedReturnUrl.match(/%2F(\d+)(?:%3F|$)/) ||
                       decodedReturnUrl.match(/article_id=(\d+)/) ||
+                      decodedReturnUrl.match(/og-article-(\d+)/) ||
+                      decodedReturnUrl.match(/\/(\d+)(?:\.html|\?|$)/) ||
                       decodedReturnUrl.match(/\/(\d+)$/);
       
       if (idMatch) {
         articleId = idMatch[1];
-        console.log(`[BYPASS-V25] Article ID captured: ${articleId}`);
+        console.log(`[BYPASS-V26] Article ID captured: ${articleId}`);
         
         // BINARY RESCUE: If the bot wanted an image but got trapped in a cookie check, serve the image binary NOW.
-        const isImageRescue = decodedReturnUrl.includes('/api/static-preview') || decodedReturnUrl.includes('/api/proxy-image');
+        const isImageRescue = decodedReturnUrl.includes('/api/static-preview') || decodedReturnUrl.includes('/api/proxy-image') || decodedReturnUrl.includes('og-image.jpg');
         if (isImageRescue) {
-          console.log(`[BYPASS-V25] Image Rescue triggered for Article: ${articleId}`);
+          console.log(`[BYPASS-V26] Image Rescue triggered for Article: ${articleId}`);
           const { supabase } = await import("./src/services/supabase.js");
           const { data: article } = await supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
           const rescueUrl = article?.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&h=630&auto=format&fit=crop";
@@ -186,8 +188,8 @@ app.use(async (req, res, next) => {
         ogDesc = (article.summary || article.content || "").substring(0, 200).replace(/[\r\n\t]/gm, " ").trim();
         if (article.image_url) {
           const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-          // NEW CLEAN STATIC PROXY URL (v25 reset)
-          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v25`;
+          // NEW CLEAN STATIC PROXY URL (v26 reset)
+          ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?ref=v26`;
         }
       }
     } catch (e) {}
@@ -199,7 +201,7 @@ app.use(async (req, res, next) => {
   const escapedImage = escapeHtml(ogImage);
   const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
   
-  // For bots, we want og:url to point to the scrappable .well-known path (v25)
+  // For bots, we want og:url to point to the scrappable .well-known path (v26)
   // This prevents LinkedIn from following a human redirect and getting lost.
   const botFriendlyUrl = articleId ? `${cleanBase}/.well-known/og-article-${articleId}.html` : `${cleanBase}${req.originalUrl}`;
   const humanUrl = articleId ? `${cleanBase}/article/${articleId}` : `${cleanBase}${req.originalUrl}`;
@@ -207,10 +209,10 @@ app.use(async (req, res, next) => {
 
   const metaTags = `<title>${escapedTitle}</title><meta name="description" content="${escapedDesc}"/><meta property="og:title" content="${escapedTitle}"/><meta property="og:description" content="${escapedDesc}"/><meta property="og:image" content="${escapedImage}"/><meta property="og:image:url" content="${escapedImage}"/><meta property="og:image:secure_url" content="${escapedImage}"/><meta property="og:image:type" content="image/jpeg"/><meta property="og:image:alt" content="${escapedTitle}"/><meta property="og:url" content="${ogUrl}"/><meta property="og:type" content="article"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="${escapedTitle}"/><meta name="twitter:description" content="${escapedDesc}"/><meta name="twitter:image" content="${escapedImage}"/><meta name="twitter:image:src" content="${escapedImage}"/><meta name="robots" content="index, follow, max-image-preview:large"><link rel="image_src" href="${escapedImage}" />`;
 
-  // 5. BOT RESPONSE (v25 Absolute Exit)
+  // 5. BOT RESPONSE (v26 Titan Exit)
   if (isBot) {
     const botHtml = `<!DOCTYPE html><html lang="en" prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article#"><head><meta charset="utf-8">${metaTags}<meta itemprop="image" content="${escapedImage}"/></head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" alt="${escapedTitle}"/></article></body></html>`;
-    console.log(`[BOT-FINAL-V25] Responding to Bot | Path: ${req.path} | Article: ${articleId}`);
+    console.log(`[BOT-FINAL-V26] Responding to Bot | Path: ${req.path} | Article: ${articleId}`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
     res.setHeader('X-Robots-Tag', 'noindex, follow');
