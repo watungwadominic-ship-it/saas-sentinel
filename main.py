@@ -45,11 +45,8 @@ def post_to_linkedin(text, title, url, summary=None, image_url=None):
         
         # Use the passed URL as the source for scraping.
         # It already contains the .well-known path and bot bypass flags from the caller.
-        # We ensure the URL is clean and only has one set of bot-bypass flags.
+        # We ensure the URL is clean. No dynamic timestamp buster here to avoid LinkedIn cache confusion.
         scraping_url = url
-        if "v=" not in scraping_url:
-            cache_buster = int(time.time())
-            scraping_url = f"{url}&v={cache_buster}" if "?" in url else f"{url}?v={cache_buster}"
         
         print(f"📡 Sending to LinkedIn: {title[:50]}...")
         
