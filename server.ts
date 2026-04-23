@@ -83,9 +83,19 @@ app.use(async (req, res, next) => {
   const isLinkedIn = /linkedin/i.test(userAgent) || 
                      userAgent.includes('authorizedentity') || 
                      userAgent.includes('linkedinbot') ||
+                     userAgent.includes('linkedin-bot') ||
+                     userAgent.includes('authorized-entity') ||
                      userAgent.includes('apache-httpclient') ||
+                     userAgent.includes('linkedin-post-inspector') ||
                      userAgent.includes('post-inspector') ||
+                     userAgent.includes('linkedin-image-fetcher') ||
                      userAgent.includes('image-fetcher') ||
+                     userAgent.includes('linkedin-share') ||
+                     userAgent.includes('linkedin-reader') ||
+                     userAgent.includes('linkedin-media-fetcher') ||
+                     userAgent.includes('ms-office') ||
+                     userAgent.includes('office-collaboration') ||
+                     userAgent.includes('microsoft-link-preview') ||
                      xLinkedInId !== undefined;
 
   const botRegex = /\b(linkedin|google|facebook|twitter|slack|whatsapp|telegram|discord|crawler|spider|archiver|curl|wget|bot|preview|embed)\b/i;
@@ -188,7 +198,8 @@ app.use(async (req, res, next) => {
   `;
 
   // 5. BOT RESPONSE: Minimal HTML
-  if (isBot && !isRealBrowser) {
+  // CRITICAL: Ensure we don't serve HTML for the image proxy route!
+  if (isBot && !isRealBrowser && !req.path.includes('proxy-image')) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure; Max-Age=3600');
     return res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">${metaTags}</head><body><article><h1>${escapedTitle}</h1><p>${escapedDesc}</p><img src="${escapedImage}" /></article></body></html>`);
