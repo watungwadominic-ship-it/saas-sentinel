@@ -276,12 +276,12 @@ def run_news_bot():
             
             display_summary = summary_text[:200] if summary_text else ""
             
-            # v31 GHOST: New fresh path to reset infrastructure counters.
-            # Mirror Omega strategy by ending in .jpg for mimickry.
-            display_url = f"{app_url}/api/v31/share/{article_id}/preview.jpg" if article_id else app_url
+            # v32 FREQUENCY: Fresh path and sync query.
+            # Mirror mimicry with .jpg but strictly separate from binary image calls.
+            display_url = f"{app_url}/api/v32/share/{article_id}/preview.jpg" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v31)
-            scraping_url = f"{app_url}/api/v31/share/{article_id}/preview.jpg?ref=v31"
+            # Scraping URL for LinkedIn crawler (v32)
+            scraping_url = f"{app_url}/api/v32/share/{article_id}/preview.jpg?_v=32"
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
