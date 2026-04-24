@@ -276,14 +276,14 @@ def run_news_bot():
             
             display_summary = summary_text[:200] if summary_text else ""
             
-            # v41 STRATEGY: Use a specialized portal path for maximum stealth and bot rescue.
-            display_url = f"{app_url}/api/v41/news/portal/{article_id}" if article_id else app_url
+            # v42 FEED MIMICRY: Use an XML-style feed path to high-trust bypass.
+            display_url = f"{app_url}/news/feed/v42/{article_id}.xml" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v41)
-            scraping_url = f"{app_url}/api/v41/news/portal/{article_id}?ref=v41"
+            # Scraping URL for LinkedIn crawler (v42)
+            scraping_url = f"{app_url}/news/feed/v42/{article_id}.xml?ref=v42&format=rss"
             
             # Proxied image for API hint
-            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v41" if article_id else None
+            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v42" if article_id else None
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
