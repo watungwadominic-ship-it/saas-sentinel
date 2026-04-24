@@ -276,14 +276,14 @@ def run_news_bot():
             
             display_summary = summary_text[:200] if summary_text else ""
             
-            # v37 MIMICRY: Path mimicking an XML data endpoint to bypass cookie interactive traps.
-            display_url = f"{app_url}/api/v37/news/{article_id}.xml" if article_id else app_url
+            # v38 GHOST: Pure sharing path decoupled from bot classification for humans.
+            display_url = f"{app_url}/v38/share/{article_id}" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v37)
-            scraping_url = f"{app_url}/api/v37/news/{article_id}.xml?ref=v37"
+            # Scraping URL for LinkedIn crawler (v38)
+            scraping_url = f"{app_url}/v38/share/{article_id}?ref=v38"
             
             # Proxied image for API hint
-            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v37" if article_id else None
+            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v38" if article_id else None
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
