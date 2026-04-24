@@ -276,14 +276,15 @@ def run_news_bot():
             
             display_summary = summary_text[:200] if summary_text else ""
             
-            # v34 ABSOLUTE: Transparent path.
-            display_url = f"{app_url}/v34/{article_id}" if article_id else app_url
+            # v35 MIMICRY: Static-looking path to bypass cookie checks.
+            # Mirror Omega strategy by ending in .jpg for mimickry.
+            display_url = f"{app_url}/share/n/{article_id}.jpg" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v34)
-            scraping_url = f"{app_url}/v34/{article_id}?ref=v34"
+            # Scraping URL for LinkedIn crawler (v35)
+            scraping_url = f"{app_url}/share/n/{article_id}.jpg?ref=v35"
             
             # Proxied image for API hint
-            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v34" if article_id else None
+            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v35" if article_id else None
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
