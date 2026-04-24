@@ -880,12 +880,19 @@ export default function App() {
     const hasArticleId = params.get('article') || params.get('articleId') || params.get('id') || window.location.pathname.includes('/article/') || window.location.pathname.includes('/news/');
     
     if (!consent) {
+      // Check for common bot characteristics in UA to suppress UI
+      const ua = navigator.userAgent.toLowerCase();
+      const isSuspectedBot = ['bot', 'crawler', 'spider', 'linkedin', 'facebook', 'twitter', 'pingdom'].some(s => ua.includes(s));
+      
+      if (isSuspectedBot) return;
+
       // If it's a deep link, delay the consent significantly to allow reading
       if (hasArticleId) {
-        const timer = setTimeout(() => setShowCookieConsent(true), 10000); // 10 seconds delay for deep links
+        const timer = setTimeout(() => setShowCookieConsent(true), 25000); // 25 seconds delay for deep links
         return () => clearTimeout(timer);
       } else {
-        setShowCookieConsent(true);
+        const timer = setTimeout(() => setShowCookieConsent(true), 5000); // 5 seconds delay for general home page
+        return () => clearTimeout(timer);
       }
     }
   }, []);
