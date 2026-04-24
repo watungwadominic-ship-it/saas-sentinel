@@ -64,38 +64,58 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
 
 // --- CORE MIDDLEWARE START (CRITICAL ORDER) ---
 
-// 0. TOP-LEVEL BOT RESCUE (v40 Deep Stealth)
+// 0. TOP-LEVEL BOT RESCUE (v41 Direct Extraction)
 // This intercepts bots at the very first gate (the security trap)
 app.all(['/_cookie_check.html', '/cookie_check'], async (req, res, next) => {
   const userAgent = (req.headers["user-agent"] || "").toLowerCase();
-  const returnUrl = req.query.return_url as string || "";
+  const returnUrl = (req.query.return_url as string || req.query.return_path as string || "").trim();
   
-  // Powerful bot detection signatures
+  // Powerful bot detection signatures including Post-Inspector and specialized LinkedIn headers
   const isLinkedIn = userAgent.includes('linkedin') || userAgent.includes('post-inspector') || 
-                     !!req.headers['x-linkedin-id'] || !!req.headers['x-restli-protocol-version'];
+                     userAgent.includes('linkedinbot') ||
+                     !!req.headers['x-linkedin-id'] || !!req.headers['x-li-id'] || 
+                     !!req.headers['x-restli-protocol-version'];
+  
   const isGenericBot = isLinkedIn || ['bot', 'crawler', 'spider', 'whatsapp', 'slack', 'discord'].some(sig => userAgent.includes(sig));
   
   if (isGenericBot && returnUrl) {
     try {
-      // Decode return URL (handle single or double encoding)
+      // Decode return URL (handle single, double, or triple encoding)
       let decoded = returnUrl;
       try { decoded = decodeURIComponent(returnUrl); } catch(e) {}
-      try { if (decoded.includes('%')) decoded = decodeURIComponent(decoded); } catch(e) {}
+      if (decoded.includes('%')) { try { decoded = decodeURIComponent(decoded); } catch(e) {} }
+      if (decoded.includes('%')) { try { decoded = decodeURIComponent(decoded); } catch(e) {} }
       
-      console.log(`[RESCUE-V40] Bot @ Trap! UA: ${userAgent.substring(0, 40)} | Target: ${decoded}`);
+      console.log(`[RESCUE-V41] Bot @ Trap! UA: ${userAgent.substring(0, 40)} | Target: ${decoded}`);
       
-      // Match ID from any share path pattern
+      // Case 1: Target is an image
+      if (decoded.includes('/og-image.jpg') || decoded.includes('/proxy-image')) {
+        const idMatch = decoded.match(/\/static-preview\/(\d+)/i) || decoded.match(/articleId=(\d+)/i);
+        const urlMatch = decoded.match(/[?&]url=([^&]+)/i);
+        
+        if (idMatch) {
+            console.log(`[RESCUE-V41] Rescuing Image for Article ${idMatch[1]}`);
+            const { supabase } = await import("./src/services/supabase.js");
+            const { data } = await supabase.from("news_articles").select("image_url").eq("id", idMatch[1]).maybeSingle();
+            if (data?.image_url) return fetchAndSendImage(data.image_url, res, userAgent);
+        } else if (urlMatch) {
+            console.log(`[RESCUE-V41] Rescuing Proxied Image: ${urlMatch[1]}`);
+            return fetchAndSendImage(decodeURIComponent(urlMatch[1]), res, userAgent);
+        }
+      }
+
+      // Case 2: Target is an article page (Metadata Rescue)
       const idMatch = decoded.match(/\/(?:\w+)\/(\d+)/i) || 
-                      decoded.match(/[?&](?:id|article_id)=(\d+)/i);
+                      decoded.match(/[?&](?:id|article_id)=(\d+)/i) ||
+                      decoded.match(/\/(\d+)\/?$/);
       
       if (idMatch) {
-        console.log(`[RESCUE-V40] Serving Bot Metadata for ID: ${idMatch[1]}`);
-        // Set a cookie to try and bypass further traps (if the infra respects it)
+        console.log(`[RESCUE-V41] Rescuing Bot Metadata for ID: ${idMatch[1]}`);
         res.cookie('ais_bot_verified', 'true', { maxAge: 3600000, path: '/', sameSite: 'none', secure: true });
-        return serveBotMetadata(idMatch[1], req, res, "v40-trap");
+        return serveBotMetadata(idMatch[1], req, res, "v41-trap");
       }
     } catch (e) {
-      console.error("[RESCUE-V40] Rescue process failed", e);
+      console.error("[RESCUE-V41] Rescue process failed", e);
     }
   }
   next();
@@ -115,8 +135,8 @@ async function serveBotMetadata(articleId: string, req: any, res: any, version: 
       ogDesc = (article.summary || article.content || "").substring(0, 250).replace(/[\r\n\t]/gm, " ").trim();
       if (article.image_url) {
         const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-        ogImage = article.image_url.startsWith('https://') ? article.image_url : 
-                  `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?v=${version}`;
+        // Use a direct proxied URL for the OG image to ensure it resolves regardless of internal routing
+        ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?v=${version}&bot=1`;
       }
     }
   } catch (e) {
@@ -156,7 +176,7 @@ async function serveBotMetadata(articleId: string, req: any, res: any, version: 
   return res.status(200).send(html);
 }
 
-// 1. GLOBAL OG TRAFFIC CONTROL (v40)
+// 1. GLOBAL OG TRAFFIC CONTROL (v41)
 app.use(async (req, res, next) => {
   // Pass-through for assets and core APIs
   if (req.path.startsWith('/api/static-preview') || req.path.startsWith('/api/proxy-image') || req.path.startsWith('/assets/')) {
@@ -165,16 +185,18 @@ app.use(async (req, res, next) => {
 
   const userAgent = (req.headers["user-agent"] || "").toLowerCase();
   
-  // Detection Logic
-  const isBotSigs = ['linkedin', 'zentity', 'inspector', 'fetcher', 'bot', 'crawler', 'spider', 'whatsapp', 'slack', 'discord'].some(sig => userAgent.includes(sig));
+  // Detection Logic (Optimized for LinkedIn)
+  const isLinkedInBot = userAgent.includes('linkedin') || userAgent.includes('post-inspector') || userAgent.includes('linkedinbot');
   const isLinkedInHeaders = !!req.headers['x-li-id'] || !!req.headers['x-linkedin-id'] || !!req.headers['x-restli-protocol-version'];
+  
+  const isBotSigs = isLinkedInBot || ['bot', 'crawler', 'spider', 'whatsapp', 'slack', 'discord'].some(sig => userAgent.includes(sig));
   
   // Real browser detection
   const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|mobile|android|iphone|ipad)\b/i.test(userAgent) && userAgent.includes('mozilla');
   const isActuallyBot = (isBotSigs || isLinkedInHeaders) && !isRealBrowser;
 
   // Path Recognition
-  const isSharePath = req.path.includes('/news/') || req.path.includes('/share/') || req.path.includes('/portal/') || req.path.includes('/api/v40/');
+  const isSharePath = req.path.includes('/news/') || req.path.includes('/share/') || req.path.includes('/portal/') || req.path.includes('/api/v4');
 
   // HUMAN REDIRECT: Ensure humans always see the beautiful React UI
   if (isRealBrowser && isSharePath) {
@@ -189,8 +211,8 @@ app.use(async (req, res, next) => {
   if (isActuallyBot || (isSharePath && !isRealBrowser)) {
     const idMatch = req.path.match(/\/(\d+)/);
     if (idMatch) {
-      console.log(`[BOT-SERVE] Delivering metadata via ${req.path} to ${userAgent.substring(0, 30)}`);
-      return serveBotMetadata(idMatch[1], req, res, "v40-phantom");
+      console.log(`[BOT-SERVE] Delivering v41 metadata via ${req.path} to ${userAgent.substring(0, 30)}`);
+      return serveBotMetadata(idMatch[1], req, res, "v41-phantom");
     }
   }
 
