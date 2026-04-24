@@ -276,14 +276,14 @@ def run_news_bot():
             
             display_summary = summary_text[:200] if summary_text else ""
             
-            # v33 ABSOLUTE: Transparent insights path.
-            display_url = f"{app_url}/insights/{article_id}" if article_id else app_url
+            # v34 ABSOLUTE: Transparent path.
+            display_url = f"{app_url}/v34/{article_id}" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v33)
-            scraping_url = f"{app_url}/insights/{article_id}?ref=v33"
+            # Scraping URL for LinkedIn crawler (v34)
+            scraping_url = f"{app_url}/v34/{article_id}?ref=v34"
             
             # Proxied image for API hint
-            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v33" if article_id else None
+            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v34" if article_id else None
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
