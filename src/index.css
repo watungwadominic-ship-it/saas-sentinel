@@ -19,6 +19,8 @@
   --color-glass-pill: rgba(255, 255, 255, 0.3);
   --color-sunlight: rgba(255, 255, 255, 0.6);
   --color-card-hover: rgba(255, 255, 255, 0.5);
+
+  --animate-spin-slow: spin 3s linear infinite;
 }
 
 .dark {
