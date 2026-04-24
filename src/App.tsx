@@ -37,7 +37,8 @@ import {
   Gem,
   Archive,
   Clock,
-  ArrowUp
+  ArrowUp,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -500,11 +501,27 @@ function Sidebar({
 }: any) {
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-72 bg-[var(--color-sidebar-bg)] dark:bg-black/50 backdrop-blur-2xl border-r border-white/10 z-[120] hidden lg:flex flex-col p-8 shadow-2xl">
-      <div className="flex items-center gap-3 mb-12 cursor-pointer" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-        <div className="bg-accent p-2.5 rounded-xl shadow-lg shadow-accent/20">
-          <Newspaper className="w-6 h-6 text-white" />
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+          <div className="bg-accent p-2.5 rounded-xl shadow-lg shadow-accent/20">
+            <Newspaper className="w-6 h-6 text-white" />
+          </div>
+          <h1 className="text-xl font-black tracking-tight text-[var(--color-sidebar-text)]">SaaS Sentinel</h1>
         </div>
-        <h1 className="text-xl font-black tracking-tight text-[var(--color-sidebar-text)]">SaaS Sentinel</h1>
+
+        <button 
+          onClick={async (e) => {
+             const btn = e.currentTarget;
+             const original = btn.innerHTML;
+             btn.innerHTML = 'SYNCING...';
+             await fetch('/api/cron/fetch-news').catch(() => {});
+             window.location.reload();
+          }}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-900/40 hover:bg-orange-500 transition-all active:scale-95"
+        >
+          <RefreshCw className="w-4 h-4 animate-spin-slow" />
+          FORCE MARKET SYNC
+        </button>
       </div>
 
       <nav className="flex-1 space-y-2">
@@ -1195,9 +1212,28 @@ export default function App() {
             ];
           }
         }
-        setArticles(data);
+        setArticles(data.length > 0 ? data : [
+          {
+            id: 'mock-initial-1',
+            title: 'Welcome to SaaS Sentinel Market Intelligence',
+            summary: 'The database is currently initializing or experiencing a connection delay. Please use the Force Market Sync button to refresh the signal.',
+            content: 'Our high-precision scanners are active. If you see this message, the live database sync is restricted. Use the Sync button to manually trigger a fresh market sweep and bypass connection issues.',
+            category: 'Intelligence Feed',
+            date: new Date().toISOString(),
+            image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2426'
+          }
+        ]);
       } catch (error) {
         console.error("Failed to load articles", error);
+        // Emergency Mock Data if even the state setter fails or something crashes
+        setArticles([{
+          id: 'error-mock',
+          title: 'System Alert: Sync Required',
+          summary: 'Connect to live market intelligence by clicking the Sync button.',
+          content: 'Database connection failed. Please trigger a manual sync to pull real data.',
+          category: 'Intelligence Feed',
+          date: new Date().toISOString()
+        }]);
       } finally {
         setLoading(false);
       }
@@ -1325,11 +1361,26 @@ export default function App() {
                 {/* Tier 2: Brand & Navigation (Bottom Bar) */}
                 <nav className={`flex items-center justify-between gap-2 px-5 md:px-8 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isScrolled ? 'py-2' : 'py-3 md:py-4'}`}>
                   {/* Left side: Logo & Brand */}
-                  <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-                    <div className={`bg-accent rounded-xl shadow-lg transition-all duration-500 ${isScrolled ? 'p-1' : 'p-2'}`}>
-                      <Newspaper className={`${isScrolled ? 'w-3.5 h-3.5' : 'w-5 h-5 md:w-6 md:h-6'} text-white`} />
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+                      <div className={`bg-accent rounded-xl shadow-lg transition-all duration-500 ${isScrolled ? 'p-1' : 'p-2'}`}>
+                        <Newspaper className={`${isScrolled ? 'w-3.5 h-3.5' : 'w-5 h-5 md:w-6 md:h-6'} text-white`} />
+                      </div>
+                      <h1 className={`${isScrolled ? 'text-[10px]' : 'text-xs md:text-base'} font-bold tracking-tight text-text transition-all duration-500`}>SaaS Sentinel</h1>
                     </div>
-                    <h1 className={`${isScrolled ? 'text-[10px]' : 'text-xs md:text-base'} font-bold tracking-tight text-text transition-all duration-500`}>SaaS Sentinel</h1>
+                    {!isScrolled && (
+                      <button 
+                        onClick={async (e) => {
+                           const btn = e.currentTarget;
+                           btn.innerHTML = 'SYNCING...';
+                           await fetch('/api/cron/fetch-news').catch(() => {});
+                           window.location.reload();
+                        }}
+                        className="text-[8px] font-black bg-orange-600 text-white px-2 py-0.5 rounded shadow-lg animate-pulse"
+                      >
+                        SYNC FEED
+                      </button>
+                    )}
                   </div>
                   
                   {/* Center/Right: Nav Links & Sub Button */}
@@ -1579,6 +1630,21 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-12">
                 {/* News Feed */}
                 <section className="min-w-0">
+                  {/* Database Connection Alert */}
+                  {articles.length === 0 && !loading && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mb-8 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center gap-4"
+                    >
+                      <AlertCircle className="w-8 h-8 text-red-500 shrink-0" />
+                      <div>
+                        <h4 className="font-bold text-red-500 text-sm">Database Sync Limited</h4>
+                        <p className="text-xs text-text/60">Connection to Supabase is currently restricted. Please use the "Force Market Sync" button in the sidebar to refresh signal manually.</p>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* Liquid Glass Search Bar */}
                   <div className="mb-12 relative group">
                     <div className="absolute inset-0 bg-accent/5 blur-2xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
@@ -1806,9 +1872,24 @@ export default function App() {
         <footer className="border-t border-text/10 mt-20 py-12 bg-white/10 dark:bg-black/10 backdrop-blur-xl">
           <div className="max-w-6xl mx-auto px-4">
             <div className="flex flex-col md:flex-row justify-between items-center gap-12">
-              <div className="flex items-center gap-2">
-                <Newspaper className="w-6 h-6 text-accent" />
-                <span className="font-black text-xl text-text">SaaS Sentinel</span>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  <Newspaper className="w-6 h-6 text-accent" />
+                  <span className="font-black text-xl text-text">SaaS Sentinel</span>
+                </div>
+                <button 
+                  onClick={async (e) => {
+                     const btn = e.currentTarget;
+                     const original = btn.innerHTML;
+                     btn.innerHTML = '<span class="animate-spin mr-2">...</span> SYNCING';
+                     await fetch('/api/cron/fetch-news').catch(() => {});
+                     window.location.reload();
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 shadow-lg shadow-orange-900/20 transition-all active:scale-95"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Force Market Sync
+                </button>
               </div>
               
               <div className="flex gap-8 text-xs font-black text-text/30 uppercase tracking-widest">
