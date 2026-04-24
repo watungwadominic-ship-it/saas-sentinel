@@ -276,18 +276,19 @@ def run_news_bot():
             
             display_summary = summary_text[:200] if summary_text else ""
             
-            # v32 FREQUENCY: Fresh path and sync query.
-            # Mirror mimicry with .jpg but strictly separate from binary image calls.
-            display_url = f"{app_url}/api/v32/share/{article_id}/preview.jpg" if article_id else app_url
+            # v33 ABSOLUTE: Transparent insights path.
+            display_url = f"{app_url}/insights/{article_id}" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v32)
-            scraping_url = f"{app_url}/api/v32/share/{article_id}/preview.jpg?_v=32"
+            # Scraping URL for LinkedIn crawler (v33)
+            scraping_url = f"{app_url}/insights/{article_id}?ref=v33"
+            
+            # Proxied image for API hint
+            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v33" if article_id else None
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
-            # Note: We send None for image_url here because LinkedIn's API prefers to scrape the image 
-            # from the portal tags rather than receiving a raw URL in the thumbnail field.
-            post_to_linkedin(social_text, title, scraping_url, summary_text, None)
+            # V33 Strategy: Provide proxied_image as thumbnail_url hint.
+            post_to_linkedin(social_text, title, scraping_url, summary_text, proxied_image)
 
             processed_count += 1
         except Exception as e:
