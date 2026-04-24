@@ -276,14 +276,14 @@ def run_news_bot():
             
             display_summary = summary_text[:200] if summary_text else ""
             
-            # v46 STEALTH PROTOCOL: Final hardened path.
-            display_url = f"{app_url}/news/v46/article/{article_id}/index.html" if article_id else app_url
+            # v47 STEALTH PROTOCOL: Final hardened path.
+            display_url = f"{app_url}/news/v47/article/{article_id}/index.html" if article_id else app_url
             
             # scraping_url is what LinkedIn's bot actually visits.
-            scraping_url = f"{app_url}/news/v46/article/{article_id}/index.html?ref=social_v46"
+            scraping_url = f"{app_url}/news/v47/article/{article_id}/index.html?ref=social_v47"
             
             # Image hint URL
-            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?v=46" if article_id else None
+            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?v=47" if article_id else None
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
