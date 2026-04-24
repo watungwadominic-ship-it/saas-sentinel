@@ -276,14 +276,14 @@ def run_news_bot():
             
             display_summary = summary_text[:200] if summary_text else ""
             
-            # v38 GHOST: Pure sharing path decoupled from bot classification for humans.
-            display_url = f"{app_url}/v38/share/{article_id}" if article_id else app_url
+            # v39 PHANTOM: Standard news-style path to blend in with trusted content.
+            display_url = f"{app_url}/news/v39/{article_id}" if article_id else app_url
             
-            # Scraping URL for LinkedIn crawler (v38)
-            scraping_url = f"{app_url}/v38/share/{article_id}?ref=v38"
+            # Scraping URL for LinkedIn crawler (v39)
+            scraping_url = f"{app_url}/news/v39/{article_id}?ref=v39"
             
             # Proxied image for API hint
-            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v38" if article_id else None
+            proxied_image = f"{app_url}/api/static-preview/{article_id}/og-image.jpg?ref=v39" if article_id else None
         
             social_text = f"📡 SaaS Intelligence: {title}\n\n{display_summary}...\n\nRead more on SaaS Sentinel: {display_url} \n\n#SaaS #AI #MarketIntel"
             
