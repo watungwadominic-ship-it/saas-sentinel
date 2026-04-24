@@ -64,41 +64,39 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
 
 // --- CORE MIDDLEWARE START (CRITICAL ORDER) ---
 
-// 0. SUPREME BOT RESCUE (v47 Stealth Intercept)
+// 0. SUPREME BOT RESCUE (v48 Stealth Hardened)
 app.all(['/_cookie_check.html', '/cookie_check', '/security_check'], async (req, res, next) => {
   const userAgent = (req.headers["user-agent"] || "").toLowerCase();
   const returnUrl = (req.query.return_url as string || req.query.return_path as string || "").trim();
   
-  // LinkedIn specialized detection
-  const isLinkedIn = userAgent.includes('linkedin') || userAgent.includes('social-preview');
+  // High-priority LinkedIn/Social detection
+  const isLinkedIn = userAgent.includes('linkedin') || userAgent.includes('social-preview') || userAgent.includes('bot') || userAgent.includes('crawler');
+  const referer = (req.headers['referer'] || "").toLowerCase();
   
-  if (!returnUrl && !isLinkedIn) return next();
+  if (!returnUrl && !isLinkedIn && !referer.includes('linkedin')) return next();
 
   let decoded = returnUrl;
   try { if (returnUrl) decoded = decodeURIComponent(returnUrl); } catch(e) {}
   if (decoded.includes('%')) { try { decoded = decodeURIComponent(decoded); } catch(e) {} }
 
-  const isSocial = decoded.includes('/news/') || decoded.includes('/share/') || decoded.includes('/v') || decoded.includes('/article/');
-  const isBot = isLinkedIn || ['bot','crawler','spider','facebook','inspector'].some(s => userAgent.includes(s));
+  // Extract ID from anywhere possible (URL, referer, or platform context)
+  const idMatch = decoded.match(/\/(\d+)/) || 
+                  req.path.match(/\/(\d+)/) || 
+                  referer.match(/\/(\d+)/) ||
+                  decoded.match(/[?&]article_id=(\d+)/i);
 
-  if (isSocial || isBot) {
-    try {
-      console.log(`[RESCUE-V47] Intercepting Trap: ${decoded.substring(0, 50)} | UA: ${userAgent}`);
-      const idMatch = decoded.match(/\/(?:\w+\/)?(\d+)(?:\.html|\.xml|\/|\?|$)/) || decoded.match(/[?&]id=(\d+)/i) || req.headers['referer']?.match(/\/(\d+)/);
-      
-      // If we still don't have an ID, check common bot patterns
-      let articleId = idMatch ? idMatch[1] : null;
-      
-      if (articleId) {
-         if (decoded.includes('/og-image.jpg') || decoded.includes('/static-preview/')) {
-            const { supabase } = await import("./src/services/supabase.js");
-            const { data } = await supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
-            if (data?.image_url) return fetchAndSendImage(data.image_url, res, userAgent);
-         }
-         res.cookie('ais_bot_verified', 'true', { maxAge: 3600000, path: '/', sameSite: 'none', secure: true });
-         return serveBotMetadata(articleId, req, res, "v47-trap");
-      }
-    } catch (e) {}
+  if (idMatch) {
+     const articleId = idMatch[1];
+     console.log(`[RESCUE-V48] Hardened Intercept for ID: ${articleId} | Target: ${decoded.substring(0, 40)}`);
+     
+     if (decoded.includes('/og-image.jpg')) {
+        const { supabase } = await import("./src/services/supabase.js");
+        const { data } = await supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
+        if (data?.image_url) return fetchAndSendImage(data.image_url, res, userAgent);
+     }
+     
+     res.cookie('ais_bot_verified', 'true', { maxAge: 3600000, path: '/', sameSite: 'none', secure: true });
+     return serveBotMetadata(articleId, req, res, "v48-rescue");
   }
   next();
 });
@@ -123,7 +121,7 @@ async function serveBotMetadata(articleId: string, req: any, res: any, version: 
 
   const escapeHtml = (str: string) => str.replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m] || m));
   const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-  const canonicalUrl = `${cleanBase}/news/v47/article/${articleId}/index.html`;
+  const canonicalUrl = `${cleanBase}/news/v48/article/${articleId}/index.html`;
   
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>${escapeHtml(ogTitle)}</title>
@@ -166,7 +164,7 @@ app.use(async (req, res, next) => {
   // Bot rescue on any share-like path
   if (!isRealBrowser && (isSharePath || isDirectAppPath)) {
     const idMatch = req.path.match(/\/(\d+)/);
-    if (idMatch) return serveBotMetadata(idMatch[1], req, res, "v47-phantom");
+    if (idMatch) return serveBotMetadata(idMatch[1], req, res, "v48-phantom");
   }
   next();
 });
