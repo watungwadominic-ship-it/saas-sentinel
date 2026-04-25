@@ -150,14 +150,20 @@ def run_news_bot():
         last_error = "Unknown Error"
         for attempt in range(3):
             try:
-                # ... existing completion call ...
+                # Add explicit JSON framing to the system prompt
+                system_instruction = (
+                    "You are the Senior Intelligence Director at SaaS Sentinel. Your objective is to provide high-stakes strategic intelligence for institutional investors and Fortune 500 executives. "
+                    "Your tone is clinical, forward-looking, and strictly analytical. Focus exclusively on B2B SaaS, Enterprise Software, and Cloud Infrastructure. "
+                    "You MUST output raw JSON. No commentary. No markdown backticks. Just the JSON object."
+                )
+                
                 completion = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
-                    temperature=0.7, 
+                    temperature=0.3, # Lower temperature for stable JSON
                     messages=[
                         {
                             "role": "system", 
-                            "content": "You are the Senior Intelligence Director at SaaS Sentinel. Your objective is to provide high-stakes strategic intelligence for institutional investors and Fortune 500 executives. Your tone is clinical, forward-looking, and strictly analytical. Focus exclusively on B2B SaaS, Enterprise Software, and Cloud Infrastructure. Format your response into a dense, value-rich JSON object."
+                            "content": system_instruction
                         },
                         {
                             "role": "user", 
@@ -166,23 +172,34 @@ def run_news_bot():
                                 f"Market Context: {latest.get('description', '')}\n\n"
                                 "Is this relevant to B2B SaaS, Enterprise Software, Cloud Infrastructure, or significant Market Tech developments?\n"
                                 "If this is completely irrelevant (e.g., consumer lifestyle, sports, general politics), set 'is_relevant' to false.\n\n"
-                                "Required Fields:\n"
-                                "- is_relevant: true/false\n"
-                                "- feed_summary: A dense, 120-word professional dispatch for our terminal feed.\n"
-                                "- strategic_analysis: 3 paragraphs of deep-dive intelligence (Market Positioning, Competitive Shifts, Financial Implications).\n"
-                                "- revenue_breakdown: 4 bullet points on specific market or revenue impact (array of strings).\n"
-                                "- verdict: One bold, authoritative strategic conclusion.\n"
-                                "- sentinel_take: A sharp 'insider' perspective on the hidden narrative.\n"
-                                "- confidence_score: 0-100\n"
-                                "- strategic_impact: High/Medium/Low\n"
-                                "- sentiment: BULLISH/BEARISH/NEUTRAL"
+                                "Required JSON Format:\n"
+                                "{\n"
+                                "  \"is_relevant\": true,\n"
+                                "  \"feed_summary\": \"(DENSE DISPATCH - 120 words)\",\n"
+                                "  \"strategic_analysis\": [\"(Paragraph 1)\", \"(Paragraph 2)\", \"(Paragraph 3)\"],\n"
+                                "  \"revenue_breakdown\": [\"(Point 1)\", \"(Point 2)\", \"(Point 3)\", \"(Point 4)\"],\n"
+                                "  \"verdict\": \"(Authoritative Strategic Conclusion)\",\n"
+                                "  \"sentinel_take\": \"(Hidden Narrative Insight)\",\n"
+                                "  \"confidence_score\": 95,\n"
+                                "  \"strategic_impact\": \"High\",\n"
+                                "  \"sentiment\": \"BULLISH\",\n"
+                                "  \"category\": \"Market\"\n"
+                                "}"
                             )
                         }
                     ],
                     response_format={"type": "json_object"}
                 )
                 
-                ai_data_raw = json.loads(completion.choices[0].message.content)
+                content = completion.choices[0].message.content.strip()
+                # Clean up potential markdown if model ignored the instruction
+                if "```" in content:
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:].strip()
+                    content = content.strip()
+                
+                ai_data_raw = json.loads(content)
                 if ai_data_raw.get('is_relevant') is False:
                     print(f"⏭️ Skipping (Not Relevant): {title[:50]}...")
                     relevancy_skipped = True
