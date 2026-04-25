@@ -49,50 +49,6 @@ const formatDate = (dateString: string | undefined) => {
   return date.toLocaleDateString();
 };
 
-interface ErrorBoundaryProps {
-  children: React.ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: any;
-}
-
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      let message = "Something went wrong.";
-      message = this.state.error.message || message;
-
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-bg p-4 transition-colors duration-500">
-          <div className="glass-panel p-8 rounded-3xl max-w-md w-full text-center">
-            <AlertCircle className="w-12 h-12 text-accent mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-text mb-2">Application Error</h2>
-            <p className="text-text/60 mb-6">{message}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="glass-button w-full"
-            >
-              Reload Application
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 function MarketTicker() {
   const [stocks, setStocks] = useState<any[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -107,18 +63,20 @@ function MarketTicker() {
         
         if (error) throw error;
         
-        if (data && data.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
           setStocks(data);
           // Set last updated from the latest record
           const latest = data.reduce((prev, curr) => {
-            if (!prev.last_updated) return curr;
-            if (!curr.last_updated) return prev;
+            if (!prev || !prev.last_updated) return curr;
+            if (!curr || !curr.last_updated) return prev;
             return new Date(curr.last_updated) > new Date(prev.last_updated) ? curr : prev;
           }, data[0]);
           
           if (latest && latest.last_updated) {
             setLastUpdated(latest.last_updated);
           }
+        } else {
+          throw new Error("No ticker data found");
         }
       } catch (error) {
         console.error('Error fetching stocks:', error);
@@ -135,7 +93,7 @@ function MarketTicker() {
     fetchStocks();
   }, []);
 
-  if (stocks.length === 0) return null;
+  if (!Array.isArray(stocks) || stocks.length === 0) return null;
 
   return (
     <div className="relative w-full overflow-hidden group">
@@ -143,7 +101,7 @@ function MarketTicker() {
       <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-[var(--color-ticker-bg)] to-transparent z-10 pointer-events-none opacity-80" />
       <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[var(--color-ticker-bg)] to-transparent z-10 pointer-events-none opacity-80" />
       
-      {lastUpdated && (
+      {lastUpdated && !isNaN(new Date(lastUpdated).getTime()) && (
         <div className="absolute -top-4 right-2 text-[7px] font-black uppercase text-accent/60 bg-accent/5 backdrop-blur-md px-2 py-0.5 rounded-full z-20 border border-accent/10 flex items-center gap-1">
           <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
           Live • {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -151,7 +109,8 @@ function MarketTicker() {
       )}
       
       <div className="flex items-center gap-12 animate-marquee whitespace-nowrap py-2 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer">
-        {stocks.concat(stocks).concat(stocks).map((stock, i) => {
+        {(Array.isArray(stocks) ? stocks.concat(stocks).concat(stocks) : []).map((stock, i) => {
+          if (!stock) return null;
           const price = typeof stock.price === 'number' ? `$${stock.price.toFixed(2)}` : stock.price;
           const changeValue = typeof stock.change === 'number' ? stock.change : parseFloat(stock.change);
           const changeStr = typeof stock.change === 'number' ? `${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(1)}%` : stock.change;
@@ -805,7 +764,7 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
             </h3>
             
             <div className="space-y-6">
-              {article.breakdown && article.breakdown.length > 0 ? (
+              {Array.isArray(article.breakdown) && article.breakdown.length > 0 ? (
                 article.breakdown.map((point, i) => (
                   <div key={i} className="flex gap-4 group">
                     <div className="w-8 h-8 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 text-accent font-black text-xs group-hover:bg-accent group-hover:text-white transition-all">
@@ -877,7 +836,7 @@ function FeaturedInsightCard({ article, onClick }: { article: Article, onClick: 
             <div className="flex items-center gap-3 mb-4 text-[9px] font-black uppercase tracking-widest text-text/40">
               <span>{article.source}</span>
               <span>•</span>
-              <span>{new Date(article.date).toLocaleDateString()}</span>
+              <span>{formatDate(article.date)}</span>
             </div>
             
             <h2 className="text-xl md:text-2xl xl:text-3xl font-black mb-4 leading-tight text-gradient-warm line-clamp-2">
@@ -1252,8 +1211,7 @@ export default function App() {
   });
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen relative transition-colors duration-500">
+    <div className="min-h-screen relative transition-colors duration-500">
         {/* Background Gradients */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100%] h-[100%] bg-sunlight opacity-60" />
@@ -1806,6 +1764,5 @@ export default function App() {
       </div>
     </div>
   </div>
-  </ErrorBoundary>
   );
 }
