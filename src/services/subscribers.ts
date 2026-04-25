@@ -1,5 +1,5 @@
-import { supabase } from './supabase.js';
-import { Subscriber } from '../types.js';
+import { supabase } from './supabase';
+import { Subscriber } from '../types';
 
 export async function addSubscriber(email: string): Promise<{ success: boolean; error?: string; alreadyExists?: boolean }> {
   const { error } = await supabase
