@@ -19,6 +19,7 @@
     { "src": "/article/(.*)", "dest": "/server.ts" },
     { "src": "/(.*)cookie_check(.*)", "dest": "/server.ts" },
     { "src": "/(.*)return_url=(.*)", "dest": "/server.ts" },
+    { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/server.ts" }
   ]
 }
