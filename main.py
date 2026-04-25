@@ -115,10 +115,11 @@ def run_news_bot():
         print(f"❌ NewsAPI Error: {e}")
         return
 
-    # Process top 5 articles to find the most relevant ones
+    # Process top 20 articles to find the most relevant ones. 
+    # Increased depth to ensure we find fresh content when top results are already analyzed.
     processed_count = 0
-    for latest in articles[:10]:
-        if processed_count >= 3: # Limit to 3 fresh insights per run
+    for latest in articles[:20]:
+        if processed_count >= 5: # Increased to 5 fresh insights per run if available
             break
 
         title = latest['title']
@@ -133,9 +134,10 @@ def run_news_bot():
         }
         
         try:
+            # Use exact match for title. 
             check = requests.get(f"{SUPABASE_URL}/rest/v1/news_articles?title=eq.{requests.utils.quote(title)}", headers=headers)
             if check.status_code == 200 and check.json():
-                print(f"⏭️ Skipping (Already Analyzed): {title[:40]}...")
+                print(f"⏭️ Skipping (Already Analyzed): {title[:50]}...")
                 continue
         except Exception as e:
             print(f"⚠️ Duplicate check failed for: {title[:20]}")
@@ -143,6 +145,7 @@ def run_news_bot():
         print(f"\n🧠 Deep Analyzing: {title}")
         
         ai_data = None
+        relevancy_skipped = False
         for attempt in range(3):
             try:
                 completion = client.chat.completions.create(
@@ -175,19 +178,24 @@ def run_news_bot():
                     response_format={"type": "json_object"}
                 )
                 
-                ai_data = json.loads(completion.choices[0].message.content)
-                if ai_data.get('is_relevant') is False:
+                ai_data_raw = json.loads(completion.choices[0].message.content)
+                if ai_data_raw.get('is_relevant') is False:
                     print(f"⏭️ Skipping (Not Relevant): {title[:50]}...")
-                    ai_data = None
+                    relevancy_skipped = True
                     break
+                
+                ai_data = ai_data_raw
                 break 
                 
             except Exception as e:
                 print(f"⚠️ AI Attempt {attempt+1} failed: {e}")
                 time.sleep(2)
         
+        if relevancy_skipped:
+            continue
+
         if not ai_data:
-            print(f"❌ Failed to generate AI analysis for: {title}")
+            print(f"❌ AI Generation Failed for: {title}")
             continue
 
         # Clean and format the analysis content
