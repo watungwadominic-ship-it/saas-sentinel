@@ -64,9 +64,19 @@ function MarketTicker() {
         if (error) throw error;
         
         if (Array.isArray(data) && data.length > 0) {
-          setStocks(data);
+          // Deduplicate signals if the database has repeats due to failed clear-writes
+          const uniqueData: any[] = [];
+          const seen = new Set();
+          data.forEach(item => {
+            if (!seen.has(item.symbol)) {
+              uniqueData.push(item);
+              seen.add(item.symbol);
+            }
+          });
+          
+          setStocks(uniqueData);
           // Set last updated from the latest record
-          const latest = data.reduce((prev, curr) => {
+          const latest = uniqueData.reduce((prev, curr) => {
             if (!prev || !prev.last_updated) return curr;
             if (!curr || !curr.last_updated) return prev;
             return new Date(curr.last_updated) > new Date(prev.last_updated) ? curr : prev;
@@ -108,16 +118,16 @@ function MarketTicker() {
         </div>
       )}
       
-      <div className="flex items-center gap-12 animate-marquee whitespace-nowrap py-2 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer">
-        {(Array.isArray(stocks) ? stocks.concat(stocks).concat(stocks) : []).map((stock, i) => {
+      <div className="flex animate-marquee gap-12 items-center py-2 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer whitespace-nowrap overflow-hidden">
+        {(Array.isArray(stocks) ? [...stocks, ...stocks, ...stocks] : []).slice(0, 50).map((stock, i) => {
           if (!stock) return null;
           const price = typeof stock.price === 'number' ? `$${stock.price.toFixed(2)}` : stock.price;
           const changeValue = typeof stock.change === 'number' ? stock.change : parseFloat(stock.change);
           const changeStr = typeof stock.change === 'number' ? `${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(1)}%` : stock.change;
-          const isPositive = typeof changeValue === 'number' ? changeValue >= 0 : changeStr.startsWith('+');
+          const isPositive = typeof changeValue === 'number' ? changeValue >= 0 : String(changeStr).startsWith('+');
 
           return (
-            <div key={i} className="flex items-center gap-3 text-[10px] font-bold">
+            <div key={i} className="flex items-center gap-3 text-[10px] font-bold shrink-0">
               <span className="text-text">{stock.symbol}&nbsp;</span>
               <span className="text-text/60">{price}&nbsp;</span>
               <span className={isPositive ? 'text-accent' : 'text-[#d64545]'}>
