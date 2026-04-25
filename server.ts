@@ -227,10 +227,29 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 });
 
 // PRODUCTION SERVING
-if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(process.cwd(), 'dist')));
+if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+  const distPath = path.join(process.cwd(), 'dist');
+  console.log(`[SERVER] Production mode. Serving static from: ${distPath}`);
+  
+  app.use(express.static(distPath, {
+    index: false, // Don't serve index.html from here, we handle it below
+    maxAge: '1d'
+  }));
+
   app.get('*', (req, res) => {
-    res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+    // If it looks like a static asset but wasn't found, 404 instead of returning index.html
+    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|woff2?|webp)$/i)) {
+      console.log(`[SERVER] Static asset not found: ${req.path}`);
+      return res.status(404).send('Not found');
+    }
+    
+    const indexFile = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexFile)) {
+      res.sendFile(indexFile);
+    } else {
+      console.error(`[SERVER] CRITICAL: index.html not found at ${indexFile}`);
+      res.status(500).send("Build artifact missing. Please check your build step.");
+    }
   });
 } else {
   const { createServer: createViteServer } = await import("vite");
