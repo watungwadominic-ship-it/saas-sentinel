@@ -936,10 +936,11 @@ export default function App() {
     try {
       const saved = localStorage.getItem('theme');
       if (saved) return saved === 'dark';
+      return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true;
     } catch (e) {
-      console.warn("localStorage not available", e);
+      console.warn("Theme detection fallback implemented", e);
+      return true;
     }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   const [showHeader, setShowHeader] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -1068,6 +1069,7 @@ export default function App() {
       }
 
       if (articleId && articleId !== 'undefined' && articleId !== 'null') {
+        setLoading(true); // Ensure loading state is active while deep linking
         console.log(`[DEBUG-APP] Deep link detected for articleId: ${articleId}`);
         
         // If we already have articles, try to find it
