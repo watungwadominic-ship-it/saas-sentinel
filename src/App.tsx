@@ -103,10 +103,15 @@ function MarketTicker() {
         if (data && data.length > 0) {
           setStocks(data);
           // Set last updated from the latest record
-          const latest = data.reduce((prev, curr) => 
-            new Date(curr.last_updated) > new Date(prev.last_updated) ? curr : prev
-          , data[0]);
-          setLastUpdated(latest.last_updated);
+          const latest = data.reduce((prev, curr) => {
+            if (!prev.last_updated) return curr;
+            if (!curr.last_updated) return prev;
+            return new Date(curr.last_updated) > new Date(prev.last_updated) ? curr : prev;
+          }, data[0]);
+          
+          if (latest && latest.last_updated) {
+            setLastUpdated(latest.last_updated);
+          }
         }
       } catch (error) {
         console.error('Error fetching stocks:', error);
@@ -452,7 +457,7 @@ function ArchivePage({ onSelect }: { onSelect: (article: Article) => void }) {
                     <span className="text-[10px] font-bold text-accent uppercase tracking-widest">{article.category}</span>
                     <div className="flex items-center gap-2 text-text/30">
                       <Clock className="w-3 h-3" />
-                      <span className="text-[10px] font-bold">{new Date(article.date).toLocaleDateString()}</span>
+                      <span className="text-[10px] font-bold">{formatDate(article.date)}</span>
                     </div>
                   </div>
                   <h3 className="text-xl font-black text-text mb-3 group-hover:text-accent transition-colors leading-tight">
@@ -474,7 +479,7 @@ function ArchivePage({ onSelect }: { onSelect: (article: Article) => void }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[8px] font-bold text-accent uppercase tracking-widest">{article.category}</span>
-                    <span className="text-[8px] text-text/30 font-bold">• {new Date(article.date).toLocaleDateString()}</span>
+                    <span className="text-[8px] text-text/30 font-bold">• {formatDate(article.date)}</span>
                   </div>
                   <h3 className="text-sm font-black text-text truncate group-hover:text-accent transition-colors">
                     {article.title}
@@ -706,7 +711,7 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
                 <span className="text-text/80">{article.source}</span>
               </div>
               <span>•</span>
-              <span>{new Date(article.date).toLocaleDateString()}</span>
+              <span>{formatDate(article.date)}</span>
               <span>•</span>
               <a href="#" className="text-accent hover:underline flex items-center gap-1">
                 Original Source <ChevronRight className="w-3 h-3" />
@@ -915,7 +920,12 @@ export default function App() {
   });
   const [showHeader, setShowHeader] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const [isScrolled, setIsScrolled] = useState(false);
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'Recent';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Recent';
+    return date.toLocaleDateString();
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [showFabTooltip, setShowFabTooltip] = useState(false);
   const [showCookieConsent, setShowCookieConsent] = useState(false);
@@ -1521,7 +1531,7 @@ export default function App() {
                             </p>
 
                             <div className="mt-auto pt-6 border-t border-text/5 flex items-center justify-between">
-                              <span className="text-[10px] text-text/30 font-bold">{new Date(article.date).toLocaleDateString()}</span>
+                              <span className="text-[10px] text-text/30 font-bold">{formatDate(article.date)}</span>
                               <div className="text-accent font-black text-[10px] uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all">
                                 View Report <ChevronRight className="w-3 h-3" />
                               </div>
