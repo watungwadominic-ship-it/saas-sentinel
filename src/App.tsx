@@ -174,19 +174,26 @@ function MarketTicker() {
 
 function LiquidGlassSpinner() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 w-full col-span-full">
-      <div className="relative w-20 h-20">
-        <div className="absolute inset-0 border-4 border-accent/20 rounded-full" />
+    <div className="flex flex-col items-center justify-center py-32 w-full col-span-full">
+      <div className="relative w-24 h-24">
+        <div className="absolute inset-0 border-2 border-accent/10 rounded-full" />
         <motion.div 
-          className="absolute inset-0 border-4 border-t-accent rounded-full"
+          className="absolute inset-0 border-2 border-t-accent rounded-full"
           animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
         />
-        <div className="absolute inset-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 shadow-inner" />
+        <div className="absolute inset-4 bg-accent/5 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center">
+          <Activity className="w-6 h-6 text-accent animate-pulse" />
+        </div>
       </div>
-      <p className="mt-6 text-[10px] font-black text-text/40 uppercase tracking-[0.3em] animate-pulse">
-        Sourcing Intelligence...
-      </p>
+      <div className="mt-8 text-center">
+        <p className="text-[10px] font-black text-text/60 uppercase tracking-[0.4em] mb-2 animate-pulse">
+          Parsing Global SaaS Signals
+        </p>
+        <p className="text-[8px] text-text/30 font-bold uppercase tracking-widest">
+          Establishing Secure Node Connection
+        </p>
+      </div>
     </div>
   );
 }
@@ -1545,6 +1552,17 @@ export default function App() {
                             <p className="text-sm text-text/60 leading-relaxed line-clamp-3 mb-6 italic">
                               "{article.summary}"
                             </p>
+
+                            {article.verdict && (
+                              <div className="mb-6 p-4 bg-accent/5 rounded-2xl border border-accent/10">
+                                <h4 className="text-[8px] font-black text-accent uppercase tracking-widest mb-1 flex items-center gap-1">
+                                  <Zap className="w-2.5 h-2.5" /> Verdict
+                                </h4>
+                                <p className="text-xs font-bold text-text/80 line-clamp-2 leading-snug">
+                                  {article.verdict}
+                                </p>
+                              </div>
+                            )}
 
                             <div className="mt-auto pt-6 border-t border-text/5 flex items-center justify-between">
                               <span className="text-[10px] text-text/30 font-bold">{formatDate(article.date)}</span>
