@@ -151,21 +151,21 @@ def run_news_bot():
                     messages=[
                         {
                             "role": "system", 
-                            "content": "You are the Head of Research at SaaS Sentinel, providing elite market intelligence for top-tier executives and institutional investors. Your tone is analytical, precise, and authoritative. You only analyze B2B SaaS and Enterprise Software. Ignore consumer tech. Format your response as a JSON object."
+                            "content": "You are the Senior Intelligence Director at SaaS Sentinel. Your objective is to provide high-stakes strategic intelligence for institutional investors and Fortune 500 executives. Your tone is clinical, forward-looking, and strictly analytical. Focus exclusively on B2B SaaS, Enterprise Software, and Cloud Infrastructure. Format your response into a dense, value-rich JSON object."
                         },
                         {
                             "role": "user", 
                             "content": (
-                                f"News Title: {title}\n"
-                                f"Context: {latest.get('description', '')}\n\n"
-                                "Perform a high-level strategic analysis. If this is not strictly B2B/Enterprise SaaS/Cloud, set 'is_relevant' to false.\n\n"
-                                "Required JSON fields:\n"
+                                f"Analyze this development: {title}\n"
+                                f"Market Context: {latest.get('description', '')}\n\n"
+                                "If this is not tier-1 B2B/Enterprise SaaS/Cloud news, set 'is_relevant' to false.\n\n"
+                                "Required Fields:\n"
                                 "- is_relevant: true/false\n"
-                                "- feed_summary: A professional 150-word summary for the dashboard feed.\n"
-                                "- strategic_analysis: Detailed 3-paragraph executive brief.\n"
-                                "- revenue_breakdown: A list of 4 specific financial or strategic implications for the sector (as an array of strings).\n"
-                                "- verdict: A one-sentence bold strategic prediction (e.g. 'Consolidation in the sector is inevitable by Q3.').\n"
-                                "- sentinel_take: A short 'insider' opinion on the news.\n"
+                                "- feed_summary: A dense, 120-word professional dispatch for our terminal feed.\n"
+                                "- strategic_analysis: 3 paragraphs of deep-dive intelligence (Market Positioning, Competitive Shifts, Financial Implications).\n"
+                                "- revenue_breakdown: 4 bullet points on specific market or revenue impact (array of strings).\n"
+                                "- verdict: One bold, authoritative strategic conclusion.\n"
+                                "- sentinel_take: A sharp 'insider' perspective on the hidden narrative.\n"
                                 "- confidence_score: 0-100\n"
                                 "- strategic_impact: High/Medium/Low\n"
                                 "- sentiment: BULLISH/BEARISH/NEUTRAL"
@@ -241,7 +241,7 @@ def run_news_bot():
             "breakdown": ai_data.get('revenue_breakdown', []),
             "verdict": ai_data.get('verdict', ""),
             "sentinel_take": ai_data.get('sentinel_take', ""),
-            "date": datetime.now().isoformat()
+            "analysis_content": clean_analysis.strip()
         }
         
         try:
