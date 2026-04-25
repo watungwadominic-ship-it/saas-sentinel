@@ -1083,6 +1083,7 @@ export default function App() {
             setShowAbout(false);
             setShowPrivacy(false);
             setShowArchive(false);
+            setLoading(false); // Fix: set loading false after finding article
             window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
           } else {
@@ -1105,6 +1106,8 @@ export default function App() {
           }
         } catch (err) {
           console.error("Failed to fetch specific article for deep link:", err);
+        } finally {
+          setLoading(false); // Fix: ensure loading false after fetch attempt
         }
       }
     }
