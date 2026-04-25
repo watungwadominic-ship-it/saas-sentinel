@@ -1,6 +1,6 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
+import App from './App';
 import './index.css';
 
 if (typeof window !== 'undefined' && !window.process) {
@@ -8,7 +8,7 @@ if (typeof window !== 'undefined' && !window.process) {
   window.process = { env: {} };
 }
 
-import {ErrorBoundary} from './components/ErrorBoundary.tsx';
+import {ErrorBoundary} from './components/ErrorBoundary';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
