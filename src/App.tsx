@@ -118,10 +118,10 @@ function MarketTicker() {
 
           return (
             <div key={i} className="flex items-center gap-3 text-[10px] font-bold">
-              <span className="text-text">{stock.symbol}</span>
-              <span className="text-text/60">{price}</span>
+              <span className="text-text">{stock.symbol}&nbsp;</span>
+              <span className="text-text/60">{price}&nbsp;</span>
               <span className={isPositive ? 'text-accent' : 'text-[#d64545]'}>
-                {changeStr}
+                {changeStr}&nbsp;&nbsp;&nbsp;
               </span>
             </div>
           );
