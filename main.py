@@ -102,7 +102,7 @@ def run_news_bot():
         "q": search_query, 
         "from": start_date, 
         "language": "en", 
-        "sortBy": "relevancy", 
+        "sortBy": "publishedAt", 
         "apiKey": NEWS_API_KEY
     }
     
@@ -134,20 +134,23 @@ def run_news_bot():
         }
         
         try:
-            # Use exact match for title. 
-            check = requests.get(f"{SUPABASE_URL}/rest/v1/news_articles?title=eq.{requests.utils.quote(title)}", headers=headers)
+            # Better duplicate check using params
+            dup_params = {"title": f"eq.{title}"}
+            check = requests.get(f"{SUPABASE_URL}/rest/v1/news_articles", headers=headers, params=dup_params)
             if check.status_code == 200 and check.json():
                 print(f"⏭️ Skipping (Already Analyzed): {title[:50]}...")
                 continue
         except Exception as e:
-            print(f"⚠️ Duplicate check failed for: {title[:20]}")
+            print(f"⚠️ Duplicate check failed: {e}")
 
         print(f"\n🧠 Deep Analyzing: {title}")
         
         ai_data = None
         relevancy_skipped = False
+        last_error = "Unknown Error"
         for attempt in range(3):
             try:
+                # ... existing completion call ...
                 completion = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     temperature=0.7, 
@@ -161,7 +164,8 @@ def run_news_bot():
                             "content": (
                                 f"Analyze this development: {title}\n"
                                 f"Market Context: {latest.get('description', '')}\n\n"
-                                "If this is not tier-1 B2B/Enterprise SaaS/Cloud news, set 'is_relevant' to false.\n\n"
+                                "Is this relevant to B2B SaaS, Enterprise Software, Cloud Infrastructure, or significant Market Tech developments?\n"
+                                "If this is completely irrelevant (e.g., consumer lifestyle, sports, general politics), set 'is_relevant' to false.\n\n"
                                 "Required Fields:\n"
                                 "- is_relevant: true/false\n"
                                 "- feed_summary: A dense, 120-word professional dispatch for our terminal feed.\n"
@@ -188,6 +192,7 @@ def run_news_bot():
                 break 
                 
             except Exception as e:
+                last_error = str(e)
                 print(f"⚠️ AI Attempt {attempt+1} failed: {e}")
                 time.sleep(2)
         
@@ -195,7 +200,7 @@ def run_news_bot():
             continue
 
         if not ai_data:
-            print(f"❌ AI Generation Failed for: {title}")
+            print(f"❌ AI Generation Failed for: {title} | Error: {last_error}")
             continue
 
         # Clean and format the analysis content
