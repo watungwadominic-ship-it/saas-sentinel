@@ -4,11 +4,11 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from './services/supabase.js';
-import { Article } from './types.js';
-import { generateArticle, fetchTopSaaSNews, parseNewsIntoStories } from './services/gemini.js';
-import { fetchNewsArticles, saveNewsArticle, fetchArticleById } from './services/news_articles.js';
-import { addSubscriber } from './services/subscribers.js';
+import { supabase } from './services/supabase';
+import { Article } from './types';
+import { generateArticle, fetchTopSaaSNews, parseNewsIntoStories } from './services/gemini';
+import { fetchNewsArticles, saveNewsArticle, fetchArticleById } from './services/news_articles';
+import { addSubscriber } from './services/subscribers';
 import ReactMarkdown from 'react-markdown';
 import { 
   Newspaper, 
@@ -42,9 +42,17 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Error Boundary Component
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
-  constructor(props: { children: React.ReactNode }) {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
@@ -80,18 +88,25 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 function MarketTicker() {
   const [stocks, setStocks] = useState<any[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchStocks() {
       try {
         const { data, error } = await supabase
           .from('market_stocks')
-          .select('*');
+          .select('*')
+          .order('symbol', { ascending: true });
         
         if (error) throw error;
         
         if (data && data.length > 0) {
           setStocks(data);
+          // Set last updated from the latest record
+          const latest = data.reduce((prev, curr) => 
+            new Date(curr.last_updated) > new Date(prev.last_updated) ? curr : prev
+          , data[0]);
+          setLastUpdated(latest.last_updated);
         }
       } catch (error) {
         console.error('Error fetching stocks:', error);
@@ -115,6 +130,12 @@ function MarketTicker() {
       {/* Gradient Masks for Fading Effect */}
       <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-[var(--color-ticker-bg)] to-transparent z-10 pointer-events-none opacity-80" />
       <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[var(--color-ticker-bg)] to-transparent z-10 pointer-events-none opacity-80" />
+      
+      {lastUpdated && (
+        <div className="absolute -top-4 right-0 text-[8px] font-black uppercase text-accent/40 bg-[var(--color-ticker-bg)] px-2 rounded-full z-20">
+          Updated {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      )}
       
       <div className="flex items-center gap-12 animate-marquee whitespace-nowrap py-2 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer">
         {stocks.concat(stocks).concat(stocks).map((stock, i) => {
