@@ -151,21 +151,24 @@ def run_news_bot():
                     messages=[
                         {
                             "role": "system", 
-                            "content": "You are a strict SaaS Intelligence Agent. You only analyze B2B SaaS, Cloud infrastructure, and Enterprise Tech news. Ignore consumer tech, entertainment, or general economy unless it directly impacts the B2B tech sector. Return ONLY a valid JSON object."
+                            "content": "You are the Head of Research at SaaS Sentinel, providing elite market intelligence for top-tier executives and institutional investors. Your tone is analytical, precise, and authoritative. You only analyze B2B SaaS and Enterprise Software. Ignore consumer tech. Format your response as a JSON object."
                         },
                         {
                             "role": "user", 
                             "content": (
                                 f"News Title: {title}\n"
                                 f"Context: {latest.get('description', '')}\n\n"
-                                "If this news is NOT about B2B SaaS, Enterprise Software, or Cloud Infrastructure, set 'is_relevant' to false.\n\n"
-                                f"Return JSON with these keys: "
-                                f"'is_relevant' (boolean), "
-                                f"'feed_summary' (string, 100 words), "
-                                f"'strategic_analysis' (string, 3 paragraphs), "
-                                f"'confidence_score' (integer, 0-100), "
-                                f"'strategic_impact' (string, High/Medium/Low), "
-                                f"'sentiment' (string, BULLISH/BEARISH/NEUTRAL)."
+                                "Perform a high-level strategic analysis. If this is not strictly B2B/Enterprise SaaS/Cloud, set 'is_relevant' to false.\n\n"
+                                "Required JSON fields:\n"
+                                "- is_relevant: true/false\n"
+                                "- feed_summary: A professional 150-word summary for the dashboard feed.\n"
+                                "- strategic_analysis: Detailed 3-paragraph executive brief.\n"
+                                "- revenue_breakdown: A list of 4 specific financial or strategic implications for the sector (as an array of strings).\n"
+                                "- verdict: A one-sentence bold strategic prediction (e.g. 'Consolidation in the sector is inevitable by Q3.').\n"
+                                "- sentinel_take: A short 'insider' opinion on the news.\n"
+                                "- confidence_score: 0-100\n"
+                                "- strategic_impact: High/Medium/Low\n"
+                                "- sentiment: BULLISH/BEARISH/NEUTRAL"
                             )
                         }
                     ],
@@ -194,12 +197,9 @@ def run_news_bot():
             if isinstance(text_data, list):
                 return " ".join([str(i) for i in text_data])
             if isinstance(text_data, dict):
-                # If it's a dict, it might be the whole AI response or a nested field
-                # Try to find a string value within it
                 for key in ['feed_summary', 'strategic_analysis', 'summary', 'content', 'text', 'analysis']:
                     if key in text_data and text_data[key]:
                         return str(text_data[key])
-                # Fallback: join all values
                 return "\n\n".join([str(v) for v in text_data.values()])
             return str(text_data)
 
@@ -207,11 +207,8 @@ def run_news_bot():
         summary_text = clean_ai_text(ai_data.get('feed_summary', ""))
         
         # 4. Save to Supabase
-        # Mapping the AI fields to the database schema
-        # Ensure image URL is absolute and has proper dimensions
         image_url = latest.get('urlToImage')
         if not image_url:
-            # Better fallback with proper dimensions for social media
             image_url = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630"
         
         source_url = latest.get('url', '')
@@ -225,10 +222,8 @@ def run_news_bot():
                     from urllib.parse import urljoin
                     image_url = urljoin(source_url, image_url)
                 if not image_url.startswith('http'):
-                    # Last fallback if still not absolute
                     image_url = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630"
 
-        # If it's an Unsplash URL, ensure it has the right dimensions
         if "unsplash.com" in image_url and ("w=" not in image_url or "h=" not in image_url):
             base_img = image_url.split('?')[0]
             image_url = f"{base_img}?auto=format&fit=crop&q=80&w=1200&h=630"
@@ -237,13 +232,16 @@ def run_news_bot():
             "title": title,
             "summary": summary_text.strip(),
             "content": clean_analysis.strip(),
-            "analysis_content": clean_analysis.strip(),
             "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": image_url,
             "source_url": source_url,
             "published_at": latest.get('publishedAt') or datetime.now().isoformat(),
             "confidence_score": ai_data.get('confidence_score', 95),
-            "strategic_impact": ai_data.get('strategic_impact', 'High')
+            "strategic_impact": ai_data.get('strategic_impact', 'High'),
+            "breakdown": ai_data.get('revenue_breakdown', []),
+            "verdict": ai_data.get('verdict', ""),
+            "sentinel_take": ai_data.get('sentinel_take', ""),
+            "date": datetime.now().isoformat()
         }
         
         try:
