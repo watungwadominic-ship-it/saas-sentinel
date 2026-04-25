@@ -42,6 +42,13 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+const formatDate = (dateString: string | undefined) => {
+  if (!dateString) return 'Recent';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Recent';
+  return date.toLocaleDateString();
+};
+
 interface ErrorBoundaryProps {
   children: React.ReactNode;
 }
@@ -137,8 +144,9 @@ function MarketTicker() {
       <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[var(--color-ticker-bg)] to-transparent z-10 pointer-events-none opacity-80" />
       
       {lastUpdated && (
-        <div className="absolute -top-4 right-0 text-[8px] font-black uppercase text-accent/40 bg-[var(--color-ticker-bg)] px-2 rounded-full z-20">
-          Updated {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div className="absolute -top-4 right-2 text-[7px] font-black uppercase text-accent/60 bg-accent/5 backdrop-blur-md px-2 py-0.5 rounded-full z-20 border border-accent/10 flex items-center gap-1">
+          <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
+          Live • {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
       
@@ -605,9 +613,8 @@ function AnalysisImage({ src, alt, className = "", rounded = "rounded-[2.5rem]" 
     if (!url) return fallbackImage;
     if (url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co')) return url;
     
-    // Add cache buster and force_bot=true to help bypass some intermediary caches
-    const cacheBuster = Date.now();
-    return `/api/proxy-image?url=${encodeURIComponent(url)}&v=${cacheBuster}&force_bot=true&ls=1&_bot=1`;
+    // Remove cache buster to allow browser caching
+    return `/api/proxy-image?url=${encodeURIComponent(url)}&force_bot=true&ls=1&_bot=1`;
   };
 
   const imageUrl = error || !src ? fallbackImage : getProxiedUrl(src);
@@ -803,7 +810,11 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
                   </div>
                 ))
               ) : (
-                <p className="italic text-text/40 text-center py-4">Context loading...</p>
+                <div className="py-8 px-4 text-center space-y-4">
+                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-accent/20 border-t-accent animate-spin mx-auto opacity-40" />
+                  <p className="text-xs font-black text-text/40 uppercase tracking-widest">Generating Strategic Intelligence</p>
+                  <p className="text-[10px] text-text/20 font-medium px-4">Our AI Sentinel is parsing real-time financial data to extract deep market implications.</p>
+                </div>
               )}
             </div>
           </div>
@@ -816,7 +827,12 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
             </div>
             <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
               <span className="text-xs font-bold text-text/60">Sentiment</span>
-              <span className="text-xs font-black text-emerald-500 uppercase tracking-widest">Bullish</span>
+              <span className={`text-xs font-black uppercase tracking-widest ${
+                (article.category || '').toUpperCase() === 'BULLISH' ? 'text-emerald-500' : 
+                (article.category || '').toUpperCase() === 'BEARISH' ? 'text-rose-500' : 'text-amber-500'
+              }`}>
+                {article.category || 'Bullish'}
+              </span>
             </div>
           </div>
         </aside>
@@ -920,12 +936,7 @@ export default function App() {
   });
   const [showHeader, setShowHeader] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return 'Recent';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Recent';
-    return date.toLocaleDateString();
-  };
+  const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFabTooltip, setShowFabTooltip] = useState(false);
   const [showCookieConsent, setShowCookieConsent] = useState(false);
@@ -1502,15 +1513,20 @@ export default function App() {
                           className="group glass-card cursor-pointer flex flex-col h-full transition-all duration-500 hover:shadow-2xl hover:shadow-accent/5"
                           onClick={() => setSelectedArticle(article)}
                         >
-                          <div className="relative aspect-video overflow-hidden rounded-2xl mb-6">
+                          <div className="relative aspect-video overflow-hidden rounded-2xl mb-6 bg-slate-900 shadow-inner">
                             <AnalysisImage 
                               src={article.image_url} 
                               alt={article.title} 
                               rounded="rounded-none"
-                              className="!border-none !shadow-none"
+                              className="!border-none !shadow-none group-hover:scale-105 transition-transform duration-700"
                             />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                             <div className="absolute top-3 left-3 flex gap-2 z-20">
-                              <span className="text-[10px] font-bold bg-white/60 dark:bg-black/60 text-text px-3 py-1.5 rounded-full uppercase tracking-widest border border-white/20 backdrop-blur-md shadow-sm">
+                              <span className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border backdrop-blur-md shadow-sm ${
+                                (article.category || '').toUpperCase() === 'BEARISH' ? 'bg-rose-500/20 text-rose-500 border-rose-500/30' :
+                                (article.category || '').toUpperCase() === 'BULLISH' ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' :
+                                'bg-white/60 dark:bg-black/60 text-text border-white/20'
+                              }`}>
                                 {article.category === 'Analysis' ? 'AI Update' : article.category}
                               </span>
                             </div>
