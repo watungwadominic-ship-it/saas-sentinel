@@ -32,6 +32,25 @@ export async function fetchNewsArticles(categories?: string[]): Promise<Article[
     // Fallback for content
     const content = row.content || row.analysis_content || '';
 
+    // Handle verdict and sentinel_take if they are embedded in content
+    let verdict = row.verdict;
+    let sentinel_take = row.sentinel_take;
+
+    if (!verdict && content.includes('**Strategic Verdict:**')) {
+      const parts = content.split('**Strategic Verdict:**');
+      if (parts.length > 1) {
+        const afterVerdict = parts[1].split('**Sentinel\'s Take:**')[0].trim();
+        verdict = afterVerdict;
+      }
+    }
+
+    if (!sentinel_take && content.includes('**Sentinel\'s Take:**')) {
+      const parts = content.split('**Sentinel\'s Take:**');
+      if (parts.length > 1) {
+        sentinel_take = parts[1].trim();
+      }
+    }
+
     return {
       id: row.id,
       title: row.title,
@@ -43,8 +62,8 @@ export async function fetchNewsArticles(categories?: string[]): Promise<Article[
       source: row.source || 'SaaS Sentinel',
       image_url: row.image_url,
       breakdown: row.breakdown,
-      sentinel_take: row.sentinel_take,
-      verdict: row.verdict
+      sentinel_take: sentinel_take,
+      verdict: verdict
     };
   });
 }
@@ -133,6 +152,25 @@ export async function fetchArticleById(id: string): Promise<Article | null> {
     // Fallback for content
     const content = row.content || row.analysis_content || '';
 
+    // Handle verdict and sentinel_take if they are embedded in content
+    let verdict = row.verdict;
+    let sentinel_take = row.sentinel_take;
+
+    if (!verdict && content.includes('**Strategic Verdict:**')) {
+      const parts = content.split('**Strategic Verdict:**');
+      if (parts.length > 1) {
+        const afterVerdict = parts[1].split('**Sentinel\'s Take:**')[0].trim();
+        verdict = afterVerdict;
+      }
+    }
+
+    if (!sentinel_take && content.includes('**Sentinel\'s Take:**')) {
+      const parts = content.split('**Sentinel\'s Take:**');
+      if (parts.length > 1) {
+        sentinel_take = parts[1].trim();
+      }
+    }
+
     return {
       id: row.id,
       title: row.title,
@@ -144,8 +182,8 @@ export async function fetchArticleById(id: string): Promise<Article | null> {
       source: row.source || 'SaaS Sentinel',
       image_url: row.image_url,
       breakdown: row.breakdown,
-      sentinel_take: row.sentinel_take,
-      verdict: row.verdict
+      sentinel_take: sentinel_take,
+      verdict: verdict
     };
   } catch (err: any) {
     console.error(`[DEBUG] Unexpected error in fetchArticleById for id ${id}:`, err.message || err);
