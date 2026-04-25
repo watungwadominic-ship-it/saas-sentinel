@@ -228,7 +228,7 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 
 // PRODUCTION SERVING
 if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-  const distPath = path.join(process.cwd(), 'dist');
+  const distPath = path.join(__dirname, 'dist');
   console.log(`[SERVER] Production mode. Serving static from: ${distPath}`);
   
   app.use(express.static(distPath, {
