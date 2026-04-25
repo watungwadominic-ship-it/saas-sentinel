@@ -8,7 +8,7 @@ if (typeof window !== 'undefined' && !window.process) {
   window.process = { env: {} };
 }
 
-import {ErrorBoundary} from './components/ErrorBoundary';
+import {ErrorBoundary} from './components/ErrorBoundary.tsx';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
