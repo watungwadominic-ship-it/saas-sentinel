@@ -1766,3 +1766,28 @@ export default function App() {
   </div>
   );
 }
+
+// Global Error Boundary
+export class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean; error: any}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#d6d3cb] p-4 text-center">
+          <div className="bg-white/40 backdrop-blur-xl p-8 rounded-3xl border border-white/20 max-w-md shadow-2xl">
+            <h2 className="text-xl font-bold mb-2">Platform Restart Required</h2>
+            <p className="opacity-70 mb-6">{this.state.error?.message || "Critical interface failure detected."}</p>
+            <button onClick={() => window.location.reload()} className="bg-[#f08924] text-white px-6 py-2 rounded-xl font-bold w-full">
+              Reinitialize Terminal
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
