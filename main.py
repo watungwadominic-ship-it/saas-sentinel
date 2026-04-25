@@ -231,7 +231,7 @@ def run_news_bot():
         payload = {
             "title": title,
             "summary": summary_text.strip(),
-            "content": clean_analysis.strip(),
+            "content": f"{clean_analysis.strip()}\n\n**Strategic Verdict:** {ai_data.get('verdict', 'N/A')}\n\n**Sentinel's Take:** {ai_data.get('sentinel_take', 'N/A')}",
             "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": image_url,
             "source_url": source_url,
@@ -239,9 +239,7 @@ def run_news_bot():
             "confidence_score": ai_data.get('confidence_score', 95),
             "strategic_impact": ai_data.get('strategic_impact', 'High'),
             "breakdown": ai_data.get('revenue_breakdown', []),
-            "verdict": ai_data.get('verdict', ""),
-            "sentinel_take": ai_data.get('sentinel_take', ""),
-            "analysis_content": clean_analysis.strip()
+            "analysis_content": f"{clean_analysis.strip()}\n\n**Strategic Verdict:** {ai_data.get('verdict', 'N/A')}\n\n**Sentinel's Take:** {ai_data.get('sentinel_take', 'N/A')}"
         }
         
         try:
