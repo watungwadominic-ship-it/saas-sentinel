@@ -485,8 +485,7 @@ function ArchivePage({ onSelect }: { onSelect: (article: Article) => void }) {
 }
 
 function Sidebar({ 
-  activeTab, 
-  setActiveTab, 
+  selectedArticle,
   setSelectedArticle, 
   setShowPrivacy, 
   setShowAbout, 
@@ -499,45 +498,25 @@ function Sidebar({
   user,
   handleLogout
 }: any) {
+
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-72 bg-[var(--color-sidebar-bg)] dark:bg-black/50 backdrop-blur-2xl border-r border-white/10 z-[120] hidden lg:flex flex-col p-8 shadow-2xl">
-      <div className="flex flex-col gap-4 mb-8">
+      <div className="flex flex-col gap-4 mb-12">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
           <div className="bg-accent p-2.5 rounded-xl shadow-lg shadow-accent/20">
             <Newspaper className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-xl font-black tracking-tight text-[var(--color-sidebar-text)]">SaaS Sentinel</h1>
+          <h1 className="text-xl font-black tracking-tight text-[var(--color-sidebar-text)] uppercase">SaaS Sentinel</h1>
         </div>
-
-        <button 
-          onClick={async (e) => {
-             const btn = e.currentTarget;
-             const original = btn.innerHTML;
-             btn.innerHTML = 'SYNCING...';
-             await fetch('/api/cron/fetch-news').catch(() => {});
-             window.location.reload();
-          }}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-900/40 hover:bg-orange-500 transition-all active:scale-95"
-        >
-          <RefreshCw className="w-4 h-4 animate-spin-slow" />
-          FORCE MARKET SYNC
-        </button>
       </div>
 
       <nav className="flex-1 space-y-2">
         <button 
-          onClick={() => { setActiveTab('Intelligence Feed'); setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); }}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${activeTab === 'Intelligence Feed' && !showAbout && !showPrivacy && !showArchive ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
+          onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); }}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${!selectedArticle && !showAbout && !showPrivacy && !showArchive ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
         >
           <Activity className="w-5 h-5" />
           Feed
-        </button>
-        <button 
-          onClick={() => { setActiveTab('Market Analysis'); setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); }}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${activeTab === 'Market Analysis' && !showAbout && !showPrivacy && !showArchive ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
-        >
-          <TrendingUp className="w-5 h-5" />
-          Analysis
         </button>
         <button 
           onClick={() => { setShowArchive(true); setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); }}
@@ -654,15 +633,29 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
         className="glass-button !inline-flex !w-auto !px-6 !py-3 mb-8 text-text/60 font-bold text-xs uppercase tracking-widest hover:!bg-white/10 transition-all"
       >
         <ChevronRight className="w-4 h-4 rotate-180" />
-        Back to analysis
+        Back to intelligence
       </button>
 
       {/* Analysis Hero Image */}
       <div className="mb-12">
-        <AnalysisImage 
-          src={article.image_url} 
-          alt={article.title} 
-        />
+        {article.image_url ? (
+          <AnalysisImage 
+            src={article.image_url} 
+            alt={article.title} 
+          />
+        ) : (
+          <div className="w-full aspect-[21/9] rounded-[3rem] bg-gradient-to-br from-accent/20 via-black/40 to-accent/5 border border-accent/20 flex flex-col items-center justify-center p-12 text-center shadow-2xl relative overflow-hidden group">
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+            <Newspaper className="w-20 h-20 text-accent mb-6 animate-pulse" />
+            <h2 className="text-3xl font-black text-white/40 uppercase tracking-[0.5em] group-hover:tracking-[0.8em] transition-all duration-1000">
+              Intelligence Briefing
+            </h2>
+            <div className="absolute bottom-8 left-8 right-8 flex justify-between items-center opacity-30">
+              <span className="text-[10px] font-black uppercase tracking-widest leading-none">Status: Decrypted</span>
+              <span className="text-[10px] font-black uppercase tracking-widest leading-none">Security Level: Elite</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col xl:flex-row gap-12 items-start">
@@ -711,7 +704,7 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
                 <div className="relative z-10">
                   <h3 className="text-[10px] font-black text-accent uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
                     <Zap className="w-4 h-4" />
-                    The Sentinel's Take
+                    EXECUTIVE ANALYSIS
                   </h3>
                   
                   <div className="prose prose-xl prose-slate dark:prose-invert max-w-none text-text/90 leading-[1.8] font-medium">
@@ -733,15 +726,33 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
           </section>
 
           {/* The Verdict (Prediction) */}
-          <section>
+          <section className="mb-12">
             <div className="p-8 md:p-12 glass-card border-white/20 bg-gradient-to-br from-accent/10 to-transparent rounded-[2.5rem] text-center">
               <h3 className="text-[10px] font-black text-text/40 uppercase tracking-[0.3em] mb-6">
-                The Verdict
+                STRATEGIC OUTLOOK
               </h3>
               <p className="text-2xl md:text-4xl font-black text-text leading-tight tracking-tight">
                 {article.verdict || "Market volatility expected as structural shifts continue."}
               </p>
             </div>
+          </section>
+
+          {/* Social Share / Integration Section */}
+          <section className="flex flex-wrap gap-4 pt-12 border-t border-text/10">
+            <button 
+              onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`, '_blank')}
+              className="flex items-center gap-3 px-6 py-3 bg-[#0077b5] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-lg"
+            >
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+              Share on LinkedIn
+            </button>
+            <button 
+              onClick={() => window.open(`https://threads.net/intent/post?text=${encodeURIComponent(article.title + ' - SaaS Intelligence Breakdown via @SaaSSentinel')}`, '_blank')}
+              className="flex items-center gap-3 px-6 py-3 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-lg"
+            >
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 192 192"><path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.834C118.497 71.7915 120.315 75.82 121.411 80.7937C110.82 80.5962 98.7188 80.8999 87.0544 84.7725C74.6041 89.288 64.8878 98.0581 61.7042 109.525C59.9886 115.704 60.3341 122.753 64.2952 128.729C68.3267 134.811 75.334 139.117 84.0538 140.85C87.6201 141.558 91.3113 141.916 95.0211 141.916C105.105 141.916 115.011 138.838 122.062 133.053C126.746 129.213 130.402 124.321 132.553 118.6L143.193 124.623C139.805 133.642 133.4 141.523 126.16 146.997C117.151 153.801 106.104 157.067 95.0211 157.067C90.2223 157.067 85.4526 156.611 80.8415 155.698C68.1009 153.167 57.018 146.983 49.3248 138.355C41.8329 129.93 38.6534 118.727 40.3813 106.772C44.1522 89.6015 56.6433 76.5415 72.8427 68.6186C80.2078 65.018 88.5298 63.1513 97.2662 63.1513C104.97 63.1513 112.593 64.4447 119.576 67.019C128.691 70.384 135.539 76.8407 139.691 85.945C140.334 86.9536 140.947 87.969 141.537 88.9883ZM118.156 122.972C113.626 126.68 106.31 129.624 95.0211 129.624C92.6587 129.624 90.3129 129.408 88.0163 128.95C82.7846 127.904 78.5085 125.132 76.0125 121.139C74.3414 118.461 74.3828 115.111 75.3195 111.737C77.3005 104.593 84.1444 98.4239 94.671 94.6033C104.606 91.31 114.717 91.0776 123.634 91.8023C122.259 104.184 118.156 122.972z"/></svg>
+              Share on Threads
+            </button>
           </section>
         </div>
 
@@ -749,7 +760,7 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
         <aside className="w-full xl:w-[40%] xl:sticky xl:top-32 space-y-8">
           <div className="glass-panel p-8 rounded-[2.5rem] border-white/10">
             <h3 className="text-[10px] font-black text-text/40 uppercase tracking-[0.3em] mb-8 flex items-center gap-4">
-              Quick Context
+              REVENUE IMPLICATIONS
               <div className="h-px flex-1 bg-text/10" />
             </h3>
             
@@ -865,7 +876,6 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [activeTab, setActiveTab] = useState<'Intelligence Feed' | 'Market Analysis'>('Intelligence Feed');
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
@@ -873,10 +883,13 @@ export default function App() {
   const [subscribeSuccess, setSubscribeSuccess] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
-  const isGenerating = useRef(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved) return saved === 'dark';
+    try {
+      const saved = localStorage.getItem('theme');
+      if (saved) return saved === 'dark';
+    } catch (e) {
+      console.warn("localStorage not available", e);
+    }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   const [showHeader, setShowHeader] = useState(true);
@@ -973,97 +986,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Auto-Sync / Background Generation
-  useEffect(() => {
-    async function checkAndGenerate() {
-      try {
-        const { data, error } = await supabase
-          .from('news_articles')
-          .select('created_at')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (error) {
-          console.error("Error checking latest article:", error);
-          return;
-        }
-
-        const now = new Date();
-        const lastPostDate = data ? new Date(data.created_at) : null;
-        const hoursSinceLastPost = lastPostDate ? (now.getTime() - lastPostDate.getTime()) / (1000 * 60 * 60) : Infinity;
-
-        if (!data || hoursSinceLastPost >= 24) {
-          console.log("Feed is empty or stale. Triggering auto-generation...");
-          await triggerAutoGeneration();
-        }
-      } catch (err) {
-        console.error("Auto-sync failed:", err);
-      }
-    }
-
-    if (!loading) {
-      checkAndGenerate();
-    }
-  }, [loading]);
-
-  const triggerAutoGeneration = async () => {
-    if (isGenerating.current) {
-      console.log("Auto-generation already in progress. Skipping...");
-      return;
-    }
-
-    const lastGenTime = localStorage.getItem('last_news_generation');
-    const now = Date.now();
-    if (lastGenTime && now - parseInt(lastGenTime) < 5 * 60 * 1000) {
-      console.log("Auto-generation cooldown active (5 min). Skipping...");
-      return;
-    }
-
-    isGenerating.current = true;
-    localStorage.setItem('last_news_generation', now.toString());
-
-    try {
-      // 1. Fetch top news
-      const context = articles.slice(0, 3).map(a => `${a.title}: ${a.summary}`).join('\n');
-      const rawNews = await fetchTopSaaSNews(context);
-      // 2. Parse into stories
-      const stories = await parseNewsIntoStories(rawNews);
-      // 3. Generate and save top 3 to match LinkedIn quantity
-      const topStories = stories.slice(0, 3);
-      
-      for (const story of topStories) {
-        // Add a 30-second delay between articles to respect free tier rate limits (2 RPM for Pro)
-        if (topStories.indexOf(story) > 0) {
-          console.log("Waiting 30s before next generation to avoid rate limits...");
-          await sleep(30000);
-        }
-
-        const result = await generateArticle(story.title, story.snippet);
-        await saveNewsArticle({
-          title: result.title,
-          content: result.content || "Analysis pending.",
-          summary: story.snippet,
-          category: result.category || "Intelligence Feed",
-          readTime: "5 min read",
-          source: "SaaS Sentinel AI",
-          breakdown: result.breakdown,
-          sentinel_take: result.sentinel_take,
-          verdict: result.verdict
-        });
-      }
-      
-      // Refresh articles
-      const data = await fetchNewsArticles();
-      setArticles(data);
-      console.log('PRIVATE KEY ACTIVE');
-    } catch (error) {
-      console.error("Auto-generation failed:", error);
-    } finally {
-      isGenerating.current = false;
-    }
-  };
-
   // Deep Linking Logic
   useEffect(() => {
     async function handleDeepLink() {
@@ -1105,13 +1027,7 @@ export default function App() {
           if (found) {
             console.log(`[DEBUG-APP] Found article in current list: ${found.title}`);
             
-            // Switch tab if needed to show the best view
-            if (found.category === 'Analysis' || found.category === 'Market' || found.sentinel_take || (found.breakdown && found.breakdown.length > 0)) {
-              setActiveTab('Market Analysis');
-            } else {
-              setActiveTab('Intelligence Feed');
-            }
-            
+            // Switch tab logic removed - merged views
             setSelectedArticle(found);
             setShowAbout(false);
             setShowPrivacy(false);
@@ -1129,13 +1045,7 @@ export default function App() {
           if (article) {
             console.log(`[DEBUG-APP] Fetched article for deep link: ${article.title}`);
             
-            // Switch tab if needed to show the best view
-            if (article.category === 'Analysis' || article.category === 'Market' || article.sentinel_take || (article.breakdown && article.breakdown.length > 0)) {
-              setActiveTab('Market Analysis');
-            } else {
-              setActiveTab('Intelligence Feed');
-            }
-            
+            // Switch tab logic removed - merged views
             setSelectedArticle(article);
             setShowAbout(false);
             setShowPrivacy(false);
@@ -1165,81 +1075,57 @@ export default function App() {
     async function loadArticles() {
       setLoading(true);
       try {
-        let data: Article[] = [];
-        if (activeTab === 'Intelligence Feed') {
-          // Fetch all rows
-          data = await fetchNewsArticles();
+        // Fetch all rows from database
+        const data = await fetchNewsArticles();
+        
+        if (data && data.length > 0) {
+          setArticles(data);
         } else {
-          // Fetch only 'Analysis' or 'Market'
-          data = await fetchNewsArticles(['Analysis', 'Market']);
-          
-          // Fallback to mock data if empty
-          if (data.length === 0) {
-            data = [
-              {
-                id: 'mock-1',
-                title: 'The 2026 SaaS Multiples Report: Why Efficiency is the New Growth',
-                content: 'In 2026, the market has shifted its focus from "growth at all costs" to "efficient growth." This report analyzes the top 50 SaaS companies and their Rule of 40 performance. We find that companies with a 20%+ free cash flow margin are trading at a 30% premium compared to those with higher growth but negative margins. The era of cheap capital is over, and the era of the "SaaS Cash Machine" has begun.',
-                summary: 'An analysis of 2026 SaaS valuation multiples showing a 30% premium for high-margin efficiency over pure growth.',
-                category: 'Market',
-                date: new Date().toISOString(),
-                readTime: '8 min read',
-                source: 'SaaS Sentinel Analysis',
-                image_url: 'https://images.unsplash.com/photo-1551288049-bbda38a5f9a2?auto=format&fit=crop&q=80&w=2426'
-              },
-              {
-                id: 'mock-2',
-                title: 'M&A Heatmap: Salesforce vs. Microsoft in the Battle for Agentic AI',
-                content: 'The battle for the enterprise desktop has moved to the background. Salesforce and Microsoft are aggressively acquiring startups in the "Agentic AI" space—autonomous software that can execute tasks without human intervention. This heatmap shows the recent acquisitions and the strategic gaps remaining in both ecosystems. Salesforce is winning in CRM-specific agents, while Microsoft dominates the horizontal productivity layer.',
-                summary: 'A strategic comparison of Salesforce and Microsoft acquisitions in the autonomous AI agent space.',
-                category: 'Analysis',
-                date: new Date().toISOString(),
-                readTime: '12 min read',
-                source: 'SaaS Sentinel Analysis',
-                image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2426'
-              },
-              {
-                id: 'mock-3',
-                title: 'Vertical SaaS Deep Dive: Why Logistics is the Next $100B Opportunity',
-                content: 'While horizontal SaaS is becoming saturated, vertical SaaS continues to find massive untapped markets. Logistics, specifically mid-market freight forwarding, remains one of the most fragmented and technologically underserved industries. This deep dive explores the unit economics of the three leading startups in this space and why we expect a major IPO in Q4 2026.',
-                summary: 'Deep dive into the logistics vertical SaaS market and why it is poised for a $100B valuation breakout.',
-                category: 'Market',
-                date: new Date().toISOString(),
-                readTime: '10 min read',
-                source: 'SaaS Sentinel Analysis',
-                image_url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=2426'
-              }
-            ];
-          }
+          // Fallback to high-quality mock data if database is truly empty
+          setArticles([
+            {
+              id: 'mock-1',
+              title: 'The 2026 SaaS Multiples Report: Why Efficiency is the New Growth',
+              content: 'In 2026, the market has shifted its focus from "growth at all costs" to "efficient growth." This report analyzes the top 50 SaaS companies and their Rule of 40 performance. We find that companies with a 20%+ free cash flow margin are trading at a 30% premium compared to those with higher growth but negative margins. The era of cheap capital is over, and the era of the "SaaS Cash Machine" has begun.',
+              summary: 'An analysis of 2026 SaaS valuation multiples showing a 30% premium for high-margin efficiency over pure growth.',
+              category: 'Market Intelligence',
+              date: new Date().toISOString(),
+              readTime: '8 min read',
+              source: 'SaaS Sentinel Analysis',
+              image_url: 'https://images.unsplash.com/photo-1551288049-bbda38a5f9a2?auto=format&fit=crop&q=80&w=2426'
+            },
+            {
+              id: 'mock-initial-1',
+              title: 'System Initializing',
+              summary: 'Connecting to live market intelligence streams. If data does not appear shortly, please verify database credentials.',
+              content: 'Our high-precision scanners are active. We are currently establishing a heartbeat connection to the primary SaaS database.',
+              category: 'System',
+              date: new Date().toISOString(),
+              readTime: '1 min read',
+              source: 'System',
+              image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2426'
+            }
+          ]);
         }
-        setArticles(data.length > 0 ? data : [
-          {
-            id: 'mock-initial-1',
-            title: 'Welcome to SaaS Sentinel Market Intelligence',
-            summary: 'The database is currently initializing or experiencing a connection delay. Please use the Force Market Sync button to refresh the signal.',
-            content: 'Our high-precision scanners are active. If you see this message, the live database sync is restricted. Use the Sync button to manually trigger a fresh market sweep and bypass connection issues.',
-            category: 'Intelligence Feed',
-            date: new Date().toISOString(),
-            image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2426'
-          }
-        ]);
       } catch (error) {
         console.error("Failed to load articles", error);
-        // Emergency Mock Data if even the state setter fails or something crashes
         setArticles([{
           id: 'error-mock',
-          title: 'System Alert: Sync Required',
-          summary: 'Connect to live market intelligence by clicking the Sync button.',
-          content: 'Database connection failed. Please trigger a manual sync to pull real data.',
-          category: 'Intelligence Feed',
+          title: 'Database Connection Offline',
+          summary: 'We are experiencing difficulties connecting to the intelligence stream.',
+          content: 'Database connection failed. Our engineers have been alerted to the drop in signal signal.',
+          category: 'Alert',
+          readTime: '1 min read',
+          source: 'System',
           date: new Date().toISOString()
         }]);
       } finally {
         setLoading(false);
       }
     }
+
     loadArticles();
-  }, [activeTab]);
+  }, []);
 
   const handleLogin = async () => {
     try {
@@ -1298,12 +1184,18 @@ export default function App() {
     }
   };
 
-  const filteredArticles = articles.filter(article => 
-    article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    article.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    article.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    article.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredArticles = articles.filter(article => {
+    const query = searchQuery.toLowerCase();
+    const title = (article.title || '').toLowerCase();
+    const content = (article.content || '').toLowerCase();
+    const summary = (article.summary || '').toLowerCase();
+    const category = (article.category || '').toLowerCase();
+    
+    return title.includes(query) ||
+           content.includes(query) ||
+           summary.includes(query) ||
+           category.includes(query);
+  });
 
   return (
     <ErrorBoundary>
@@ -1316,8 +1208,7 @@ export default function App() {
         <div className="relative z-10 flex flex-col lg:flex-row">
           {/* Desktop Sidebar */}
           <Sidebar 
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            selectedArticle={selectedArticle}
             setSelectedArticle={setSelectedArticle}
             setShowPrivacy={setShowPrivacy}
             setShowAbout={setShowAbout}
@@ -1368,35 +1259,16 @@ export default function App() {
                       </div>
                       <h1 className={`${isScrolled ? 'text-[10px]' : 'text-xs md:text-base'} font-bold tracking-tight text-text transition-all duration-500`}>SaaS Sentinel</h1>
                     </div>
-                    {!isScrolled && (
-                      <button 
-                        onClick={async (e) => {
-                           const btn = e.currentTarget;
-                           btn.innerHTML = 'SYNCING...';
-                           await fetch('/api/cron/fetch-news').catch(() => {});
-                           window.location.reload();
-                        }}
-                        className="text-[8px] font-black bg-orange-600 text-white px-2 py-0.5 rounded shadow-lg animate-pulse"
-                      >
-                        SYNC FEED
-                      </button>
-                    )}
                   </div>
                   
                   {/* Center/Right: Nav Links & Sub Button */}
                   <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
                     <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold overflow-x-auto no-scrollbar whitespace-nowrap px-1">
                         <button 
-                          onClick={() => { setActiveTab('Intelligence Feed'); setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); }}
-                          className={`relative transition-colors py-1 ${activeTab === 'Intelligence Feed' && !showAbout && !showPrivacy && !showArchive ? 'text-accent' : 'text-[var(--color-nav-text)] hover:text-text'}`}
+                          onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); }}
+                          className={`relative transition-colors py-1 ${!selectedArticle && !showAbout && !showPrivacy && !showArchive ? 'text-accent' : 'text-[var(--color-nav-text)] hover:text-text'}`}
                         >
                           Feed
-                        </button>
-                        <button 
-                          onClick={() => { setActiveTab('Market Analysis'); setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); }}
-                          className={`relative transition-colors py-1 ${activeTab === 'Market Analysis' && !showAbout && !showPrivacy && !showArchive ? 'text-accent' : 'text-[var(--color-nav-text)] hover:text-text'}`}
-                        >
-                          Analysis
                         </button>
                         {!isScrolled && (
                           <>
@@ -1531,120 +1403,14 @@ export default function App() {
             ) : showPrivacy ? (
               <PrivacyPage key="privacy-page" />
             ) : selectedArticle ? (
-              activeTab === 'Market Analysis' ? (
-                <SentinelAnalysisView 
-                  article={selectedArticle} 
-                  onBack={() => setSelectedArticle(null)} 
-                />
-              ) : (
-                <motion.div 
-                  key="article-detail"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="max-w-3xl mx-auto"
-                >
-                <button 
-                  onClick={() => setSelectedArticle(null)}
-                  className="glass-button !inline-flex !w-auto !px-6 !py-3 mb-8 text-text/60 font-bold text-xs uppercase tracking-widest"
-                >
-                  <ChevronRight className="w-4 h-4 rotate-180" />
-                  Back to feed
-                </button>
-                
-                <div className="mb-8 md:mb-12">
-                  <AnalysisImage 
-                    src={selectedArticle.image_url} 
-                    alt={selectedArticle.title} 
-                  />
-                  <div className="mt-8">
-                    <span className="text-[10px] font-black bg-accent/10 text-accent px-4 py-2 rounded-full uppercase tracking-[0.2em] border border-accent/20">{selectedArticle.category}</span>
-                  </div>
-                  <h1 className="mt-6">{selectedArticle.title}</h1>
-                  <div className="mt-8 flex flex-wrap items-center gap-4 text-[10px] font-black uppercase tracking-widest text-text/40 border-y py-6 border-text/10">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-white/40 dark:bg-white/10 rounded-full flex items-center justify-center border border-white/20">
-                        <UserIcon className="w-4 h-4 text-text/60" />
-                      </div>
-                      <span className="text-text/80">{selectedArticle.source}</span>
-                    </div>
-                    <span className="hidden sm:inline">•</span>
-                    <span>{new Date(selectedArticle.date).toLocaleDateString()}</span>
-                    <span className="hidden sm:inline">•</span>
-                    <span>{selectedArticle.readTime}</span>
-                  </div>
-                </div>
-
-                <div className="mb-12 p-8 md:p-12 glass-panel border-white/20 rounded-[3rem]">
-                  <h4 className="text-[10px] font-black text-accent uppercase tracking-[0.2em] mb-4">Quick Take</h4>
-                  <p className="text-xl md:text-2xl font-bold text-text leading-relaxed italic">
-                    "{selectedArticle.summary}"
-                  </p>
-                </div>
-
-                <div className="prose prose-slate dark:prose-invert max-w-none text-text/80 px-4 md:px-0">
-                  <ReactMarkdown>{selectedArticle.sentinel_take || selectedArticle.content}</ReactMarkdown>
-                </div>
-
-                {selectedArticle.verdict && (
-                  <div className="mt-12 p-8 bg-accent/5 border border-accent/20 rounded-3xl">
-                    <h4 className="text-[10px] font-black text-accent uppercase tracking-[0.3em] mb-4">The Verdict</h4>
-                    <p className="text-xl font-bold text-text leading-snug">{selectedArticle.verdict}</p>
-                  </div>
-                )}
-
-                {/* Sentinel Recommendation Box */}
-                {(selectedArticle.title + ' ' + selectedArticle.content + ' ' + selectedArticle.summary).toLowerCase().match(/marketing|crm|growth/) && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-12 p-8 glass-card border-white/20 bg-white/40 dark:bg-white/5 rounded-[2.5rem] relative overflow-hidden group"
-                  >
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                      <TrendingUp className="w-24 h-24 text-text" />
-                    </div>
-                    <div className="relative z-10">
-                      <div className="flex items-center gap-2 mb-4">
-                        <TrendingUp className="w-5 h-5 text-accent" />
-                        <h4 className="font-bold text-sm uppercase tracking-widest text-text/60">Sentinel Recommendation</h4>
-                      </div>
-                      <p className="text-text/80 text-lg leading-relaxed mb-6 max-w-xl">
-                        To scale your SaaS operations effectively, we recommend <span className="text-text font-black">HubSpot</span>. It's the industry-leading platform for managing your entire customer journey—from marketing automation to sales CRM and growth analytics.
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <a 
-                          href="https://www.hubspot.com" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="btn-accent !px-8 !py-3 !text-sm font-bold"
-                        >
-                          Get Started Free
-                        </a>
-                        <span className="text-[10px] text-text/30 uppercase font-bold tracking-widest border border-text/10 px-2 py-1 rounded">Partner Link</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            )) : (
+              <SentinelAnalysisView 
+                article={selectedArticle} 
+                onBack={() => setSelectedArticle(null)} 
+              />
+            ) : (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-12">
                 {/* News Feed */}
                 <section className="min-w-0">
-                  {/* Database Connection Alert */}
-                  {articles.length === 0 && !loading && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mb-8 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center gap-4"
-                    >
-                      <AlertCircle className="w-8 h-8 text-red-500 shrink-0" />
-                      <div>
-                        <h4 className="font-bold text-red-500 text-sm">Database Sync Limited</h4>
-                        <p className="text-xs text-text/60">Connection to Supabase is currently restricted. Please use the "Force Market Sync" button in the sidebar to refresh signal manually.</p>
-                      </div>
-                    </motion.div>
-                  )}
-
                   {/* Liquid Glass Search Bar */}
                   <div className="mb-12 relative group">
                     <div className="absolute inset-0 bg-accent/5 blur-2xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
@@ -1667,14 +1433,6 @@ export default function App() {
                       )}
                     </div>
                   </div>
-
-                  {/* Featured Insight Card for Analysis Page */}
-                  {activeTab === 'Market Analysis' && articles.length > 0 && !searchQuery && (
-                    <FeaturedInsightCard 
-                      article={articles[0]} 
-                      onClick={() => setSelectedArticle(articles[0])} 
-                    />
-                  )}
 
                   <div className="flex items-center justify-between border-b border-text/5 pb-4 mb-8">
                     <h2 className="text-xl font-bold flex items-center gap-2 text-text">
@@ -1733,7 +1491,7 @@ export default function App() {
                               <span className="text-[10px] font-bold text-text/30">{article.readTime}</span>
                             </div>
 
-                            <h3 className={`text-xl font-black group-hover:text-accent transition-colors leading-tight mb-4 line-clamp-2 ${activeTab === 'Market Analysis' ? 'text-gradient-warm' : ''}`}>
+                            <h3 className="text-xl font-black group-hover:text-accent transition-colors leading-tight mb-4 line-clamp-2">
                               {article.title}
                             </h3>
                             
@@ -1751,9 +1509,10 @@ export default function App() {
                         </motion.article>
                       ))
                     ) : (
-                      <div className="col-span-full text-center py-20 glass-panel rounded-[2.5rem] border-dashed border-text/10">
-                        <Newspaper className="w-12 h-12 text-text/10 mx-auto mb-4" />
-                        <p className="text-text/40 font-bold">No intelligence reports found.</p>
+                      <div className="col-span-full text-center py-20 glass-panel rounded-[2.5rem] border-dashed border-text/10 bg-white/5">
+                        <Newspaper className="w-16 h-16 text-text/10 mx-auto mb-6 animate-pulse" />
+                        <h3 className="text-lg font-black text-text/60 mb-2 uppercase tracking-widest">Digital Void Detected</h3>
+                        <p className="text-text/40 font-medium mb-8 max-w-sm mx-auto">No intelligence reports have been processed for this view yet. Our AI Sentinel is likely gathering fresh data.</p>
                       </div>
                     )}
                   </div>
@@ -1850,7 +1609,7 @@ export default function App() {
                   <div className="glass-panel p-8 rounded-[2rem]">
                     <h4 className="font-bold mb-8 flex items-center gap-2 text-sm uppercase tracking-widest text-text/80">
                       <Flame className="w-5 h-5 text-accent" />
-                      Trending Analysis
+                      Intelligence Clusters
                     </h4>
                     <ul className="space-y-6">
                       {['#Funding', '#AIUpdate', '#M&A', '#VerticalSaaS', '#SaaSOps'].map((topic) => (
@@ -1877,19 +1636,6 @@ export default function App() {
                   <Newspaper className="w-6 h-6 text-accent" />
                   <span className="font-black text-xl text-text">SaaS Sentinel</span>
                 </div>
-                <button 
-                  onClick={async (e) => {
-                     const btn = e.currentTarget;
-                     const original = btn.innerHTML;
-                     btn.innerHTML = '<span class="animate-spin mr-2">...</span> SYNCING';
-                     await fetch('/api/cron/fetch-news').catch(() => {});
-                     window.location.reload();
-                  }}
-                  className="flex items-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 shadow-lg shadow-orange-900/20 transition-all active:scale-95"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Force Market Sync
-                </button>
               </div>
               
               <div className="flex gap-8 text-xs font-black text-text/30 uppercase tracking-widest">
