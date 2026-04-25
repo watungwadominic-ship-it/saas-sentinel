@@ -235,12 +235,11 @@ def run_news_bot():
             "category": ai_data.get('sentiment', 'BULLISH'), 
             "image_url": image_url,
             "source_url": source_url,
-            "published_at": latest.get('publishedAt') or datetime.now().isoformat(),
             "confidence_score": ai_data.get('confidence_score', 95),
             "strategic_impact": ai_data.get('strategic_impact', 'High'),
             "breakdown": ai_data.get('revenue_breakdown', []),
             "analysis_content": f"{clean_analysis.strip()}\n\n**Strategic Verdict:** {ai_data.get('verdict', 'N/A')}\n\n**Sentinel's Take:** {ai_data.get('sentinel_take', 'N/A')}",
-            "published_at": datetime.now().isoformat()
+            "published_at": latest.get('publishedAt') or datetime.now().isoformat()
         }
         
         try:
