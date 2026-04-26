@@ -228,39 +228,34 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 
 // PRODUCTION SERVING
 if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-  let distPath = path.join(__dirname, 'dist');
-  
-  if (!fs.existsSync(distPath)) {
-    const fallbackPath = path.join(process.cwd(), 'dist');
-    if (fs.existsSync(fallbackPath)) {
-      distPath = fallbackPath;
-    }
-  }
+  const distPath = path.resolve(process.cwd(), 'dist');
   console.log(`[SERVER] Production mode. Serving static from: ${distPath}`);
+  
+  // Explicitly serve assets folder first
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true
+  }));
 
+  // Serve other static files
   app.use(express.static(distPath, {
     index: false,
     maxAge: '1d'
   }));
 
   app.get('*', (req, res) => {
-    // If it looks like a static asset but wasn't found, 404
-    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|woff2?|webp)$/i)) {
-      console.log(`[SERVER] Static asset not found: ${req.path}`);
+    // Prevent serving index.html for missing assets
+    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|woff2?|webp|html)$/i) && !req.path.endsWith('index.html')) {
+      console.log(`[SERVER] 404 for asset: ${req.path}`);
       return res.status(404).send('Not found');
     }
     
-    const indexFile = path.join(distPath, 'index.html');
+    const indexFile = path.resolve(distPath, 'index.html');
     if (fs.existsSync(indexFile)) {
       res.sendFile(indexFile);
     } else {
-      console.error(`[SERVER] CRITICAL: index.html not found at ${indexFile}`);
-      // Fallback check
-      const fallbackIndex = path.join(process.cwd(), 'dist', 'index.html');
-      if (fs.existsSync(fallbackIndex)) {
-        return res.sendFile(fallbackIndex);
-      }
-      res.status(500).send("Build artifact missing.");
+      console.error(`[SERVER] ERROR: Build output missing index.html at ${indexFile}`);
+      res.status(500).send("Application build artifacts missing. Contact administrator.");
     }
   });
 } else {
