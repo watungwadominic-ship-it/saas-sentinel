@@ -228,16 +228,23 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 
 // PRODUCTION SERVING
 if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-  const distPath = path.join(__dirname, 'dist');
-  console.log(`[SERVER] Production mode. Serving static from: ${distPath}`);
+  let distPath = path.join(__dirname, 'dist');
   
+  if (!fs.existsSync(distPath)) {
+    const fallbackPath = path.join(process.cwd(), 'dist');
+    if (fs.existsSync(fallbackPath)) {
+      distPath = fallbackPath;
+    }
+  }
+  console.log(`[SERVER] Production mode. Serving static from: ${distPath}`);
+
   app.use(express.static(distPath, {
-    index: false, // Don't serve index.html from here, we handle it below
+    index: false,
     maxAge: '1d'
   }));
 
   app.get('*', (req, res) => {
-    // If it looks like a static asset but wasn't found, 404 instead of returning index.html
+    // If it looks like a static asset but wasn't found, 404
     if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|woff2?|webp)$/i)) {
       console.log(`[SERVER] Static asset not found: ${req.path}`);
       return res.status(404).send('Not found');
@@ -248,7 +255,12 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
       res.sendFile(indexFile);
     } else {
       console.error(`[SERVER] CRITICAL: index.html not found at ${indexFile}`);
-      res.status(500).send("Build artifact missing. Please check your build step.");
+      // Fallback check
+      const fallbackIndex = path.join(process.cwd(), 'dist', 'index.html');
+      if (fs.existsSync(fallbackIndex)) {
+        return res.sendFile(fallbackIndex);
+      }
+      res.status(500).send("Build artifact missing.");
     }
   });
 } else {
