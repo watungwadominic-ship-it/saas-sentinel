@@ -228,13 +228,36 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 
 // PRODUCTION SERVING
 if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+  // Use a safer path resolution for Vercel lambdas
   const distPath = path.resolve(process.cwd(), 'dist');
-  console.log(`[SERVER] Production mode. Serving static from: ${distPath}`);
+  console.log(`[SERVER] Production mode. Environment: ${process.env.VERCEL ? 'Vercel' : 'Node'}`);
+  console.log(`[SERVER] CWD: ${process.cwd()}`);
+  console.log(`[SERVER] Resolved distPath: ${distPath}`);
   
-  // Explicitly serve assets folder first
+  // Debug endpoint to check filesystem on Vercel
+  app.get('/api/debug-fs', (req, res) => {
+    try {
+      const files = fs.existsSync(distPath) ? fs.readdirSync(distPath) : null;
+      const assets = fs.existsSync(path.join(distPath, 'assets')) ? fs.readdirSync(path.join(distPath, 'assets')) : null;
+      res.json({
+        cwd: process.cwd(),
+        distPath,
+        distExists: fs.existsSync(distPath),
+        distFiles: files,
+        assetsFiles: assets,
+        nodeEnv: process.env.NODE_ENV,
+        vercelEnv: process.env.VERCEL
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Explicitly serve assets folder first with correct headers
   app.use('/assets', express.static(path.join(distPath, 'assets'), {
     maxAge: '1y',
-    immutable: true
+    immutable: true,
+    fallthrough: false // If it's in /assets and not found, it's a 404
   }));
 
   // Serve other static files
@@ -244,18 +267,18 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
   }));
 
   app.get('*', (req, res) => {
-    // Prevent serving index.html for missing assets
-    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|woff2?|webp|html)$/i) && !req.path.endsWith('index.html')) {
-      console.log(`[SERVER] 404 for asset: ${req.path}`);
-      return res.status(404).send('Not found');
+    // Prevent serving index.html for what look like missing assets
+    if (req.path.includes('.') && !req.path.endsWith('.html')) {
+        console.log(`[SERVER] Asset 404: ${req.path}`);
+        return res.status(404).send('Resource not found');
     }
     
-    const indexFile = path.resolve(distPath, 'index.html');
+    const indexFile = path.join(distPath, 'index.html');
     if (fs.existsSync(indexFile)) {
       res.sendFile(indexFile);
     } else {
-      console.error(`[SERVER] ERROR: Build output missing index.html at ${indexFile}`);
-      res.status(500).send("Application build artifacts missing. Contact administrator.");
+      console.error(`[SERVER] ERROR: Application artifact missing: ${indexFile}`);
+      res.status(500).send("Build artifacts missing. Deployment in progress or failed.");
     }
   });
 } else {
