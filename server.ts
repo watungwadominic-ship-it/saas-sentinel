@@ -36,7 +36,14 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+    if (!response.ok) {
+      // Don't log as error if it's an expected external failure (404, 503, etc)
+      if (response.status >= 400) {
+        console.warn(`[PROXY-HELPER-WARN] Image ${response.status} (${response.statusText}): ${imageUrl}`);
+        throw new Error(`Upstream ${response.status}`);
+      }
+      throw new Error(`Failed to fetch image: ${response.statusText}`);
+    }
 
     const contentType = response.headers.get("content-type") || "image/jpeg";
     res.setHeader("Content-Type", contentType);
@@ -56,8 +63,18 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
     return res.send(Buffer.from(arrayBuffer));
   } catch (error: any) {
     clearTimeout(timeoutId);
-    console.error(`[PROXY-HELPER-ERROR] ${error.name === 'AbortError' ? 'Timeout' : error.message} for ${imageUrl}`);
+    
+    const isUpstreamError = error.message.startsWith('Upstream');
+    const isTimeout = error.name === 'AbortError';
+    
+    if (isUpstreamError || isTimeout) {
+      console.log(`[PROXY-HELPER-INFO] Fallback triggered for: ${imageUrl} (${error.message})`);
+    } else {
+      console.error(`[PROXY-HELPER-ERROR] ${error.message} for ${imageUrl}`);
+    }
+
     res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "no-cache");
     return res.send(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
   }
 };
@@ -227,17 +244,28 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 });
 
 // PRODUCTION SERVING OR BUILT ARTIFACTS EXIST
-const distPath = path.resolve(__dirname, 'dist');
-if (process.env.NODE_ENV === "production" || process.env.VERCEL || fs.existsSync(path.join(distPath, 'index.html'))) {
-  console.log(`[SERVER] Serving from dist: ${distPath}`);
+const distPath = path.resolve(process.cwd(), 'dist');
+const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
+
+if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
+  console.log(`[SERVER] Production mode. distPath: ${distPath}`);
   
-  // Serve static files with explicit MIME type enforcement
-  app.use('/assets', express.static(path.join(distPath, 'assets'), {
-    maxAge: '1y',
-    immutable: true,
-    index: false,
-    fallthrough: false // Error 404 if asset not found in /assets
-  }));
+  // High-reliability asset serving
+  app.use('/assets', (req, res, next) => {
+    const filePath = path.join(distPath, 'assets', req.path);
+    console.log(`[ASSET-REQUEST] Looking for: ${filePath}`);
+    
+    if (fs.existsSync(filePath)) {
+      if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+      if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+      if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
+      
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.sendFile(filePath);
+    }
+    console.warn(`[ASSET-ERROR] Not found in /assets: ${req.path}`);
+    next();
+  });
 
   app.use(express.static(distPath, {
     maxAge: '1d',
@@ -247,17 +275,37 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL || fs.existsSync
     }
   }));
 
+  // Debug endpoint for Vercel/Production
+  app.get('/api/debug-vercel', (req, res) => {
+    try {
+      const exists = fs.existsSync(distPath);
+      const files = exists ? fs.readdirSync(distPath) : [];
+      const assetFiles = fs.existsSync(path.join(distPath, 'assets')) ? fs.readdirSync(path.join(distPath, 'assets')) : [];
+      res.json({
+        cwd: process.cwd(),
+        dirname: __dirname,
+        distPath,
+        exists,
+        files,
+        assetFiles,
+        env: {
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL: process.env.VERCEL
+        }
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   app.get('*', (req, res) => {
-    // API and asset exclusion
-    if (req.path.startsWith('/api/') || req.path.includes('.')) {
-       return res.status(404).send('Not found');
-    }
-    
+    // API exclusion
+    if (req.path.startsWith('/api/')) return res.status(404).send('Not found');
+
     const indexFile = path.join(distPath, 'index.html');
     if (fs.existsSync(indexFile)) {
       res.sendFile(indexFile);
     } else {
-      res.status(500).send("Build artifacts missing.");
+      console.error(`[SERVER] ERROR: missing index.html at ${indexFile}`);
+      res.status(500).send("Build artifacts missing. Please run build.");
     }
   });
 } else {
