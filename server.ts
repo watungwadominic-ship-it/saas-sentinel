@@ -3,9 +3,9 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 import { fileURLToPath } from 'url';
-import { supabase } from "./src/services/supabase.js";
-import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini.js";
-import { saveNewsArticle } from "./src/services/news_articles.js";
+import { supabase } from "./src/services/supabase";
+import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini";
+import { saveNewsArticle } from "./src/services/news_articles";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
