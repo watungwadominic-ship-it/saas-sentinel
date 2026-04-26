@@ -106,32 +106,25 @@ function MarketTicker() {
   if (!Array.isArray(stocks) || stocks.length === 0) return null;
 
   return (
-    <div className="relative w-full overflow-hidden group">
-      {/* Gradient Masks for Fading Effect */}
-      <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-[var(--color-ticker-bg)] to-transparent z-10 pointer-events-none opacity-80" />
-      <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[var(--color-ticker-bg)] to-transparent z-10 pointer-events-none opacity-80" />
+    <div className="relative w-full overflow-hidden group py-1">
+      {/* Edge Fades */}
+      <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-[var(--color-ticker-bg)]/80 to-transparent z-10 pointer-events-none" />
+      <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[var(--color-ticker-bg)]/80 to-transparent z-10 pointer-events-none" />
       
-      {lastUpdated && !isNaN(new Date(lastUpdated).getTime()) && (
-        <div className="absolute -top-4 right-2 text-[7px] font-black uppercase text-accent/60 bg-accent/5 backdrop-blur-md px-2 py-0.5 rounded-full z-20 border border-accent/10 flex items-center gap-1">
-          <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
-          Live • {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      )}
-      
-      <div className="flex animate-marquee gap-12 items-center py-2 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer whitespace-nowrap overflow-hidden">
-        {(Array.isArray(stocks) ? [...stocks, ...stocks, ...stocks] : []).slice(0, 50).map((stock, i) => {
+      <div className="flex animate-marquee-slower items-center py-1 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer whitespace-nowrap overflow-hidden">
+        {(Array.isArray(stocks) ? [...stocks, ...stocks, ...stocks, ...stocks] : []).slice(0, 100).map((stock, i) => {
           if (!stock) return null;
           const price = typeof stock.price === 'number' ? `$${stock.price.toFixed(2)}` : stock.price;
-          const changeValue = typeof stock.change === 'number' ? stock.change : parseFloat(stock.change);
+          const changeValue = typeof stock.change === 'number' ? stock.change : parseFloat(String(stock.change));
           const changeStr = typeof stock.change === 'number' ? `${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(1)}%` : stock.change;
           const isPositive = typeof changeValue === 'number' ? changeValue >= 0 : String(changeStr).startsWith('+');
 
           return (
-            <div key={i} className="flex items-center gap-3 text-[10px] font-bold shrink-0">
-              <span className="text-text">{stock.symbol}&nbsp;</span>
-              <span className="text-text/60">{price}&nbsp;</span>
-              <span className={isPositive ? 'text-accent' : 'text-[#d64545]'}>
-                {changeStr}&nbsp;&nbsp;&nbsp;
+            <div key={i} className="flex items-center gap-3 text-[10px] font-bold shrink-0 mx-8 transition-opacity hover:opacity-100 opacity-80 group-hover:opacity-70">
+              <span className="text-text font-black tracking-tight">{stock.symbol}</span>
+              <span className="text-text/40 font-mono text-[9px]">{price}</span>
+              <span className={isPositive ? 'text-accent' : 'text-rose-500'}>
+                {changeStr}
               </span>
             </div>
           );
