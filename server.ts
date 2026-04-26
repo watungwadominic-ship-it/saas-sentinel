@@ -3,6 +3,9 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 import { fileURLToPath } from 'url';
+import { supabase } from "./src/services/supabase.js";
+import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini.js";
+import { saveNewsArticle } from "./src/services/news_articles.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,7 +110,6 @@ app.all(['/_cookie_check.html', '/cookie_check', '/security_check'], async (req,
      console.log(`[RESCUE-V48] Hardened Intercept for ID: ${articleId} | Target: ${decoded.substring(0, 40)}`);
      
      if (decoded.includes('/og-image.jpg')) {
-        const { supabase } = await import("./src/services/supabase.js");
         const { data } = await supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
         if (data?.image_url) return fetchAndSendImage(data.image_url, res, userAgent);
      }
@@ -124,7 +126,6 @@ async function serveBotMetadata(articleId: string, req: any, res: any, version: 
   let ogImage = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&h=630&auto=format&fit=crop";
 
   try {
-    const { supabase } = await import("./src/services/supabase.js");
     const { data: article } = await supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
     if (article) {
       ogTitle = (article.title || ogTitle).substring(0, 95);
@@ -192,7 +193,6 @@ app.use(async (req, res, next) => {
 app.get("/api/static-preview/:articleId/og-image.jpg", async (req, res) => {
   const { articleId } = req.params;
   try {
-    const { supabase } = await import("./src/services/supabase.js");
     const { data: article } = await supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
     if (article?.image_url) {
       return fetchAndSendImage(article.image_url, res, req.headers['user-agent'] as string);
@@ -217,22 +217,22 @@ app.get("/api/proxy-image*", (req, res) => {
   return fetchAndSendImage(imageUrl, res, req.headers['user-agent'] as string);
 });
 
+app.get("/api/ping", (req, res) => {
+  res.json({ status: "alive", timestamp: new Date().toISOString() });
+});
+
 app.get("/api/news", async (req, res) => {
-  const { supabase } = await import("./src/services/supabase.js");
   const { data } = await supabase.from("news_articles").select("*").order("created_at", { ascending: false });
   res.json(data);
 });
 
 app.get("/api/news/:id", async (req, res) => {
-  const { supabase } = await import("./src/services/supabase.js");
   const { data } = await supabase.from("news_articles").select("*").eq("id", req.params.id).maybeSingle();
   res.json(data);
 });
 
 app.all("/api/cron/fetch-news", async (req, res) => {
   try {
-    const { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } = await import("./src/services/gemini.js");
-    const { saveNewsArticle } = await import("./src/services/news_articles.js");
     const rawNews = await fetchTopSaaSNews();
     const stories = await parseNewsIntoStories(rawNews);
     if (stories?.[0]) {
@@ -243,31 +243,29 @@ app.all("/api/cron/fetch-news", async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
+
 // PRODUCTION SERVING OR BUILT ARTIFACTS EXIST
 const getDistPath = () => {
+  // If we are on Vercel, the dist path is usually relative to the task root
+  if (process.env.VERCEL) {
+    const vercelPaths = ['/var/task/dist', path.join(process.cwd(), 'dist')];
+    for (const vp of vercelPaths) {
+      if (fs.existsSync(path.join(vp, 'index.html'))) return vp;
+    }
+  }
+
   const possiblePaths = [
     path.resolve(process.cwd(), 'dist'),
     path.resolve(__dirname, 'dist'),
-    path.resolve(__dirname, '..', 'dist'),
-    path.resolve(process.cwd()),
-    path.resolve(__dirname),
-    path.resolve(process.cwd(), '..', 'dist'),
-    path.join(process.cwd(), 'public'),
-    // Vercel specific common locations
-    '/var/task/dist',
-    path.join(process.cwd(), '.vercel/output/static')
+    path.join(process.cwd(), 'public')
   ];
   
-  console.log(`[SERVER] Startup at ${new Date().toISOString()}`);
-  console.log(`[SERVER] process.cwd(): ${process.cwd()}`);
-  console.log(`[SERVER] __dirname: ${__dirname}`);
-
   for (const p of possiblePaths) {
     try {
       if (fs.existsSync(p) && fs.lstatSync(p).isDirectory()) {
         const indexPath = path.join(p, 'index.html');
         if (fs.existsSync(indexPath)) {
-           console.log(`[SERVER] Found valid build artifacts at: ${p}`);
            return p;
         }
       }
@@ -277,7 +275,6 @@ const getDistPath = () => {
 };
 
 const distPath = getDistPath();
-const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
 
 if (distPath || isProduction) {
   const finalDistPath = distPath || path.resolve(process.cwd(), 'dist');
@@ -348,7 +345,7 @@ if (distPath || isProduction) {
       res.status(500).send(`<html><body><h1>500: Build Artifacts Missing</h1><p>Environment: ${process.env.VERCEL ? 'Vercel' : 'Manual'}</p><p>Tried: ${finalDistPath}</p></body></html>`);
     }
   });
-} else {
+} else if (!process.env.VERCEL) {
   console.log("[SERVER] Starting Vite Dev Server...");
   const { createServer: createViteServer } = await import("vite");
   const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
