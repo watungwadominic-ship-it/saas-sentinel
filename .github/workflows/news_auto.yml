@@ -19,7 +19,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install -r .github/bot_scripts/deps.txt
+        run: pip install -r .github/python_intel/deps.txt
 
       - name: Run News Bot
         env:
@@ -30,4 +30,4 @@ jobs:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
           SHARED_APP_URL: ${{ secrets.SHARED_APP_URL }}
-        run: python .github/bot_scripts/bot_engine.py
+        run: python .github/python_intel/bot_engine.py
