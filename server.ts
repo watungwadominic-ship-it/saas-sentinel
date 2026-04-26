@@ -252,24 +252,27 @@ const getDistPath = () => {
     path.resolve(process.cwd()),
     path.resolve(__dirname),
     path.resolve(process.cwd(), '..', 'dist'),
-    path.join(process.cwd(), 'public')
+    path.join(process.cwd(), 'public'),
+    // Vercel specific common locations
+    '/var/task/dist',
+    path.join(process.cwd(), '.vercel/output/static')
   ];
   
-  console.log(`[SERVER] Searching for build artifacts in ${possiblePaths.length} locations...`);
+  console.log(`[SERVER] Startup at ${new Date().toISOString()}`);
+  console.log(`[SERVER] process.cwd(): ${process.cwd()}`);
+  console.log(`[SERVER] __dirname: ${__dirname}`);
+
   for (const p of possiblePaths) {
     try {
-      if (!fs.existsSync(p)) continue;
-      const indexPath = path.join(p, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        const files = fs.readdirSync(p);
-        if (files.includes('assets') || files.some(f => f.endsWith('.js') || f.endsWith('.css'))) {
-           console.log(`[SERVER] 🎉 Found valid build artifacts at: ${p}`);
+      if (fs.existsSync(p) && fs.lstatSync(p).isDirectory()) {
+        const indexPath = path.join(p, 'index.html');
+        if (fs.existsSync(indexPath)) {
+           console.log(`[SERVER] Found valid build artifacts at: ${p}`);
            return p;
         }
       }
     } catch (e) {}
   }
-  console.warn("[SERVER] ⚠️ No build artifacts found in any location!");
   return null;
 };
 
@@ -278,39 +281,32 @@ const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERC
 
 if (distPath || isProduction) {
   const finalDistPath = distPath || path.resolve(process.cwd(), 'dist');
-  console.log(`[SERVER] Static serving mode. finalDistPath: ${finalDistPath}`);
-  
-  // High-reliability asset serving
+  console.log(`[SERVER] Mode: ${isProduction ? 'Production' : 'Static Serving'}. Path: ${finalDistPath}`);
+
+  // Serve static assets with explicit MIME types and cache headers
   app.use('/assets', (req, res, next) => {
     const assetPath = req.path.startsWith('/') ? req.path.slice(1) : req.path;
+    const filePath = path.join(finalDistPath, 'assets', assetPath);
     
-    const possibleAssetPaths = [
-      path.join(finalDistPath, 'assets', assetPath),
-      path.join(finalDistPath, assetPath)
-    ];
-
-    for (const filePath of possibleAssetPaths) {
-      try {
-        if (fs.existsSync(filePath) && !fs.lstatSync(filePath).isDirectory()) {
-          console.log(`[SERVER] ✅ Serving asset: ${filePath}`);
-          if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
-          if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
-          if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
-          if (filePath.endsWith('.png')) res.setHeader('Content-Type', 'image/png');
-          if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) res.setHeader('Content-Type', 'image/jpeg');
-          
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-          return res.sendFile(filePath);
-        }
-      } catch (e) {}
+    if (fs.existsSync(filePath) && !fs.lstatSync(filePath).isDirectory()) {
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.css': 'text/css',
+        '.js': 'application/javascript',
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp'
+      };
+      if (mimeTypes[ext]) res.setHeader('Content-Type', mimeTypes[ext]);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.sendFile(filePath);
     }
-    console.warn(`[SERVER] ❌ Asset not found: ${assetPath} (tried ${possibleAssetPaths.join(', ')})`);
     next();
   });
 
-  app.use(express.static(finalDistPath, {
-    maxAge: '1d'
-  }));
+  app.use(express.static(finalDistPath, { index: false }));
 
   // Debug endpoint
   app.get('/api/debug-path', (req, res) => {
@@ -336,17 +332,20 @@ if (distPath || isProduction) {
           VERCEL: !!process.env.VERCEL
         }
       });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message, stack: e.stack });
+    }
   });
 
   app.get('*', (req, res) => {
-    if (req.path.startsWith('/api/')) return res.status(404).send('Not found');
-
+    if (req.path.startsWith('/api')) return res.status(404).json({ error: 'API route not found' });
+    
     const indexFile = path.join(finalDistPath, 'index.html');
     if (fs.existsSync(indexFile)) {
-      res.sendFile(indexFile);
+      res.setHeader('Content-Type', 'text/html');
+      return res.sendFile(indexFile);
     } else {
-      res.status(500).send(`Build artifacts not found. Searched in several locations. Last tried: ${finalDistPath}`);
+      res.status(500).send(`<html><body><h1>500: Build Artifacts Missing</h1><p>Environment: ${process.env.VERCEL ? 'Vercel' : 'Manual'}</p><p>Tried: ${finalDistPath}</p></body></html>`);
     }
   });
 } else {
