@@ -604,7 +604,7 @@ function AnalysisImage({ src, alt, className = "", rounded = "rounded-[2.5rem]" 
         className={`w-full h-full object-cover transition-opacity duration-700 ${loading ? 'opacity-0' : 'opacity-100'}`}
         onLoad={() => setLoading(false)}
         onError={() => {
-          console.error(`[IMAGE-ERROR] Failed to load: ${src}`);
+          console.warn(`[IMAGE-WARN] Failed to load resource, falling back: ${src}`);
           setError(true);
           setLoading(false);
         }}
