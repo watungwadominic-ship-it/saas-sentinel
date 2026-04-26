@@ -1,10 +1,6 @@
 # Ignore local dev and python services from Vercel build context
 python_service/
-_python_service/
 .github/
 node_modules/
 dist/
 .env
-*.py
-requirements.txt
-requirements.python
