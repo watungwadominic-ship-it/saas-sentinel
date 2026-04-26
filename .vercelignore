@@ -2,5 +2,9 @@
 python_service/
 .github/
 node_modules/
-dist/
 .env
+simple-server.ts
+test.js
+README.md
+llms.txt
+metadata.json
