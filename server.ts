@@ -244,16 +244,22 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 });
 
 // PRODUCTION SERVING OR BUILT ARTIFACTS EXIST
-const distPath = path.resolve(process.cwd(), 'dist');
+let distPath = path.resolve(process.cwd(), 'dist');
+if (!fs.existsSync(path.join(distPath, 'index.html'))) {
+  // Fallback for Vercel's different directory structures
+  distPath = path.resolve(__dirname, 'dist');
+}
+
 const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
 
 if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
-  console.log(`[SERVER] Production mode. distPath: ${distPath}`);
+  console.log(`[SERVER] Static serving mode. distPath: ${distPath}`);
   
   // High-reliability asset serving
   app.use('/assets', (req, res, next) => {
-    const filePath = path.join(distPath, 'assets', req.path);
-    console.log(`[ASSET-REQUEST] Looking for: ${filePath}`);
+    // Correctly handle Vercel's leading slashes and paths
+    const assetPath = req.path.startsWith('/') ? req.path.slice(1) : req.path;
+    const filePath = path.join(distPath, 'assets', assetPath);
     
     if (fs.existsSync(filePath)) {
       if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
@@ -263,34 +269,29 @@ if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       return res.sendFile(filePath);
     }
-    console.warn(`[ASSET-ERROR] Not found in /assets: ${req.path}`);
     next();
   });
 
   app.use(express.static(distPath, {
-    maxAge: '1d',
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
-      if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
-    }
+    maxAge: '1d'
   }));
 
   // Debug endpoint for Vercel/Production
-  app.get('/api/debug-vercel', (req, res) => {
+  app.get('/api/debug-path', (req, res) => {
     try {
       const exists = fs.existsSync(distPath);
       const files = exists ? fs.readdirSync(distPath) : [];
-      const assetFiles = fs.existsSync(path.join(distPath, 'assets')) ? fs.readdirSync(path.join(distPath, 'assets')) : [];
+      const hasIndex = fs.existsSync(path.join(distPath, 'index.html'));
       res.json({
         cwd: process.cwd(),
         dirname: __dirname,
         distPath,
         exists,
+        hasIndex,
         files,
-        assetFiles,
         env: {
           NODE_ENV: process.env.NODE_ENV,
-          VERCEL: process.env.VERCEL
+          VERCEL: !!process.env.VERCEL
         }
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -304,8 +305,7 @@ if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
     if (fs.existsSync(indexFile)) {
       res.sendFile(indexFile);
     } else {
-      console.error(`[SERVER] ERROR: missing index.html at ${indexFile}`);
-      res.status(500).send("Build artifacts missing. Please run build.");
+      res.status(500).send(`Build artifacts not found at ${distPath}. Please check deployment scripts.`);
     }
   });
 } else {
