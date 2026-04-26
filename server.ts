@@ -247,7 +247,7 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  // Serve static files - placed BEFORE general routes
+  // Serve static files with explicit MIME type enforcement
   app.use(express.static(distPath, {
     maxAge: '1d',
     setHeaders: (res, filePath) => {
@@ -262,7 +262,8 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
 
   app.get('*', (req, res) => {
     // If it's a request for a non-existent file, don't serve index.html
-    if (req.path.includes('.')) {
+    if (req.path.includes('.') && !req.path.endsWith('.html')) {
+      console.log(`[SERVER] 404 for asset: ${req.path}`);
       return res.status(404).send('Not found');
     }
     
@@ -270,7 +271,8 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
     if (fs.existsSync(indexFile)) {
       res.sendFile(indexFile);
     } else {
-      res.status(500).send("Application not ready - missing index.html");
+      console.error(`[SERVER] ERROR: missing index.html at ${indexFile}`);
+      res.status(500).send("Application not ready - missing build artifacts");
     }
   });
 } else {
