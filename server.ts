@@ -292,15 +292,19 @@ if (distPath || isProduction) {
     for (const filePath of possibleAssetPaths) {
       try {
         if (fs.existsSync(filePath) && !fs.lstatSync(filePath).isDirectory()) {
+          console.log(`[SERVER] ✅ Serving asset: ${filePath}`);
           if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
           if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
           if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
+          if (filePath.endsWith('.png')) res.setHeader('Content-Type', 'image/png');
+          if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) res.setHeader('Content-Type', 'image/jpeg');
           
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
           return res.sendFile(filePath);
         }
       } catch (e) {}
     }
+    console.warn(`[SERVER] ❌ Asset not found: ${assetPath} (tried ${possibleAssetPaths.join(', ')})`);
     next();
   });
 
