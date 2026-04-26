@@ -228,57 +228,49 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 
 // PRODUCTION SERVING
 if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-  // Use a safer path resolution for Vercel lambdas
   const distPath = path.resolve(process.cwd(), 'dist');
-  console.log(`[SERVER] Production mode. Environment: ${process.env.VERCEL ? 'Vercel' : 'Node'}`);
-  console.log(`[SERVER] CWD: ${process.cwd()}`);
-  console.log(`[SERVER] Resolved distPath: ${distPath}`);
+  console.log(`[SERVER] Production mode. distPath: ${distPath}`);
   
-  // Debug endpoint to check filesystem on Vercel
+  // Debug endpoint
   app.get('/api/debug-fs', (req, res) => {
     try {
-      const files = fs.existsSync(distPath) ? fs.readdirSync(distPath) : null;
-      const assets = fs.existsSync(path.join(distPath, 'assets')) ? fs.readdirSync(path.join(distPath, 'assets')) : null;
+      const files = fs.existsSync(distPath) ? fs.readdirSync(distPath) : [];
+      const assets = fs.existsSync(path.join(distPath, 'assets')) ? fs.readdirSync(path.join(distPath, 'assets')) : [];
       res.json({
         cwd: process.cwd(),
         distPath,
-        distExists: fs.existsSync(distPath),
-        distFiles: files,
-        assetsFiles: assets,
-        nodeEnv: process.env.NODE_ENV,
-        vercelEnv: process.env.VERCEL
+        exists: fs.existsSync(distPath),
+        files,
+        assets,
+        env: process.env.VERCEL ? 'vercel' : 'node'
       });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  // Explicitly serve assets folder first with correct headers
-  app.use('/assets', express.static(path.join(distPath, 'assets'), {
-    maxAge: '1y',
-    immutable: true,
-    fallthrough: false // If it's in /assets and not found, it's a 404
-  }));
-
-  // Serve other static files
+  // Serve static files - placed BEFORE general routes
   app.use(express.static(distPath, {
-    index: false,
-    maxAge: '1d'
+    maxAge: '1d',
+    setHeaders: (res, filePath) => {
+      // Force correct MIME types for problematic assets on some hosts
+      if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+      if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+      if (filePath.match(/\.(woff2?|png|jpg|jpeg|gif|svg|ico|webp)$/)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
   }));
 
   app.get('*', (req, res) => {
-    // Prevent serving index.html for what look like missing assets
-    if (req.path.includes('.') && !req.path.endsWith('.html')) {
-        console.log(`[SERVER] Asset 404: ${req.path}`);
-        return res.status(404).send('Resource not found');
+    // If it's a request for a non-existent file, don't serve index.html
+    if (req.path.includes('.')) {
+      return res.status(404).send('Not found');
     }
     
     const indexFile = path.join(distPath, 'index.html');
     if (fs.existsSync(indexFile)) {
       res.sendFile(indexFile);
     } else {
-      console.error(`[SERVER] ERROR: Application artifact missing: ${indexFile}`);
-      res.status(500).send("Build artifacts missing. Deployment in progress or failed.");
+      res.status(500).send("Application not ready - missing index.html");
     }
   });
 } else {
