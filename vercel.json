@@ -3,7 +3,7 @@
   "functions": {
     "api/index.ts": {
       "runtime": "@vercel/node",
-      "includeFiles": ["dist/**", "src/**", "server.ts", "package.json"],
+      "includeFiles": "dist/**",
       "maxDuration": 60
     }
   },
