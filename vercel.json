@@ -1,8 +1,10 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "dist/**",
+      "runtime": "nodejs20.x",
       "maxDuration": 60
     }
   },
