@@ -1,6 +1,4 @@
-main.py
-newsletter.py
-requirements.txt
-.github
-node_modules
-dist
+python_service/
+.github/
+node_modules/
+# dist removed from ignore to allow Vercel to see it if it's generated/needed by the node builder
