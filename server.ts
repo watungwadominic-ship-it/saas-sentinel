@@ -246,8 +246,20 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 // PRODUCTION SERVING OR BUILT ARTIFACTS EXIST
 let distPath = path.resolve(process.cwd(), 'dist');
 if (!fs.existsSync(path.join(distPath, 'index.html'))) {
-  // Fallback for Vercel's different directory structures
-  distPath = path.resolve(__dirname, 'dist');
+  const possiblePaths = [
+    path.resolve(__dirname, 'dist'),
+    path.resolve(process.cwd()),
+    path.resolve(__dirname),
+    path.join(process.cwd(), 'public')
+  ];
+  
+  for (const p of possiblePaths) {
+    if (fs.existsSync(path.join(p, 'index.html'))) {
+      distPath = p;
+      console.log(`[SERVER] Found index.html at: ${distPath}`);
+      break;
+    }
+  }
 }
 
 const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
@@ -259,15 +271,22 @@ if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
   app.use('/assets', (req, res, next) => {
     // Correctly handle Vercel's leading slashes and paths
     const assetPath = req.path.startsWith('/') ? req.path.slice(1) : req.path;
-    const filePath = path.join(distPath, 'assets', assetPath);
     
-    if (fs.existsSync(filePath)) {
-      if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
-      if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
-      if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
-      
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      return res.sendFile(filePath);
+    // Search in dist/assets and also assets/ directly
+    const possibleAssetPaths = [
+      path.join(distPath, 'assets', assetPath),
+      path.join(distPath, assetPath)
+    ];
+
+    for (const filePath of possibleAssetPaths) {
+      if (fs.existsSync(filePath)) {
+        if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+        if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+        if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
+        
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        return res.sendFile(filePath);
+      }
     }
     next();
   });
@@ -282,6 +301,10 @@ if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
       const exists = fs.existsSync(distPath);
       const files = exists ? fs.readdirSync(distPath) : [];
       const hasIndex = fs.existsSync(path.join(distPath, 'index.html'));
+      
+      // also check root
+      const rootFiles = fs.readdirSync(process.cwd());
+      
       res.json({
         cwd: process.cwd(),
         dirname: __dirname,
@@ -289,6 +312,7 @@ if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
         exists,
         hasIndex,
         files,
+        rootFiles,
         env: {
           NODE_ENV: process.env.NODE_ENV,
           VERCEL: !!process.env.VERCEL
