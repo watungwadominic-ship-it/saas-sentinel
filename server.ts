@@ -226,56 +226,42 @@ app.all("/api/cron/fetch-news", async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
-// PRODUCTION SERVING
-if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-  const distPath = path.resolve(process.cwd(), 'dist');
-  console.log(`[SERVER] Production mode. distPath: ${distPath}`);
+// PRODUCTION SERVING OR BUILT ARTIFACTS EXIST
+const distPath = path.resolve(__dirname, 'dist');
+if (process.env.NODE_ENV === "production" || process.env.VERCEL || fs.existsSync(path.join(distPath, 'index.html'))) {
+  console.log(`[SERVER] Serving from dist: ${distPath}`);
   
-  // Debug endpoint
-  app.get('/api/debug-fs', (req, res) => {
-    try {
-      const files = fs.existsSync(distPath) ? fs.readdirSync(distPath) : [];
-      const assets = fs.existsSync(path.join(distPath, 'assets')) ? fs.readdirSync(path.join(distPath, 'assets')) : [];
-      res.json({
-        cwd: process.cwd(),
-        distPath,
-        exists: fs.existsSync(distPath),
-        files,
-        assets,
-        env: process.env.VERCEL ? 'vercel' : 'node'
-      });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
   // Serve static files with explicit MIME type enforcement
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+    index: false,
+    fallthrough: false // Error 404 if asset not found in /assets
+  }));
+
   app.use(express.static(distPath, {
     maxAge: '1d',
     setHeaders: (res, filePath) => {
-      // Force correct MIME types for problematic assets on some hosts
       if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
       if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
-      if (filePath.match(/\.(woff2?|png|jpg|jpeg|gif|svg|ico|webp)$/)) {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      }
     }
   }));
 
   app.get('*', (req, res) => {
-    // If it's a request for a non-existent file, don't serve index.html
-    if (req.path.includes('.') && !req.path.endsWith('.html')) {
-      console.log(`[SERVER] 404 for asset: ${req.path}`);
-      return res.status(404).send('Not found');
+    // API and asset exclusion
+    if (req.path.startsWith('/api/') || req.path.includes('.')) {
+       return res.status(404).send('Not found');
     }
     
     const indexFile = path.join(distPath, 'index.html');
     if (fs.existsSync(indexFile)) {
       res.sendFile(indexFile);
     } else {
-      console.error(`[SERVER] ERROR: missing index.html at ${indexFile}`);
-      res.status(500).send("Application not ready - missing build artifacts");
+      res.status(500).send("Build artifacts missing.");
     }
   });
 } else {
+  console.log("[SERVER] Starting Vite Dev Server...");
   const { createServer: createViteServer } = await import("vite");
   const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
   app.use(vite.middlewares);
