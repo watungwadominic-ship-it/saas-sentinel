@@ -1,3 +1,6 @@
 main.py
+newsletter.py
 requirements.txt
-.github/
+.github
+node_modules
+dist
