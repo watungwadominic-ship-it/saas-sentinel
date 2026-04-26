@@ -1,4 +1,14 @@
+_python_service/
 python_service/
 .github/
 node_modules/
-# dist removed from ignore to allow Vercel to see it if it's generated/needed by the node builder
+dist/
+# Explicitly ignore files that might trigger the Python builder
+requirements.txt
+**/requirements.txt
+requirements.python
+**/requirements.python
+main.py
+**/main.py
+newsletter.py
+**/newsletter.py
