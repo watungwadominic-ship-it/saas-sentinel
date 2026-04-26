@@ -248,20 +248,22 @@ const getDistPath = () => {
   const possiblePaths = [
     path.resolve(process.cwd(), 'dist'),
     path.resolve(__dirname, 'dist'),
+    path.resolve(__dirname, '..', 'dist'), // Handle api/ wrapper
     path.resolve(process.cwd()),
     path.resolve(__dirname),
     path.join(process.cwd(), 'public')
   ];
   
   for (const p of possiblePaths) {
-    const indexPath = path.join(p, 'index.html');
-    if (fs.existsSync(indexPath)) {
-      // Basic check to ensure it's a real dist folder (contains assets or is large enough)
-      const files = fs.readdirSync(p);
-      if (files.includes('assets') || files.some(f => f.endsWith('.js') || f.endsWith('.css'))) {
-         return p;
+    try {
+      const indexPath = path.join(p, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        const files = fs.readdirSync(p);
+        if (files.includes('assets') || files.some(f => f.endsWith('.js') || f.endsWith('.css'))) {
+           return p;
+        }
       }
-    }
+    } catch (e) {}
   }
   return null;
 };
@@ -283,14 +285,16 @@ if (distPath || isProduction) {
     ];
 
     for (const filePath of possibleAssetPaths) {
-      if (fs.existsSync(filePath) && !fs.lstatSync(filePath).isDirectory()) {
-        if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
-        if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
-        if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
-        
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        return res.sendFile(filePath);
-      }
+      try {
+        if (fs.existsSync(filePath) && !fs.lstatSync(filePath).isDirectory()) {
+          if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+          if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+          if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
+          
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          return res.sendFile(filePath);
+        }
+      } catch (e) {}
     }
     next();
   });
@@ -302,10 +306,9 @@ if (distPath || isProduction) {
   // Debug endpoint
   app.get('/api/debug-path', (req, res) => {
     try {
-      const exists = fs.existsSync(finalDistPath);
+      const exists = !!finalDistPath && fs.existsSync(finalDistPath);
       const files = exists ? fs.readdirSync(finalDistPath) : [];
       const rootFiles = fs.readdirSync(process.cwd());
-      
       const serverDir = fs.readdirSync(__dirname);
       
       res.json({
@@ -313,7 +316,7 @@ if (distPath || isProduction) {
         dirname: __dirname,
         finalDistPath,
         exists,
-        hasIndex: fs.existsSync(path.join(finalDistPath, 'index.html')),
+        hasIndex: !!finalDistPath && fs.existsSync(path.join(finalDistPath, 'index.html')),
         files,
         rootFiles,
         serverDir,
@@ -342,7 +345,11 @@ if (distPath || isProduction) {
   app.use(vite.middlewares);
 }
 
+export default app;
+
 const PORT = 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
