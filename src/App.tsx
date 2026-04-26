@@ -113,7 +113,6 @@ function MarketTicker() {
       
       <div 
         className="flex animate-marquee-slower items-center py-1 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer whitespace-nowrap overflow-hidden"
-        style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap' }} // Force horizontal even if CSS fails
       >
         {(Array.isArray(stocks) ? [...stocks, ...stocks, ...stocks, ...stocks] : []).slice(0, 100).map((stock, i) => {
           if (!stock) return null;
@@ -126,7 +125,6 @@ function MarketTicker() {
             <div 
               key={i} 
               className="flex items-center gap-3 text-[10px] font-bold shrink-0 mx-8 transition-opacity hover:opacity-100 opacity-80 group-hover:opacity-70"
-              style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginRight: '32px' }} // Fallback spacing
             >
               <span className="text-text font-black tracking-tight">{stock.symbol}</span>
               <span className="text-text/40 font-mono text-[9px]">{price}</span>
