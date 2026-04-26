@@ -114,8 +114,8 @@ function MarketTicker() {
       <div 
         className="flex animate-marquee-slower items-center py-1 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer whitespace-nowrap overflow-hidden"
       >
-        {(Array.isArray(stocks) ? [...stocks, ...stocks, ...stocks, ...stocks] : []).slice(0, 100).map((stock, i) => {
-          if (!stock) return null;
+        {(Array.isArray(stocks) && stocks.length > 0 ? [...stocks, ...stocks, ...stocks, ...stocks] : []).slice(0, 100).map((stock, i) => {
+          if (!stock || !stock.symbol) return null;
           const price = typeof stock.price === 'number' ? `$${stock.price.toFixed(2)}` : stock.price;
           const changeValue = typeof stock.change === 'number' ? stock.change : parseFloat(String(stock.change));
           const changeStr = typeof stock.change === 'number' ? `${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(1)}%` : stock.change;
@@ -123,7 +123,7 @@ function MarketTicker() {
 
           return (
             <div 
-              key={i} 
+              key={`${stock.symbol}-${i}`} 
               className="flex items-center gap-3 text-[10px] font-bold shrink-0 mx-8 transition-opacity hover:opacity-100 opacity-80 group-hover:opacity-70"
             >
               <span className="text-text font-black tracking-tight">{stock.symbol}</span>
