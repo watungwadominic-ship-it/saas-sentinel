@@ -388,22 +388,20 @@ def update_market_ticker():
         })
 
     try:
-                # Use upsert logic if the model or API supports it, or continue with delete-then-post
-                # We add a filter to ensure it only deletes what we want
-                requests.delete(f"{SUPABASE_URL}/rest/v1/market_stocks?symbol=neq.UPDATING", headers=headers)
-                
-                # Deduplicate ticker_data before posting to be safe
-                unique_ticker_data = []
-                seen_symbols = set()
-                for item in ticker_data:
-                    if item['symbol'] not in seen_symbols:
-                        unique_ticker_data.append(item)
-                        seen_symbols.add(item['symbol'])
-                
-                requests.post(f"{SUPABASE_URL}/rest/v1/market_stocks", headers=headers, json=unique_ticker_data)
-                print(f"✅ Market Ticker Updated: {len(unique_ticker_data)} symbols updated.")
-                success = True
-                break
+        # Use upsert logic if the model or API supports it, or continue with delete-then-post
+        # We add a filter to ensure it only deletes what we want
+        requests.delete(f"{SUPABASE_URL}/rest/v1/market_stocks?symbol=neq.UPDATING", headers=headers)
+        
+        # Deduplicate ticker_data before posting to be safe
+        unique_ticker_data = []
+        seen_symbols = set()
+        for item in ticker_data:
+            if item['symbol'] not in seen_symbols:
+                unique_ticker_data.append(item)
+                seen_symbols.add(item['symbol'])
+        
+        requests.post(f"{SUPABASE_URL}/rest/v1/market_stocks", headers=headers, json=unique_ticker_data)
+        print(f"✅ Market Ticker Updated: {len(unique_ticker_data)} symbols updated.")
     except Exception as e:
         print(f"❌ Error updating ticker in Supabase: {e}")
 
