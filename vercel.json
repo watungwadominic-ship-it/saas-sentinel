@@ -1,30 +1,15 @@
 {
   "version": 2,
   "functions": {
-    "server.ts": {
-      "includeFiles": "dist/**"
+    "api/index.ts": {
+      "includeFiles": ["dist/**", "package.json"]
     }
   },
   "rewrites": [
-    {
-      "source": "/assets/(.*)",
-      "destination": "/dist/assets/$1"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/server.ts"
-    },
-    {
-      "source": "/article/(.*)",
-      "destination": "/server.ts"
-    },
-    {
-      "source": "/news/(.*)",
-      "destination": "/server.ts"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/server.ts"
-    }
+    { "source": "/api/(.*)", "destination": "/api/index.ts" },
+    { "source": "/assets/(.*)", "destination": "/api/index.ts" },
+    { "source": "/article/(.*)", "destination": "/api/index.ts" },
+    { "source": "/news/(.*)", "destination": "/api/index.ts" },
+    { "source": "/(.*)", "destination": "/api/index.ts" }
   ]
 }
