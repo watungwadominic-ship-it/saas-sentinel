@@ -2,6 +2,7 @@
   "version": 2,
   "functions": {
     "api/index.ts": {
+      "runtime": "nodejs22.x",
       "includeFiles": "dist/**",
       "maxDuration": 60
     }
