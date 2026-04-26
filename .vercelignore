@@ -1,14 +1,10 @@
-_python_service/
+# Ignore local dev and python services from Vercel build context
 python_service/
+_python_service/
 .github/
 node_modules/
 dist/
-# Explicitly ignore files that might trigger the Python builder
+.env
+*.py
 requirements.txt
-**/requirements.txt
 requirements.python
-**/requirements.python
-main.py
-**/main.py
-newsletter.py
-**/newsletter.py
