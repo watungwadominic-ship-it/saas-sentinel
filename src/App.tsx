@@ -106,12 +106,15 @@ function MarketTicker() {
   if (!Array.isArray(stocks) || stocks.length === 0) return null;
 
   return (
-    <div className="relative w-full overflow-hidden group py-1">
+    <div className="relative w-full overflow-hidden group py-1" style={{ minHeight: '30px' }}>
       {/* Edge Fades */}
       <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-[var(--color-ticker-bg)]/80 to-transparent z-10 pointer-events-none" />
       <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[var(--color-ticker-bg)]/80 to-transparent z-10 pointer-events-none" />
       
-      <div className="flex animate-marquee-slower items-center py-1 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer whitespace-nowrap overflow-hidden">
+      <div 
+        className="flex animate-marquee-slower items-center py-1 hover:[animation-play-state:paused] active:[animation-play-state:paused] cursor-pointer whitespace-nowrap overflow-hidden"
+        style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap' }} // Force horizontal even if CSS fails
+      >
         {(Array.isArray(stocks) ? [...stocks, ...stocks, ...stocks, ...stocks] : []).slice(0, 100).map((stock, i) => {
           if (!stock) return null;
           const price = typeof stock.price === 'number' ? `$${stock.price.toFixed(2)}` : stock.price;
@@ -120,10 +123,14 @@ function MarketTicker() {
           const isPositive = typeof changeValue === 'number' ? changeValue >= 0 : String(changeStr).startsWith('+');
 
           return (
-            <div key={i} className="flex items-center gap-3 text-[10px] font-bold shrink-0 mx-8 transition-opacity hover:opacity-100 opacity-80 group-hover:opacity-70">
+            <div 
+              key={i} 
+              className="flex items-center gap-3 text-[10px] font-bold shrink-0 mx-8 transition-opacity hover:opacity-100 opacity-80 group-hover:opacity-70"
+              style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginRight: '32px' }} // Fallback spacing
+            >
               <span className="text-text font-black tracking-tight">{stock.symbol}</span>
               <span className="text-text/40 font-mono text-[9px]">{price}</span>
-              <span className={isPositive ? 'text-accent' : 'text-rose-500'}>
+              <span className={isPositive ? 'text-accent' : 'text-rose-500'} style={{ color: isPositive ? undefined : '#f43f5e' }}>
                 {changeStr}
               </span>
             </div>
