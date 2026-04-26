@@ -410,3 +410,4 @@ def update_market_ticker():
 if __name__ == "__main__":
     update_market_ticker()
     run_news_bot()
+
