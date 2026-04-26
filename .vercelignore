@@ -15,6 +15,7 @@ deps.txt
 Pipfile
 pyproject.toml
 .python_intel/
+.github/
 bot_scripts/
 _bot_scripts/
 python_service/
