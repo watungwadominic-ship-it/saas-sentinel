@@ -1,5 +1,4 @@
 # Ignore local dev and python services from Vercel build context
-_bot_scripts/
 .github/
 node_modules/
 .env
@@ -9,13 +8,12 @@ README.md
 llms.txt
 metadata.json
 
-# Explicitly ignore root-level Python markers that trigger Vercel rants
-newsletter.py
-main.py
-bot_engine.py
+# Block any accidental python markers at root that trigger Vercel's detect logic
+*.py
 requirements.txt
-requirements.python
 deps.txt
 Pipfile
 pyproject.toml
-*.py
+bot_scripts/
+_bot_scripts/
+python_service/
