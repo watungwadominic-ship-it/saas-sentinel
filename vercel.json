@@ -10,16 +10,19 @@
       "src": "server.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["dist/**", "index.html"]
+        "includeFiles": ["dist/**"]
       }
     }
   ],
   "routes": [
+    {
+      "src": "/assets/(.*)",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "continue": true
+    },
+    { "handle": "filesystem" },
     { "src": "/api/(.*)", "dest": "/server.ts" },
     { "src": "/article/(.*)", "dest": "/server.ts" },
-    { "src": "/(.*)cookie_check(.*)", "dest": "/server.ts" },
-    { "src": "/(.*)return_url=(.*)", "dest": "/server.ts" },
-    { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/server.ts" }
   ]
 }
