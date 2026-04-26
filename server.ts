@@ -248,23 +248,28 @@ const getDistPath = () => {
   const possiblePaths = [
     path.resolve(process.cwd(), 'dist'),
     path.resolve(__dirname, 'dist'),
-    path.resolve(__dirname, '..', 'dist'), // Handle api/ wrapper
+    path.resolve(__dirname, '..', 'dist'),
     path.resolve(process.cwd()),
     path.resolve(__dirname),
+    path.resolve(process.cwd(), '..', 'dist'),
     path.join(process.cwd(), 'public')
   ];
   
+  console.log(`[SERVER] Searching for build artifacts in ${possiblePaths.length} locations...`);
   for (const p of possiblePaths) {
     try {
+      if (!fs.existsSync(p)) continue;
       const indexPath = path.join(p, 'index.html');
       if (fs.existsSync(indexPath)) {
         const files = fs.readdirSync(p);
         if (files.includes('assets') || files.some(f => f.endsWith('.js') || f.endsWith('.css'))) {
+           console.log(`[SERVER] 🎉 Found valid build artifacts at: ${p}`);
            return p;
         }
       }
     } catch (e) {}
   }
+  console.warn("[SERVER] ⚠️ No build artifacts found in any location!");
   return null;
 };
 
@@ -310,6 +315,7 @@ if (distPath || isProduction) {
       const files = exists ? fs.readdirSync(finalDistPath) : [];
       const rootFiles = fs.readdirSync(process.cwd());
       const serverDir = fs.readdirSync(__dirname);
+      const apiDir = fs.existsSync(path.join(process.cwd(), 'api')) ? fs.readdirSync(path.join(process.cwd(), 'api')) : [];
       
       res.json({
         cwd: process.cwd(),
@@ -320,6 +326,7 @@ if (distPath || isProduction) {
         files,
         rootFiles,
         serverDir,
+        apiDir,
         env: {
           NODE_ENV: process.env.NODE_ENV,
           VERCEL: !!process.env.VERCEL
