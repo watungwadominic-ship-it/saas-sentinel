@@ -244,9 +244,9 @@ app.all("/api/cron/fetch-news", async (req, res) => {
 });
 
 // PRODUCTION SERVING OR BUILT ARTIFACTS EXIST
-let distPath = path.resolve(process.cwd(), 'dist');
-if (!fs.existsSync(path.join(distPath, 'index.html'))) {
+const getDistPath = () => {
   const possiblePaths = [
+    path.resolve(process.cwd(), 'dist'),
     path.resolve(__dirname, 'dist'),
     path.resolve(process.cwd()),
     path.resolve(__dirname),
@@ -254,32 +254,36 @@ if (!fs.existsSync(path.join(distPath, 'index.html'))) {
   ];
   
   for (const p of possiblePaths) {
-    if (fs.existsSync(path.join(p, 'index.html'))) {
-      distPath = p;
-      console.log(`[SERVER] Found index.html at: ${distPath}`);
-      break;
+    const indexPath = path.join(p, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      // Basic check to ensure it's a real dist folder (contains assets or is large enough)
+      const files = fs.readdirSync(p);
+      if (files.includes('assets') || files.some(f => f.endsWith('.js') || f.endsWith('.css'))) {
+         return p;
+      }
     }
   }
-}
+  return null;
+};
 
+const distPath = getDistPath();
 const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
 
-if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
-  console.log(`[SERVER] Static serving mode. distPath: ${distPath}`);
+if (distPath || isProduction) {
+  const finalDistPath = distPath || path.resolve(process.cwd(), 'dist');
+  console.log(`[SERVER] Static serving mode. finalDistPath: ${finalDistPath}`);
   
   // High-reliability asset serving
   app.use('/assets', (req, res, next) => {
-    // Correctly handle Vercel's leading slashes and paths
     const assetPath = req.path.startsWith('/') ? req.path.slice(1) : req.path;
     
-    // Search in dist/assets and also assets/ directly
     const possibleAssetPaths = [
-      path.join(distPath, 'assets', assetPath),
-      path.join(distPath, assetPath)
+      path.join(finalDistPath, 'assets', assetPath),
+      path.join(finalDistPath, assetPath)
     ];
 
     for (const filePath of possibleAssetPaths) {
-      if (fs.existsSync(filePath)) {
+      if (fs.existsSync(filePath) && !fs.lstatSync(filePath).isDirectory()) {
         if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
         if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
         if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
@@ -291,28 +295,28 @@ if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
     next();
   });
 
-  app.use(express.static(distPath, {
+  app.use(express.static(finalDistPath, {
     maxAge: '1d'
   }));
 
-  // Debug endpoint for Vercel/Production
+  // Debug endpoint
   app.get('/api/debug-path', (req, res) => {
     try {
-      const exists = fs.existsSync(distPath);
-      const files = exists ? fs.readdirSync(distPath) : [];
-      const hasIndex = fs.existsSync(path.join(distPath, 'index.html'));
-      
-      // also check root
+      const exists = fs.existsSync(finalDistPath);
+      const files = exists ? fs.readdirSync(finalDistPath) : [];
       const rootFiles = fs.readdirSync(process.cwd());
+      
+      const serverDir = fs.readdirSync(__dirname);
       
       res.json({
         cwd: process.cwd(),
         dirname: __dirname,
-        distPath,
+        finalDistPath,
         exists,
-        hasIndex,
+        hasIndex: fs.existsSync(path.join(finalDistPath, 'index.html')),
         files,
         rootFiles,
+        serverDir,
         env: {
           NODE_ENV: process.env.NODE_ENV,
           VERCEL: !!process.env.VERCEL
@@ -322,14 +326,13 @@ if (isProduction || fs.existsSync(path.join(distPath, 'index.html'))) {
   });
 
   app.get('*', (req, res) => {
-    // API exclusion
     if (req.path.startsWith('/api/')) return res.status(404).send('Not found');
 
-    const indexFile = path.join(distPath, 'index.html');
+    const indexFile = path.join(finalDistPath, 'index.html');
     if (fs.existsSync(indexFile)) {
       res.sendFile(indexFile);
     } else {
-      res.status(500).send(`Build artifacts not found at ${distPath}. Please check deployment scripts.`);
+      res.status(500).send(`Build artifacts not found. Searched in several locations. Last tried: ${finalDistPath}`);
     }
   });
 } else {
