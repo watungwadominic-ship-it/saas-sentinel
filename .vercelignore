@@ -14,6 +14,7 @@ requirements.txt
 deps.txt
 Pipfile
 pyproject.toml
+.python_intel/
 bot_scripts/
 _bot_scripts/
 python_service/
