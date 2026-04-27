@@ -98,7 +98,7 @@ app.get("/sitemap.xml", async (req, res) => {
   
   try {
     const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-    const { data: articles, error } = await supabase.from("news_articles").select("id, updated_at, created_at").order("created_at", { ascending: false });
+    const { data: articles, error } = await supabase.from("news_articles").select("id, updated_at, created_at, title").order("created_at", { ascending: false });
     
     if (error) throw error;
 
@@ -111,14 +111,24 @@ app.get("/sitemap.xml", async (req, res) => {
   </url>`;
 
     if (articles) {
-      articles.forEach(article => {
+      articles.forEach((article: any) => {
         const lastMod = (article.updated_at || article.created_at || new Date().toISOString()).split('T')[0];
+        const title = (article.title || "Latest Intelligence").substring(0, 100);
+        
         sitemap += `
   <url>
     <loc>${cleanBase}/article/${article.id}</loc>
     <lastmod>${lastMod}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
+    <news:news>
+      <news:publication>
+        <news:name>SaaS Sentinel</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>${article.created_at || new Date().toISOString()}</news:publication_date>
+      <news:title>${title.replace(/[<>&"']/g, "")}</news:title>
+    </news:news>
   </url>`;
       });
     }
