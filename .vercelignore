@@ -1,14 +1,13 @@
-# Block Vercel from ever seeing these files
+# Ignore background scripts and python environment
 src/python_intelligence/
-intelligence_layer/
 python_intelligence/
+intelligence_layer/
 python_intel/
 .python_intel/
 .github/
 python_service/
 bot_scripts/
 _bot_scripts/
-scripts/
 
 # Block Vercel's backend detection logic
 *.py
@@ -23,11 +22,7 @@ runtime.txt
 node_modules/
 dist/
 .env*
-.env.example
-package-lock.json
 
-# Project specific
-README.md
+# Project specific files that Vercel might get confused by
 llms.txt
 metadata.json
-server.ts
