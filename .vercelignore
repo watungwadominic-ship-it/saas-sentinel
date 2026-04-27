@@ -1,6 +1,10 @@
 # Block Vercel from ever seeing these files
 .github/
 .python_intel/
+python_intel/
+python_intelligence/
+src/scripts/bot_intel/
+src/bot_scripts/
 python_service/
 bot_scripts/
 _bot_scripts/
