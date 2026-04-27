@@ -1,24 +1,27 @@
-# Ignore everything that isn't part of the core web app
+# Block Vercel from ever seeing these files
 .github/
 .python_intel/
 python_service/
 bot_scripts/
 _bot_scripts/
-python_service/
 
-# File patterns to block Vercel's backend detection
+# Block Vercel's backend detection logic
 *.py
 requirements.txt
 deps.txt
 Pipfile
 pyproject.toml
+.python-version
 
-# Other non-essential files
+# Standard Node.js ignores
+node_modules/
+dist/
+.env
+.env.local
+
+# Project specific
 README.md
 llms.txt
 metadata.json
-simple-server.ts
-test.js
-.env
-.env.example
+server.ts
 package-lock.json
