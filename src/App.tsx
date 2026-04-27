@@ -24,6 +24,7 @@ import {
   Home,
   Search,
   Shield,
+  ShieldCheck,
   MapPin,
   Settings,
   Sun,
@@ -202,79 +203,125 @@ function AboutPage() {
           <Brain className="w-64 h-64 text-accent" />
         </div>
         
-        <div className="relative z-10 text-center md:text-left">
-          <div className="flex flex-col md:flex-row items-center gap-6 mb-12">
-            <div className="bg-accent p-4 rounded-3xl shadow-xl shadow-accent/20">
-              <Newspaper className="w-12 h-12 text-white" />
+        <div className="relative z-10">
+          <div className="flex flex-col md:flex-row items-center gap-8 mb-16 pb-12 border-b border-text/10">
+            <div className="bg-accent p-6 rounded-[2rem] shadow-2xl shadow-accent/20">
+              <Newspaper className="w-16 h-16 text-white" />
             </div>
-            <div>
-              <h1 className="text-4xl md:text-6xl font-black text-text tracking-tighter mb-2">SaaS Sentinel</h1>
-              <p className="text-accent font-black text-xs uppercase tracking-[0.3em]">Precision Intelligence for B2B Founders</p>
+            <div className="text-center md:text-left">
+              <h1 className="text-5xl md:text-7xl font-black text-text tracking-tighter mb-4">About SaaS Sentinel</h1>
+              <p className="text-accent font-black text-sm uppercase tracking-[0.4em]">Elite B2B Market Intelligence & Strategic Analysis</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-20">
-            <div className="space-y-6">
-              <h2 className="text-3xl font-black text-text">The Mission</h2>
-              <p className="text-lg text-text/70 leading-relaxed">
-                In an era of noise and hype, SaaS Sentinel provides the signal. We don't just report news; we analyze the structural shifts in the B2B SaaS landscape to give founders and investors a competitive edge.
-              </p>
-              <p className="text-lg text-text/70 leading-relaxed">
-                Our intelligence is powered by high-precision AI models and curated by veteran market analysts who understand that data without context is just noise.
-              </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 mb-24">
+            <div className="lg:col-span-7 space-y-8">
+              <section>
+                <h2 className="text-3xl font-black text-text mb-6">The Vision</h2>
+                <p className="text-xl text-text/70 leading-relaxed font-medium">
+                  SaaS Sentinel is a premier intelligence hub designed for the modern B2B ecosystem. We bridge the gap between raw data and actionable strategy using proprietary AI-driven precision to track real-time market shifts.
+                </p>
+                <p className="text-lg text-text/60 leading-relaxed mt-4">
+                  In an increasingly volatile market, identifying "Bullish" trends and "Bearish" pitfalls requires more than just headlines. Our platform provides high-fidelity signals that give founders, venture capitalists, and software engineers a distinct competitive advantage.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-3xl font-black text-text mb-6">Founder Authority</h2>
+                <div className="flex items-start gap-6 p-8 glass-panel rounded-[2rem] bg-accent/5 border-accent/10">
+                  <div className="w-20 h-20 rounded-full bg-accent/20 shrink-0 flex items-center justify-center border border-accent/30 overflow-hidden shadow-xl">
+                    <UserIcon className="w-10 h-10 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-text mb-2">Dominic Watungwa</h3>
+                    <p className="text-accent font-bold text-xs uppercase tracking-widest mb-4">Lead Developer & Chief Strategist</p>
+                    <p className="text-text/70 leading-relaxed">
+                      Dominic is the architect behind SaaS Sentinel's proprietary analysis framework. With a deep background in software engineering and market dynamics, he ensures that every intelligence briefing meets the highest standards of technical and strategic rigor.
+                    </p>
+                  </div>
+                </div>
+              </section>
             </div>
-            <div className="glass-card !bg-white/5 border-white/10 p-8 rounded-[2.5rem] flex flex-col justify-center">
-              <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center border border-accent/20">
-                    <Zap className="w-6 h-6 text-accent" />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-text">Real-time Feed</h4>
-                    <p className="text-sm text-text/40">24/7 monitoring of the SaaS ecosystem.</p>
-                  </div>
+
+            <aside className="lg:col-span-5 space-y-8">
+              <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-white/5">
+                <h3 className="text-xl font-black text-text mb-6 flex items-center gap-3">
+                  <ShieldCheck className="w-6 h-6 text-emerald-500" />
+                  Editorial Policy
+                </h3>
+                <p className="text-sm text-text/60 leading-relaxed mb-6">
+                  Integrity is our primary asset. Every briefing published on SaaS Sentinel undergoes a rigorous multi-stage verification process:
+                </p>
+                <ul className="space-y-4">
+                  {[
+                    "AI-Driven Signal Validation",
+                    "Cross-Reference against Financial Data",
+                    "Human-Lead Strategic Peer Review",
+                    "99% Reliability Benchmark"
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-3 text-xs font-black text-text/80 uppercase tracking-widest">
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-white/5">
+                <h3 className="text-xl font-black text-text mb-4">Core Values</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { label: 'Accuracy', val: '100%' },
+                    { label: 'Integrity', val: 'Absolute' },
+                    { label: 'Privacy', val: 'Zero-Knowledge' },
+                    { label: 'Impact', val: 'High' }
+                  ].map((v, i) => (
+                    <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                      <p className="text-[10px] font-black text-text/40 uppercase mb-1">{v.label}</p>
+                      <p className="text-sm font-black text-accent tracking-widest uppercase">{v.val}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center border border-accent/20">
-                    <TrendingUp className="w-6 h-6 text-accent" />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-text">Deep Analysis</h4>
-                    <p className="text-sm text-text/40">Strategic deep-dives into market trends.</p>
-                  </div>
-                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div className="text-center border-t border-text/10 pt-20 mb-20">
+            <h2 className="text-[10px] font-black text-text/40 uppercase tracking-[0.5em] mb-8">Contact & Transparency</h2>
+            <div className="max-w-2xl mx-auto space-y-6">
+              <p className="text-lg text-text/60">
+                We maintain an open-door policy for high-level inquiries, tips, and strategic partnerships.
+              </p>
+              <div className="inline-flex flex-col items-center gap-4">
+                <a 
+                  href="mailto:watungwadominic@gmail.com" 
+                  className="px-12 py-6 bg-accent text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-accent/30 hover:scale-105 hover:bg-accent/90 transition-all active:scale-95 flex items-center gap-4"
+                >
+                  <Mail className="w-7 h-7" />
+                  watungwadominic@gmail.com
+                </a>
+                <p className="text-[10px] font-bold text-text/30 uppercase tracking-[0.2em]">Official Strategic Inquiries Only</p>
               </div>
             </div>
           </div>
 
-          <h3 className="text-[10px] font-black text-text/40 uppercase tracking-[0.4em] mb-12 text-center">Our Methodology</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
-            {[
-              { icon: Search, title: 'Scout', desc: 'Continuous scanning of global tech news, funding rounds, and product launches.' },
-              { icon: Brain, title: 'Analyst', desc: 'AI-driven synthesis and human-verified strategic implications.' },
-              { icon: Mail, title: 'Delivery', desc: 'High-precision intelligence delivered via our feed and weekly newsletter.' }
-            ].map((item, i) => (
-              <div key={i} className="text-center p-8 glass-panel rounded-[2.5rem] border-white/10 hover:border-accent/30 transition-all group">
-                <div className="w-16 h-16 rounded-3xl bg-accent/5 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
-                  <item.icon className="w-8 h-8 text-accent" />
-                </div>
-                <h4 className="text-xl font-black text-text mb-4">{item.title}</h4>
-                <p className="text-sm text-text/60 leading-relaxed">{item.desc}</p>
+          {/* AdSense/Mediavine Footer Disclosures */}
+          <footer className="mt-24 pt-12 border-t border-dotted border-text/15">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-[11px] leading-relaxed text-text/40 font-medium">
+              <div>
+                <h4 className="font-black text-text/60 uppercase tracking-widest mb-4">Ad Disclosure</h4>
+                <p>
+                  To sustain our high-fidelity intelligence operations, SaaS Sentinel may display contextual advertisements. This platform is optimized for AdSense and Mediavine networks. We prioritize your privacy and do not sell user data to third parties.
+                </p>
               </div>
-            ))}
-          </div>
-
-          <div className="text-center border-t border-text/5 pt-20">
-            <h2 className="text-3xl font-black text-text mb-6">Get in Touch</h2>
-            <p className="text-text/60 mb-10 max-w-xl mx-auto">Have a tip or want to partner with SaaS Sentinel? Our analysts are always looking for the next big signal.</p>
-            <a 
-              href="mailto:watungwadominic@gmail.com" 
-              className="inline-flex items-center gap-3 px-10 py-5 bg-accent text-white rounded-2xl font-black text-lg shadow-xl shadow-accent/20 hover:scale-105 transition-transform active:scale-95"
-            >
-              <Mail className="w-6 h-6" />
-              Contact Us
-            </a>
-          </div>
+              <div>
+                <h4 className="font-black text-text/60 uppercase tracking-widest mb-4">Legal Notice</h4>
+                <p>
+                  &copy; {new Date().getFullYear()} SaaS Sentinel by Dominic Watungwa. All strategic analysis is for informational purposes only and does not constitute financial advice. All briefings are human-verified for 99% reliability.
+                </p>
+              </div>
+            </div>
+          </footer>
         </div>
       </div>
     </motion.div>
@@ -626,260 +673,306 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
     } catch (e) {
       return point;
     }
+  };  const parseSentinelContent = (content: string | undefined) => {
+    if (!content) return { main: '', verdict: '', take: '' };
+    
+    const verdictMarker = '**Strategic Verdict:**';
+    const takeMarker = "**Sentinel's Take:**";
+    
+    let main = content;
+    let verdict = "";
+    let take = "";
+    
+    if (content.includes(verdictMarker)) {
+      const parts = content.split(verdictMarker);
+      main = parts[0].trim();
+      const rest = parts[1].split(takeMarker);
+      verdict = rest[0].trim();
+      take = rest[1] ? rest[1].trim() : "";
+    } else if (content.includes(takeMarker)) {
+      const parts = content.split(takeMarker);
+      main = parts[0].trim();
+      take = parts[1].trim();
+    }
+    
+    return { main, verdict, take };
   };
+
+  const { main, verdict, take } = parseSentinelContent(article.content);
+  
+  const sentiment = (article.category || '').toUpperCase().includes('BULLISH') ? 'BULLISH' : 
+                    (article.category || '').toUpperCase().includes('BEARISH') ? 'BEARISH' : 'NEUTRAL';
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="max-w-[1200px] mx-auto pb-20 px-4 md:px-8"
+      className="max-w-[1240px] mx-auto pb-20 px-4 md:px-8"
     >
+      {/* Navigation */}
       <button 
         onClick={onBack}
-        className="glass-button !inline-flex !w-auto !px-6 !py-3 mb-8 text-text/60 font-bold text-xs uppercase tracking-widest hover:!bg-white/10 transition-all"
+        className="group inline-flex items-center gap-2 mb-8 text-text/40 font-black text-[10px] uppercase tracking-[0.2em] hover:text-accent transition-colors"
       >
-        <ChevronRight className="w-4 h-4 rotate-180" />
+        <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-accent/50 transition-colors">
+          <ChevronRight className="w-4 h-4 rotate-180" />
+        </div>
         Back to intelligence
       </button>
 
-      {/* Analysis Hero Image */}
+      {/* Hero Image */}
       <div className="mb-12">
-        {article.image_url ? (
-          <AnalysisImage 
-            src={article.image_url} 
-            alt={article.title} 
-          />
-        ) : (
-          <div className="w-full aspect-[21/9] rounded-[3rem] bg-gradient-to-br from-accent/20 via-black/40 to-accent/5 border border-accent/20 flex flex-col items-center justify-center p-12 text-center shadow-2xl relative overflow-hidden group">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-            <Newspaper className="w-20 h-20 text-accent mb-6 animate-pulse" />
-            <h2 className="text-3xl font-black text-white/40 uppercase tracking-[0.5em] group-hover:tracking-[0.8em] transition-all duration-1000">
-              Intelligence Briefing
-            </h2>
-            <div className="absolute bottom-8 left-8 right-8 flex justify-between items-center opacity-30">
-              <span className="text-[10px] font-black uppercase tracking-widest leading-none">Status: Decrypted</span>
-              <span className="text-[10px] font-black uppercase tracking-widest leading-none">Security Level: Elite</span>
-            </div>
-          </div>
-        )}
+        <AnalysisImage 
+          src={article.image_url} 
+          alt={article.title} 
+          className="aspect-[21/9] rounded-[2rem] border-white/10 shadow-2xl"
+        />
       </div>
 
-      <div className="flex flex-col xl:flex-row gap-12 items-start">
-        {/* Main Content (60%) */}
-        <div className="w-full xl:w-[60%]">
-          {/* The Signal (Header) */}
-          <header className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="bg-accent text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-[0.2em] shadow-lg shadow-accent/20">
-                Deep Dive
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-8 xl:gap-12 items-start">
+        {/* Main Column */}
+        <div className="space-y-8 md:space-y-12">
+          {/* Header Section */}
+          <div className="space-y-6 md:space-y-8">
+            <div className="flex items-center gap-2 md:gap-3">
+              <span className="bg-[#F27D26] text-white text-[8px] md:text-[9px] font-black px-4 py-1.5 rounded-lg uppercase tracking-[0.2em] shadow-lg shadow-[#F27D26]/20">
+                Strategic Brief
               </span>
-              <span className="bg-white/5 dark:bg-white/10 text-text/40 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-[0.2em] border border-white/10 flex items-center gap-2">
-                <Clock className="w-3 h-3" />
-                {article.readTime || '5-minute read'}
+              <span className="bg-white/5 text-text/40 text-[8px] md:text-[9px] font-black px-4 py-1.5 rounded-lg uppercase tracking-[0.3em] border border-white/10 flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5" />
+                {article.readTime || '8 MIN READ'}
               </span>
             </div>
             
-            <h1 className="text-4xl md:text-6xl font-black mb-8 leading-[1.1] text-gradient-warm tracking-tight">
+            <h1 className="text-3xl md:text-5xl xl:text-6xl font-black leading-[1.05] text-text tracking-tight max-w-full xl:max-w-[95%]">
               {article.title}
             </h1>
 
-            <div className="flex flex-wrap items-center gap-4 text-[10px] font-black uppercase tracking-widest text-text/40 border-b pb-8 border-text/10">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-white/40 dark:bg-white/10 rounded-full flex items-center justify-center border border-white/20">
-                  <UserIcon className="w-4 h-4 text-text/60" />
+            <div className="flex flex-wrap items-center gap-4 md:gap-6 pt-6 border-t border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                  <UserIcon className="w-3.5 h-3.5 md:w-4 md:h-4 text-text/40" />
                 </div>
-                <span className="text-text/80">{article.source}</span>
+                <div className="flex flex-col">
+                  <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-text leading-none mb-1">Intelligence Division</span>
+                  <span className="text-[8px] md:text-[9px] font-bold text-text/30 leading-none">{formatDate(article.date)}</span>
+                </div>
               </div>
-              <span>•</span>
-              <span>{formatDate(article.date)}</span>
-              <span>•</span>
-              <a href="#" className="text-accent hover:underline flex items-center gap-1">
-                Original Source <ChevronRight className="w-3 h-3" />
+              <div className="w-px h-6 md:h-8 bg-white/5 hidden sm:block" />
+              <a 
+                href={article.source || '#'} 
+                target="_blank" 
+                rel="no-referrer"
+                className="text-[#F27D26] text-[9px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:opacity-80 transition-opacity"
+              >
+                Original Source <ChevronRight className="w-3.5 h-3.5" />
               </a>
             </div>
-          </header>
+          </div>
 
-          {/* The Sentinel's Take (Analysis) */}
-          <section className="mb-16">
-            <div className="animated-border-orange rounded-[3rem] p-px overflow-hidden">
-              <div className="glass-panel !bg-white/40 dark:!bg-black/40 shadow-[0_0_40px_rgba(242,125,38,0.1)] rounded-[3rem] p-8 md:p-12 relative overflow-hidden h-full">
-                <div className="absolute top-0 right-0 p-8 opacity-5">
-                  <Brain className="w-32 h-32 text-accent" />
+          {/* Core Analysis Section */}
+          <section className="space-y-6 md:space-y-8">
+             <div className="flex items-center gap-4 mb-2">
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-[9px] md:text-[10px] font-black text-text/20 uppercase tracking-[0.4em]">Dispatch Analysis</span>
+                <div className="h-px flex-1 bg-white/10" />
+             </div>
+             
+             <div className="prose prose-invert prose-p:text-text/70 prose-p:leading-[1.7] md:prose-p:leading-[1.8] prose-p:text-base md:prose-p:text-lg max-w-none">
+                {main.split('\n\n').map((para, i) => (
+                  <p key={i} className={i === 0 ? "text-lg md:text-xl xl:text-2xl text-text font-bold leading-tight md:leading-relaxed mb-6 md:mb-8" : ""}>
+                    {para}
+                  </p>
+                ))}
+             </div>
+          </section>
+
+          {/* Sentinel's Take Card */}
+          <section>
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#F27D26]/20 to-transparent blur-2xl opacity-50 group-hover:opacity-75 transition-opacity" />
+              
+              <div className="relative glass-panel !bg-[#0D0D15] rounded-[2rem] md:rounded-[3rem] p-8 md:p-14 border-[#F27D26]/20 overflow-hidden min-h-[auto] md:min-h-[300px] flex flex-col justify-center">
+                <div className="absolute -right-20 -top-20 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity hidden md:block">
+                  <Brain className="w-[300px] md:w-[400px] h-[300px] md:h-[400px] text-white" />
                 </div>
                 
-                <div className="relative z-10">
-                  <h3 className="text-[10px] font-black text-accent uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
-                    <Zap className="w-4 h-4" />
-                    EXECUTIVE ANALYSIS
-                  </h3>
+                <div className="relative z-10 space-y-6 md:space-y-8">
+                  <div className="flex items-center gap-3 text-[9px] md:text-[10px] font-black text-[#F27D26] uppercase tracking-[0.4em]">
+                    <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    Sentinel's Take
+                  </div>
                   
-                  <div className="prose prose-xl prose-slate dark:prose-invert max-w-none text-text/90 leading-[1.8] font-medium">
-                    {(article.sentinel_take || article.content) ? (
-                      <div className="space-y-8">
-                        {(article.sentinel_take || article.content).split('\n\n').map((para, i) => (
-                          <p key={i} className={i === 0 ? "text-2xl font-black text-text leading-tight" : ""}>
-                            {para}
-                          </p>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="italic text-text/40">Our Sentinel is currently processing the strategic implications of this development...</p>
-                    )}
+                  <div className="text-lg md:text-xl xl:text-2xl font-black text-text/95 leading-[1.5] md:leading-[1.6] tracking-tight">
+                    {take || article.summary || "Strategizing high-impact implications..."}
                   </div>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* The Verdict (Prediction) */}
-          <section className="mb-12">
-            <div className="p-8 md:p-12 glass-card border-white/20 bg-gradient-to-br from-accent/10 to-transparent rounded-[2.5rem] text-center">
-              <h3 className="text-[10px] font-black text-text/40 uppercase tracking-[0.3em] mb-6">
-                STRATEGIC OUTLOOK
-              </h3>
-              <p className="text-2xl md:text-4xl font-black text-text leading-tight tracking-tight">
-                {article.verdict || "Market volatility expected as structural shifts continue."}
-              </p>
+          {/* Strategic Outlook Card */}
+          <section>
+            <div className="glass-panel !bg-white/5 rounded-[2rem] md:rounded-[3rem] p-8 md:p-16 xl:p-20 border-white/10 text-center relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10 space-y-4 md:space-y-6">
+                <span className="text-[9px] md:text-[10px] font-black text-text/30 uppercase tracking-[0.5em] block">Strategic Outlook</span>
+                <p className="text-xl md:text-3xl xl:text-4xl font-black text-text leading-[1.2] tracking-tighter xl:max-w-[90%] mx-auto">
+                  {verdict || "Maintain strategic liquidity while monitoring vertical realignment."}
+                </p>
+              </div>
             </div>
           </section>
 
-          {/* Social Share / Integration Section */}
-          <section className="flex flex-wrap gap-4 pt-12 border-t border-text/10">
+          {/* Footer Actions */}
+          <div className="flex flex-wrap gap-4 items-center mt-12 md:mt-16 pt-8 border-t border-white/5">
             <button 
               onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`, '_blank')}
-              className="flex items-center gap-3 px-6 py-3 bg-[#0077b5] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-lg"
+              className="flex items-center gap-3 px-6 md:px-8 py-3 md:py-3.5 bg-[#0077b5] text-white rounded-xl font-black text-[9px] md:text-[10px] uppercase tracking-widest hover:brightness-110 transition-all shadow-xl shadow-[#0077b5]/20"
             >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+              <svg className="w-3.5 h-3.5 md:w-4 md:h-4 fill-current" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
               Share on LinkedIn
             </button>
             <button 
-              onClick={() => window.open(`https://threads.net/intent/post?text=${encodeURIComponent(article.title + ' - SaaS Intelligence Breakdown via @SaaSSentinel')}`, '_blank')}
-              className="flex items-center gap-3 px-6 py-3 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-lg"
+              onClick={() => window.open(`https://threads.net/intent/post?text=${encodeURIComponent(article.title)}`, '_blank')}
+              className="flex items-center gap-3 px-6 md:px-8 py-3 md:py-3.5 bg-white text-black rounded-xl font-black text-[9px] md:text-[10px] uppercase tracking-widest hover:opacity-90 transition-all shadow-xl"
             >
-              <svg className="w-5 h-5 fill-current" viewBox="0 0 192 192"><path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.834C118.497 71.7915 120.315 75.82 121.411 80.7937C110.82 80.5962 98.7188 80.8999 87.0544 84.7725C74.6041 89.288 64.8878 98.0581 61.7042 109.525C59.9886 115.704 60.3341 122.753 64.2952 128.729C68.3267 134.811 75.334 139.117 84.0538 140.85C87.6201 141.558 91.3113 141.916 95.0211 141.916C105.105 141.916 115.011 138.838 122.062 133.053C126.746 129.213 130.402 124.321 132.553 118.6L143.193 124.623C139.805 133.642 133.4 141.523 126.16 146.997C117.151 153.801 106.104 157.067 95.0211 157.067C90.2223 157.067 85.4526 156.611 80.8415 155.698C68.1009 153.167 57.018 146.983 49.3248 138.355C41.8329 129.93 38.6534 118.727 40.3813 106.772C44.1522 89.6015 56.6433 76.5415 72.8427 68.6186C80.2078 65.018 88.5298 63.1513 97.2662 63.1513C104.97 63.1513 112.593 64.4447 119.576 67.019C128.691 70.384 135.539 76.8407 139.691 85.945C140.334 86.9536 140.947 87.969 141.537 88.9883ZM118.156 122.972C113.626 126.68 106.31 129.624 95.0211 129.624C92.6587 129.624 90.3129 129.408 88.0163 128.95C82.7846 127.904 78.5085 125.132 76.0125 121.139C74.3414 118.461 74.3828 115.111 75.3195 111.737C77.3005 104.593 84.1444 98.4239 94.671 94.6033C104.606 91.31 114.717 91.0776 123.634 91.8023C122.259 104.184 118.156 122.972z"/></svg>
-              Share on Threads
+              <svg className="w-4 h-4 md:w-5 md:h-5 fill-current" viewBox="0 0 192 192"><path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.834C118.497 71.7915 120.315 75.82 121.411 80.7937C110.82 80.5962 98.7188 80.8999 87.0544 84.7725C74.6041 89.288 64.8878 98.0581 61.7042 109.525C59.9886 115.704 60.3341 122.753 64.2952 128.729C68.3267 134.811 75.334 139.117 84.0538 140.85C87.6201 141.558 91.3113 141.916 95.0211 141.916C105.105 141.916 115.011 138.838 122.062 133.053C126.746 129.213 130.402 124.321 132.553 118.6L143.193 124.623C139.805 133.642 133.4 141.523 126.16 146.997C117.151 153.801 106.104 157.067 95.0211 157.067C90.2223 157.067 85.4526 156.611 80.8415 155.698C68.1009 153.167 57.018 146.983 49.3248 138.355C41.8329 129.93 38.6534 118.727 40.3813 106.772C44.1522 89.6015 56.6433 76.5415 72.8427 68.6186C80.2078 65.018 88.5298 63.1513 97.2662 63.1513C104.97 63.1513 112.593 64.4447 119.576 67.019C128.691 70.384 135.539 76.8407 139.691 85.945C140.334 86.9536 140.947 87.969 141.537 88.9883ZM118.156 122.972C113.626 126.68 106.31 129.624 95.0211 129.624C92.6587 129.624 90.3129 129.408 88.0163 128.95C82.7846 127.904 78.5085 121.139C76.0125 121.139C74.3414 118.461 74.3828 115.111 75.3195 111.737C77.3005 104.593 84.1444 98.4239 94.671 94.6033C104.606 91.31 114.717 91.0776 123.634 91.8023C122.259 104.184 118.156 122.972z"/></svg>
+               Share on Threads
             </button>
-          </section>
+          </div>
         </div>
 
-        {/* Sidebar (40%) - Quick Context */}
-        <aside className="w-full xl:w-[40%] xl:sticky xl:top-32 space-y-8">
-          <div className="glass-panel p-8 rounded-[2.5rem] border-white/10">
-            <h3 className="text-[10px] font-black text-text/40 uppercase tracking-[0.3em] mb-8 flex items-center gap-4">
-              REVENUE IMPLICATIONS
-              <div className="h-px flex-1 bg-text/10" />
+        {/* Sidebar Column */}
+        <aside className="space-y-6 md:space-y-8">
+          {/* Revenue Implications Card */}
+          <div className="glass-panel !bg-[#12121A] rounded-[2rem] md:rounded-[2.5rem] p-8 md:p-10 border-white/10 shadow-2xl">
+            <h3 className="text-[9px] md:text-[10px] font-black text-text/40 uppercase tracking-[0.4em] mb-8 md:mb-10 flex items-center gap-4">
+              Revenue Implications
+              <div className="h-px flex-1 bg-white/5" />
             </h3>
             
-            <div className="space-y-6">
+            <div className="space-y-8">
               {Array.isArray(article.breakdown) && article.breakdown.length > 0 ? (
                 article.breakdown.map((point, i) => (
-                  <div key={i} className="flex gap-4 group">
-                    <div className="w-8 h-8 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 text-accent font-black text-xs group-hover:bg-accent group-hover:text-white transition-all">
+                  <div key={i} className="flex gap-5 group">
+                    <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-text/60 font-black text-[11px] group-hover:bg-accent group-hover:text-white transition-all group-hover:border-accent">
                       {i + 1}
                     </div>
-                    <p className="text-sm text-text/70 leading-relaxed font-medium">
+                    <p className="text-xs text-text/60 leading-relaxed font-bold group-hover:text-text/90 transition-colors">
                       {parsePoint(point)}
                     </p>
                   </div>
                 ))
               ) : (
-                <div className="py-8 px-4 text-center space-y-4">
-                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-accent/20 border-t-accent animate-spin mx-auto opacity-40" />
-                  <p className="text-xs font-black text-text/40 uppercase tracking-widest">Generating Strategic Intelligence</p>
-                  <p className="text-[10px] text-text/20 font-medium px-4">Our AI Sentinel is parsing real-time financial data to extract deep market implications.</p>
-                </div>
+                [1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex gap-5">
+                    <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-text/20 font-black text-[11px]">
+                      {i}
+                    </div>
+                    <div className="space-y-2 flex-1 pt-2">
+                      <div className="h-2 bg-white/5 rounded w-full" />
+                      <div className="h-2 bg-white/5 rounded w-3/4" />
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>
 
-          <div className="glass-card p-8 rounded-[2.5rem] bg-accent/5 border-accent/20">
-            <h4 className="text-xs font-black text-text uppercase tracking-widest mb-4">Market Impact</h4>
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 mb-4">
-              <span className="text-xs font-bold text-text/60">Sector</span>
-              <span className="text-xs font-black text-accent uppercase tracking-widest">{article.category}</span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
-              <span className="text-xs font-bold text-text/60">Sentiment</span>
-              <span className={`text-xs font-black uppercase tracking-widest ${
-                (article.category || '').toUpperCase() === 'BULLISH' ? 'text-emerald-500' : 
-                (article.category || '').toUpperCase() === 'BEARISH' ? 'text-rose-500' : 'text-amber-500'
-              }`}>
-                {article.category || 'Bullish'}
-              </span>
+          {/* Market Impact Card */}
+          <div className="glass-panel !bg-[#12121A] rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border-white/10 shadow-2xl">
+            <h3 className="text-[8px] md:text-[9px] font-black text-text uppercase tracking-[0.3em] md:tracking-[0.4em] mb-6 md:mb-8">Market Impact</h3>
+            <div className="space-y-3 md:space-y-4">
+              <div className="flex items-center justify-between p-4 md:p-5 bg-white/5 rounded-xl md:rounded-2xl border border-white/10">
+                <span className="text-[9px] md:text-[10px] font-black text-text/40 uppercase tracking-widest">Sector</span>
+                <span className="text-[9px] md:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">SaaS / Enterprise</span>
+              </div>
+              <div className="flex items-center justify-between p-4 md:p-5 bg-white/5 rounded-xl md:rounded-2xl border border-white/10">
+                <span className="text-[9px] md:text-[10px] font-black text-text/40 uppercase tracking-widest">Sentiment</span>
+                <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] ${sentiment === 'BULLISH' ? 'text-emerald-500' : sentiment === 'BEARISH' ? 'text-rose-500' : 'text-amber-500'}`}>
+                  {sentiment}
+                </span>
+              </div>
+               <div className="flex items-center justify-between p-4 md:p-5 bg-white/5 rounded-xl md:rounded-2xl border border-white/10">
+                <span className="text-[9px] md:text-[10px] font-black text-text/40 uppercase tracking-widest">Confidence</span>
+                <span className="text-[9px] md:text-[10px] font-black text-text/60 uppercase tracking-[0.2em]">92%</span>
+              </div>
             </div>
           </div>
         </aside>
       </div>
     </motion.div>
   );
-}
+};
 
 function FeaturedInsightCard({ article, onClick }: { article: Article, onClick: () => void }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mb-8 xl:mb-6 glass-panel !rounded-[2rem] overflow-hidden border-white/20 shadow-xl group cursor-pointer max-h-none xl:max-h-[350px]"
+      className="mb-12 glass-panel !bg-[#0D0D15] !rounded-[3rem] overflow-hidden border-white/5 shadow-2xl group cursor-pointer group hover:border-[#F27D26]/20 transition-all duration-700"
       onClick={onClick}
     >
-      <div className="flex flex-col xl:flex-row h-full">
-        {/* Left Side: Image + Headline + Signal (PC) / Top Side (Mobile) */}
-        <div className="w-full xl:w-1/2 flex flex-col border-b xl:border-b-0 xl:border-r border-white/10 overflow-hidden">
-          <div className="relative aspect-video xl:aspect-auto xl:h-40 overflow-hidden shrink-0">
-            <AnalysisImage 
-              src={article.image_url} 
-              alt={article.title} 
-              rounded="rounded-none"
-              className="!border-none !shadow-none"
-            />
-            <div className="absolute top-4 left-4 z-20">
-              <span className="bg-accent text-white text-[8px] font-black px-4 py-1.5 rounded-full uppercase tracking-[0.2em] shadow-lg">
-                Featured Insight
-              </span>
+      <div className="flex flex-col xl:flex-row min-h-[450px] xl:max-h-[600px]">
+        {/* Image Section */}
+        <div className="w-full xl:w-[40%] relative overflow-hidden">
+          <AnalysisImage 
+            src={article.image_url} 
+            alt={article.title} 
+            rounded="rounded-none"
+            className="!border-none !shadow-none group-hover:scale-110 transition-transform duration-1000 h-full w-full object-cover"
+          />
+          {/* Tag Overlay */}
+          <div className="absolute top-8 left-8 z-20">
+            <div className="flex items-center gap-2 bg-[#F27D26] text-white text-[10px] font-black px-5 py-2.5 rounded-xl uppercase tracking-[0.2em] shadow-2xl shadow-[#F27D26]/40">
+              <Zap className="w-4 h-4" />
+              Intelligence Briefing
             </div>
           </div>
-          
-          <div className="p-6 xl:p-8 flex-1 flex flex-col justify-center bg-white/20 dark:bg-black/20 backdrop-blur-xl">
-            <div className="flex items-center gap-3 mb-4 text-[9px] font-black uppercase tracking-widest text-text/40">
+          <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent pointer-events-none" />
+        </div>
+        
+        {/* Content Section */}
+        <div className="w-full xl:w-[60%] p-8 md:p-14 lg:p-16 flex flex-col justify-center relative">
+          {/* Abstract background element */}
+          <div className="absolute -right-20 -bottom-20 opacity-[0.02] pointer-events-none">
+            <Brain className="w-80 h-80 text-white" />
+          </div>
+
+          <div className="relative z-10 space-y-8">
+            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.3em] text-text/30">
               <span>{article.source}</span>
-              <span>•</span>
+              <div className="w-1 h-1 rounded-full bg-white/10" />
               <span>{formatDate(article.date)}</span>
+              <div className="w-1 h-1 rounded-full bg-white/10" />
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5" />
+                {article.readTime || '8 MIN READ'}
+              </div>
             </div>
             
-            <h2 className="text-xl md:text-2xl xl:text-3xl font-black mb-4 leading-tight text-gradient-warm line-clamp-2">
+            <h2 className="text-3xl md:text-5xl font-black text-text leading-[1.05] tracking-tighter group-hover:text-[#F27D26] transition-colors">
               {article.title}
             </h2>
             
-            <p className="text-sm text-text/60 italic leading-relaxed line-clamp-2">
+            <p className="text-lg text-text/50 italic leading-relaxed line-clamp-3 font-medium">
               "{article.summary}"
             </p>
-          </div>
-        </div>
-        
-        {/* Right Side: Sentinel's Take (PC) / Bottom Side (Mobile) */}
-        <div className="w-full xl:w-1/2 p-6 xl:p-8 bg-white/30 dark:bg-black/30 backdrop-blur-2xl flex flex-col overflow-hidden">
-          <h4 className="text-[9px] font-black text-accent uppercase tracking-[0.2em] mb-4 flex items-center gap-2 shrink-0">
-            <Zap className="w-3 h-3" />
-            The Sentinel's Take
-          </h4>
-          
-          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4">
-            <p className="text-xs text-text/80 leading-relaxed font-medium">
-              Our AI Sentinel has analyzed this development against the broader SaaS landscape. This isn't just a news event; it's a structural realignment of market forces.
-            </p>
-            <p className="text-xs text-text/70 leading-relaxed">
-              <span className="text-text font-bold">Strategic Impact:</span> The convergence of {article.category} and AI-driven automation is accelerating. We anticipate a 15-20% increase in vertical integration over the next quarter. Founders should focus on proprietary data moats and aggressive cost-optimization through LLM orchestration.
-            </p>
-            <p className="text-xs text-text/70 leading-relaxed">
-              <span className="text-text font-bold">Market Outlook:</span> This volatility creates a unique entry point for resilient platforms. The "Sentinel's Strategy" here is to maintain high liquidity while doubling down on core infrastructure that supports this new {article.category.toLowerCase()} paradigm.
-            </p>
-          </div>
 
-          <div className="mt-4 pt-4 border-t border-white/5 shrink-0">
-            <span className="text-[10px] font-black text-accent uppercase tracking-widest flex items-center gap-2">
-              Read Full Analysis <ChevronRight className="w-3 h-3" />
-            </span>
+            <div className="pt-8 border-t border-white/5 flex items-center justify-between">
+              <div className="flex -space-x-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="w-8 h-8 rounded-full border-2 border-[#0D0D15] bg-white/5 flex items-center justify-center">
+                    <UserIcon className="w-3.5 h-3.5 text-white/20" />
+                  </div>
+                ))}
+              </div>
+              <div className="text-[#F27D26] font-black text-[11px] uppercase tracking-[0.3em] flex items-center gap-2 group-hover:gap-4 transition-all">
+                Access Full Report <ChevronRight className="w-4 h-4" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -916,6 +1009,41 @@ export default function App() {
   const [showFabTooltip, setShowFabTooltip] = useState(false);
   const [showCookieConsent, setShowCookieConsent] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+
+  const [visibleCount, setVisibleCount] = useState(12);
+
+  const loadMore = () => {
+    setVisibleCount(prev => prev + 12);
+  };
+
+  // Dynamic SEO Metadata
+  useEffect(() => {
+    if (selectedArticle) {
+      document.title = `${selectedArticle.title} | SaaS Sentinel`;
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        metaDescription.setAttribute('content', selectedArticle.summary);
+      }
+      
+      // Update Open Graph
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', selectedArticle.title);
+      
+      const ogDesc = document.querySelector('meta[property="og:description"]');
+      if (ogDesc) ogDesc.setAttribute('content', selectedArticle.summary);
+      
+      const ogImage = document.querySelector('meta[property="og:image"]');
+      if (ogImage) ogImage.setAttribute('content', selectedArticle.image_url);
+    } else if (showAbout) {
+      document.title = "About SaaS Sentinel | Elite B2B Market Intelligence";
+    } else {
+      document.title = "SaaS Sentinel | Elite B2B Market Intelligence & SaaS Analysis";
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        metaDescription.setAttribute('content', "SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts.");
+      }
+    }
+  }, [selectedArticle, showAbout]);
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -1148,6 +1276,71 @@ export default function App() {
     loadArticles();
   }, []);
 
+  // SEO & Path-based Navigation Hijack
+  useEffect(() => {
+    const handleNavigation = async () => {
+      const path = window.location.pathname;
+      const articleMatch = path.match(/\/article\/(\d+)/);
+      
+      if (articleMatch) {
+         const articleId = articleMatch[1];
+         // Search local state first if available, else fetch
+         const existing = articles.find(a => a.id === articleId);
+         if (existing) {
+           setSelectedArticle(existing);
+         } else {
+           setLoading(true);
+           try {
+             const article = await fetchArticleById(articleId);
+             if (article) setSelectedArticle(article);
+           } catch (e) {
+             console.error("Deep link navigation error:", e);
+           } finally {
+             setLoading(false);
+           }
+         }
+      } else if (path === '/' || path === '') {
+        setSelectedArticle(null);
+        setShowAbout(false);
+        setShowArchive(false);
+        setShowPrivacy(false);
+      }
+    };
+
+    handleNavigation();
+    window.addEventListener('popstate', handleNavigation);
+    return () => window.removeEventListener('popstate', handleNavigation);
+  }, [articles.length]); // Re-run if articles load
+
+  // Sync state changes with browser History API
+  useEffect(() => {
+    let targetPath = '/';
+    if (selectedArticle) {
+      targetPath = `/article/${selectedArticle.id}`;
+    } else if (showAbout) {
+      targetPath = '/about';
+    } else if (showArchive) {
+      targetPath = '/archive';
+    } else if (showPrivacy) {
+      targetPath = '/privacy';
+    }
+
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath);
+    }
+
+    // Set page title for SEO
+    if (selectedArticle) {
+      document.title = `${selectedArticle.title} | SaaS Sentinel Intelligence`;
+    } else if (showAbout) {
+      document.title = "About | SaaS Sentinel Intelligence";
+    } else if (showArchive) {
+      document.title = "Archive | SaaS Sentinel Intelligence";
+    } else {
+      document.title = "SaaS Sentinel | Real-time SaaS Intelligence Monitoring";
+    }
+  }, [selectedArticle, showAbout, showArchive, showPrivacy]);
+
   const handleLogin = async () => {
     try {
       await supabase.auth.signInWithOAuth({
@@ -1218,6 +1411,8 @@ export default function App() {
            category.includes(query);
   });
 
+  const displayedArticles = filteredArticles.slice(0, visibleCount);
+
   return (
     <div className="min-h-screen relative transition-colors duration-500">
         {/* Background Gradients */}
@@ -1248,20 +1443,20 @@ export default function App() {
               initial={{ y: 0 }}
               animate={{ 
                 y: showHeader ? 0 : -120,
-                paddingTop: isScrolled ? '8px' : '16px',
-                paddingBottom: isScrolled ? '8px' : '0px'
+                paddingTop: isScrolled ? '6px' : '12px',
+                paddingBottom: isScrolled ? '6px' : '0px'
               }}
               transition={{ 
                 duration: 0.4, 
-                ease: [0.4, 0, 0.2, 1] // Cubic-Bezier
+                ease: [0.4, 0, 0.2, 1]
               }}
-              className="fixed top-0 left-0 right-0 z-[110] px-4 lg:hidden"
+              className="fixed top-0 left-0 right-0 z-[110] px-3 md:px-6 lg:hidden"
             >
-              <div className={`max-w-5xl mx-auto overflow-hidden shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] border ${isScrolled ? 'rounded-2xl bg-[var(--color-glass)] backdrop-blur-[10px] border-white/20' : 'rounded-[40px] bg-[var(--color-nav-bg)] backdrop-blur-md border-white/10'}`}>
+              <div className={`max-w-5xl mx-auto overflow-hidden shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] border ${isScrolled ? 'rounded-2xl bg-[var(--color-glass)] backdrop-blur-[12px] border-white/20' : 'rounded-[32px] bg-[var(--color-nav-bg)] backdrop-blur-md border-white/10'}`}>
                 {/* Tier 1: Market Pulse (Top Bar) */}
-                <div className={`bg-[var(--color-ticker-bg)] flex items-center gap-2 px-4 transition-all duration-500 ${isScrolled ? 'h-0 opacity-0 overflow-hidden' : 'h-8 opacity-100'}`}>
-                  <div className="flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-text/60 shrink-0">
-                    <Activity className="w-2.5 h-2.5 text-accent" />
+                <div className={`bg-[var(--color-ticker-bg)] flex items-center gap-2 px-4 transition-all duration-500 border-b border-white/5 ${isScrolled ? 'h-0 opacity-0 overflow-hidden' : 'h-7 opacity-100'}`}>
+                  <div className="flex items-center gap-1.5 text-[7px] md:text-[8px] font-black uppercase tracking-widest text-[#F27D26] shrink-0">
+                    <Activity className="w-2.5 h-2.5" />
                     <span className="hidden xs:inline">Market Pulse</span>
                   </div>
                   <div className="flex-1 overflow-hidden">
@@ -1270,72 +1465,57 @@ export default function App() {
                 </div>
 
                 {/* Tier 2: Brand & Navigation (Bottom Bar) */}
-                <nav className={`flex items-center justify-between gap-2 px-5 md:px-8 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isScrolled ? 'py-2' : 'py-3 md:py-4'}`}>
+                <nav className={`flex items-center justify-between gap-1.5 px-2 md:px-8 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isScrolled ? 'py-1' : 'py-2 md:py-4'}`}>
                   {/* Left side: Logo & Brand */}
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-                      <div className={`bg-accent rounded-xl shadow-lg transition-all duration-500 ${isScrolled ? 'p-1' : 'p-2'}`}>
-                        <Newspaper className={`${isScrolled ? 'w-3.5 h-3.5' : 'w-5 h-5 md:w-6 md:h-6'} text-white`} />
-                      </div>
-                      <h1 className={`${isScrolled ? 'text-[10px]' : 'text-xs md:text-base'} font-bold tracking-tight text-text transition-all duration-500`}>SaaS Sentinel</h1>
+                  <div className="flex items-center gap-1 md:gap-3 cursor-pointer shrink-0" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+                    <div className={`bg-[#F27D26] rounded-xl shadow-lg transition-all duration-500 ${isScrolled ? 'p-0.5' : 'p-1'}`}>
+                      <Newspaper className={`${isScrolled ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5 md:w-6 md:h-6'} text-white`} />
+                    </div>
+                    <div className="flex flex-col leading-none">
+                      <h1 className={`${isScrolled ? 'text-[7px]' : 'text-[9px] md:text-sm'} font-black uppercase tracking-tight text-text transition-all duration-500`}>SaaS Sentinel</h1>
                     </div>
                   </div>
                   
                   {/* Center/Right: Nav Links & Sub Button */}
-                  <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
-                    <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold overflow-x-auto no-scrollbar whitespace-nowrap px-1">
+                  <div className="flex items-center gap-1 md:gap-4 min-w-0 overflow-hidden">
+                    <div className="flex items-center gap-1.5 md:gap-4 text-[6.5px] md:text-[10px] font-black uppercase tracking-widest overflow-x-auto no-scrollbar whitespace-nowrap px-0.5">
                         <button 
                           onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); }}
-                          className={`relative transition-colors py-1 ${!selectedArticle && !showAbout && !showPrivacy && !showArchive ? 'text-accent' : 'text-[var(--color-nav-text)] hover:text-text'}`}
+                          className={`relative transition-colors py-1 ${!selectedArticle && !showAbout && !showPrivacy && !showArchive ? 'text-[#F27D26]' : 'text-text/40 hover:text-text'}`}
                         >
                           Feed
                         </button>
-                        {!isScrolled && (
-                          <>
-                            <button 
-                              onClick={() => { setShowAbout(true); setSelectedArticle(null); setShowPrivacy(false); setShowArchive(false); }}
-                              className={`relative transition-colors py-1 ${showAbout ? 'text-accent' : 'text-[var(--color-nav-text)] hover:text-text'}`}
-                            >
-                              About
-                            </button>
-                            <button 
-                              onClick={() => { setShowArchive(true); setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); }}
-                              className={`relative transition-colors py-1 ${showArchive ? 'text-accent' : 'text-[var(--color-nav-text)] hover:text-text'}`}
-                            >
-                              Archive
-                            </button>
-                          </>
-                        )}
+                        <button 
+                          onClick={() => { setShowAbout(true); setSelectedArticle(null); setShowPrivacy(false); setShowArchive(false); }}
+                          className={`relative transition-colors py-1 ${showAbout ? 'text-[#F27D26]' : 'text-text/40 hover:text-text'}`}
+                        >
+                          About
+                        </button>
+                        <button 
+                          onClick={() => { setShowArchive(true); setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); }}
+                          className={`relative transition-colors py-1 ${showArchive ? 'text-[#F27D26]' : 'text-text/40 hover:text-text'}`}
+                        >
+                          Archive
+                        </button>
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 md:gap-3 shrink-0">
                       <button 
                         onClick={() => setIsDarkMode(!isDarkMode)}
-                        className="p-2 rounded-xl bg-white/40 dark:bg-black/20 border border-white/20 hover:bg-accent/10 transition-all duration-500 flex items-center justify-center shadow-sm"
+                        className={`rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-500 flex items-center justify-center shrink-0 ${isScrolled ? 'w-5 h-5' : 'w-7 h-7'}`}
                         aria-label="Toggle theme"
                       >
-                        {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                        {isDarkMode ? <Sun className="w-2 h-2" /> : <Moon className="w-2 h-2" />}
                       </button>
 
-                      {user ? (
-                        <div className={`flex items-center gap-2 bg-white/20 rounded-full border border-white/10 transition-all duration-500 ${isScrolled ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}>
-                          <img src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture || ''} alt="" className={`${isScrolled ? 'w-4 h-4' : 'w-5 h-5'} rounded-full`} />
-                          {!isScrolled && (
-                            <button onClick={handleLogout} className="text-text/40 hover:text-text transition-colors">
-                              <LogOut className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => setShowSubscribeModal(true)}
-                          className={`btn-accent font-black transition-all duration-500 flex items-center justify-center gap-1.5 shrink-0 ${isScrolled ? '!px-2 !py-1 !text-[9px] scale-90' : '!px-3 !py-1.5 !text-[10px] md:!text-xs'}`}
-                        >
-                          <Mail className="w-3 h-3" />
-                          <span className="hidden xs:inline">Subscribe</span>
-                          <span className="xs:hidden">Sub</span>
-                        </button>
-                      )}
+                      <button 
+                        onClick={() => setShowSubscribeModal(true)}
+                        className={`bg-[#F27D26] text-white font-black rounded-lg md:rounded-xl transition-all duration-500 flex items-center justify-center gap-1 md:gap-2 uppercase tracking-widest shadow-lg shadow-[#F27D26]/20 ${isScrolled ? 'px-1.5 py-1 text-[6px]' : 'px-2 py-1.5 text-[7px] md:text-[10px]'}`}
+                      >
+                        <Mail className="w-2 h-2" />
+                        <span className="hidden xs:inline">Subscribe</span>
+                        <span className="xs:hidden">Sub</span>
+                      </button>
                     </div>
                   </div>
                 </nav>
@@ -1413,8 +1593,8 @@ export default function App() {
           </AnimatePresence>
 
         {/* Main Content */}
-        <main className="flex-1 pt-48 lg:pt-12 pb-12 transition-all duration-500 relative z-10">
-          <div className="max-w-[1200px] mx-auto px-4 md:px-8">
+        <main className="flex-1 pt-40 lg:pt-8 pb-12 transition-all duration-500 relative z-10">
+          <div className="max-w-[1800px] mx-auto px-4 md:px-12">
             <AnimatePresence mode="wait">
             {showArchive ? (
               <ArchivePage key="archive-page" onSelect={(article) => { setSelectedArticle(article); setShowArchive(false); }} />
@@ -1428,11 +1608,11 @@ export default function App() {
                 onBack={() => setSelectedArticle(null)} 
               />
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-12">
+              <div className="space-y-16">
                 {/* News Feed */}
                 <section className="min-w-0">
                   {/* Liquid Glass Search Bar */}
-                  <div className="mb-12 relative group">
+                  <div className="mb-16 relative group max-w-5xl mx-auto">
                     <div className="absolute inset-0 bg-accent/5 blur-2xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
                     <div className="relative glass-panel !rounded-3xl flex items-center px-6 py-2 border-white/20 shadow-xl focus-within:border-accent/30 transition-all">
                       <Search className="w-5 h-5 text-text/30 mr-4" />
@@ -1454,125 +1634,132 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between border-b border-text/5 pb-4 mb-8">
-                    <h2 className="text-xl font-bold flex items-center gap-2 text-text">
-                      <Activity className="w-5 h-5 text-accent" />
-                      Intelligence Feed
-                    </h2>
-                    <div className="flex gap-2">
-                      <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                      <span className="text-[10px] font-bold text-text/40 uppercase tracking-widest">Live Updates</span>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {loading && articles.length === 0 ? (
-                      <LiquidGlassSpinner />
-                    ) : loading ? (
-                      Array.from({ length: 4 }).map((_, i) => (
-                        <motion.div
-                          key={`skeleton-${i}`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                        >
-                          <SkeletonCard />
-                        </motion.div>
-                      ))
-                    ) : filteredArticles.length > 0 ? (
-                      filteredArticles.map((article) => (
-                        <motion.article 
-                          key={article.id}
-                          layout
-                          initial={{ opacity: 0, y: 30 }}
-                          whileInView={{ opacity: 1, y: 0 }}
-                          viewport={{ once: true, margin: "-50px" }}
-                          whileHover={{ backdropFilter: "blur(40px)" }}
-                          className="group glass-card cursor-pointer flex flex-col h-full transition-all duration-500 hover:shadow-2xl hover:shadow-accent/5"
-                          onClick={() => setSelectedArticle(article)}
-                        >
-                          <div className="relative aspect-video overflow-hidden rounded-2xl mb-6 bg-slate-900 shadow-inner">
-                            <AnalysisImage 
-                              src={article.image_url} 
-                              alt={article.title} 
-                              rounded="rounded-none"
-                              className="!border-none !shadow-none group-hover:scale-105 transition-transform duration-700"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-                            <div className="absolute top-3 left-3 flex gap-2 z-20">
-                              <span className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border backdrop-blur-md shadow-sm ${
-                                (article.category || '').toUpperCase() === 'BEARISH' ? 'bg-rose-500/20 text-rose-500 border-rose-500/30' :
-                                (article.category || '').toUpperCase() === 'BULLISH' ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' :
-                                'bg-white/60 dark:bg-black/60 text-text border-white/20'
-                              }`}>
-                                {article.category === 'Analysis' ? 'AI Update' : article.category}
-                              </span>
+                  {loading && articles.length === 0 ? (
+                    <LiquidGlassSpinner />
+                  ) : filteredArticles.length > 0 ? (
+                    <div className="space-y-16">
+                      {/* Featured First Article - Full Width on Desktop for Better Impact */}
+                      <FeaturedInsightCard 
+                        article={filteredArticles[0]} 
+                        onClick={() => setSelectedArticle(filteredArticles[0])} 
+                      />
+
+                      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_340px] gap-8 md:gap-10 items-start px-0">
+                        {/* Remaining Articles Grid */}
+                        <div className="space-y-12">
+                          <div className="flex items-center justify-between border-b border-text/5 pb-4">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-text">
+                              <Activity className="w-5 h-5 text-accent" />
+                              Intelligence Feed
+                            </h2>
+                            <div className="flex gap-2">
+                              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                              <span className="text-[10px] font-bold text-text/40 uppercase tracking-widest">Live Updates</span>
                             </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6 md:gap-8">
+                            {displayedArticles.slice(1).map((article) => (
+                              <motion.article 
+                                key={article.id}
+                                layout
+                                initial={{ opacity: 0, y: 30 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true, margin: "-50px" }}
+                                className="group glass-panel !bg-white/5 hover:!bg-white/10 !rounded-[2.5rem] cursor-pointer flex flex-col h-full transition-all duration-500 border-white/5 hover:border-white/20 shadow-xl overflow-hidden"
+                                onClick={() => setSelectedArticle(article)}
+                              >
+                                <div className="relative aspect-[16/10] overflow-hidden shrink-0">
+                                  <AnalysisImage 
+                                    src={article.image_url} 
+                                    alt={article.title} 
+                                    rounded="rounded-none"
+                                    className="!border-none !shadow-none group-hover:scale-105 transition-transform duration-700"
+                                  />
+                                  <div className="absolute top-4 left-4 z-20">
+                                    <span className={`text-[9px] font-black px-4 py-1.5 rounded-lg uppercase tracking-widest border backdrop-blur-xl shadow-lg ${
+                                      (article.category || '').toUpperCase().includes('BULLISH') ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' :
+                                      (article.category || '').toUpperCase().includes('BEARISH') ? 'bg-rose-500/20 text-rose-500 border-rose-500/30' :
+                                      'bg-accent/20 text-accent border-accent/30'
+                                    }`}>
+                                      {article.category === 'Analysis' ? 'AI Intelligence' : article.category}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                <div className="p-6 flex-1 flex flex-col">
+                                <div className="flex justify-between items-center mb-3">
+                                  <span className="text-[9px] font-black text-text/30 uppercase tracking-[0.2em]">{article.source}</span>
+                                  <span className="text-[9px] font-bold text-text/20">{article.readTime}</span>
+                                </div>
+
+                                <h3 className="text-lg font-black group-hover:text-accent transition-colors leading-[1.25] mb-3 line-clamp-2">
+                                  {article.title}
+                                </h3>
+                                
+                                <p className="text-xs text-text/50 leading-relaxed line-clamp-3 italic mb-6">
+                                  "{article.summary}"
+                                </p>
+
+                                <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
+                                  <span className="text-[9px] text-text/20 font-black uppercase tracking-widest">{formatDate(article.date)}</span>
+                                  <div className="text-accent font-black text-[9px] uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all">
+                                    Full Analysis <ChevronRight className="w-3 h-3" />
+                                    </div>
+                                  </div>
+                                </div>
+                              </motion.article>
+                            ))}
                           </div>
                           
-                          <div className="flex-1 flex flex-col">
-                            <div className="flex justify-between items-center mb-4">
-                              <span className="text-[10px] font-bold text-text/40 uppercase tracking-widest">{article.source}</span>
-                              <span className="text-[10px] font-bold text-text/30">{article.readTime}</span>
+                          {visibleCount < filteredArticles.length ? (
+                            <div className="flex justify-center pt-8">
+                              <button 
+                                onClick={loadMore}
+                                className="group relative px-10 py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] text-text transition-all overflow-hidden"
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-r from-accent/0 via-accent/5 to-accent/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                                Scan for More Intelligence
+                              </button>
                             </div>
-
-                            <h3 className="text-xl font-black group-hover:text-accent transition-colors leading-tight mb-4 line-clamp-2">
-                              {article.title}
-                            </h3>
-                            
-                            <p className="text-sm text-text/60 leading-relaxed line-clamp-3 mb-6 italic">
-                              "{article.summary}"
-                            </p>
-
-                            {article.verdict && (
-                              <div className="mb-6 p-4 bg-accent/5 rounded-2xl border border-accent/10">
-                                <h4 className="text-[8px] font-black text-accent uppercase tracking-widest mb-1 flex items-center gap-1">
-                                  <Zap className="w-2.5 h-2.5" /> Verdict
-                                </h4>
-                                <p className="text-xs font-bold text-text/80 line-clamp-2 leading-snug">
-                                  {article.verdict}
-                                </p>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center pt-12 pb-8 border-t border-white/5">
+                              <div className="bg-accent/5 p-4 rounded-full mb-4">
+                                <Archive className="w-6 h-6 text-accent/40" />
                               </div>
-                            )}
-
-                            <div className="mt-auto pt-6 border-t border-text/5 flex items-center justify-between">
-                              <span className="text-[10px] text-text/30 font-bold">{formatDate(article.date)}</span>
-                              <div className="text-accent font-black text-[10px] uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all">
-                                View Report <ChevronRight className="w-3 h-3" />
-                              </div>
+                              <h4 className="text-sm font-black text-text/60 uppercase tracking-widest mb-2">End of Live Feed</h4>
+                              <p className="text-xs text-text/40 mb-6 text-center max-w-xs leading-relaxed">
+                                You've reached the limit of current active intelligence. Access thousands of historical signals in our secure vault.
+                              </p>
+                              <button 
+                                onClick={() => setShowArchive(true)}
+                                className="px-8 py-3 bg-accent text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-accent/20 hover:scale-105 transition-transform"
+                              >
+                                Access Full Intelligence Archive
+                              </button>
                             </div>
+                          )}
+                        </div>
+
+                        {/* Right Sidebar Column */}
+                        <aside className="hidden lg:block space-y-8">
+                          {/* Market Ticker Card */}
+                          <div className="glass-panel p-6 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden">
+                            <div className="flex items-center justify-between mb-6">
+                              <div className="flex items-center gap-2">
+                                <Activity className="w-5 h-5 text-accent" />
+                                <h4 className="text-xs font-black uppercase tracking-widest text-text/60">Market Pulse</h4>
+                              </div>
+                              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                            </div>
+                            <div className="-mx-6 px-6 border-y border-white/5 bg-[var(--color-ticker-bg)]">
+                               <MarketTicker />
+                             </div>
+                            <p className="mt-4 text-[10px] text-text/40 font-bold uppercase tracking-widest text-center">Live SaaS Index Tracking</p>
                           </div>
-                        </motion.article>
-                      ))
-                    ) : (
-                      <div className="col-span-full text-center py-20 glass-panel rounded-[2.5rem] border-dashed border-text/10 bg-white/5">
-                        <Newspaper className="w-16 h-16 text-text/10 mx-auto mb-6 animate-pulse" />
-                        <h3 className="text-lg font-black text-text/60 mb-2 uppercase tracking-widest">Digital Void Detected</h3>
-                        <p className="text-text/40 font-medium mb-8 max-w-sm mx-auto">No intelligence reports have been processed for this view yet. Our AI Sentinel is likely gathering fresh data.</p>
-                      </div>
-                    )}
-                  </div>
-                </section>
 
-                {/* Right Sidebar Column */}
-                <aside className="hidden lg:block space-y-8">
-                  {/* Market Ticker Card */}
-                  <div className="glass-panel p-8 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-accent" />
-                        <h4 className="text-xs font-black uppercase tracking-widest text-text/60">Market Pulse</h4>
-                      </div>
-                      <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                    </div>
-                    <div className="-mx-8 px-8 border-y border-white/5 bg-[var(--color-ticker-bg)]">
-                      <MarketTicker />
-                    </div>
-                    <p className="mt-4 text-[10px] text-text/40 font-bold uppercase tracking-widest text-center">Live SaaS Index Tracking</p>
-                  </div>
-
-                  {/* Weekly Intelligence (Subscribe) Card */}
-                  <div id="newsletter-card" className="glass-panel p-8 rounded-[2rem] border border-accent/20 shadow-2xl relative overflow-hidden group">
+                          {/* Weekly Intelligence (Subscribe) Card */}
+                  <div id="newsletter-card" className="glass-panel p-6 rounded-[2rem] border border-accent/20 shadow-2xl relative overflow-hidden group">
                     <div className="absolute -top-12 -right-12 w-32 h-32 bg-accent/10 rounded-full blur-3xl group-hover:bg-accent/20 transition-all duration-700" />
                     
                     <div className="relative z-10">
@@ -1622,7 +1809,7 @@ export default function App() {
                   </div>
 
                   {/* Market Health Card */}
-                  <div className="glass-panel p-8 rounded-[2rem] border-l-4 border-accent shadow-lg">
+                  <div className="glass-panel p-6 rounded-[2rem] border-l-4 border-accent shadow-lg">
                     <div className="flex items-center gap-2 mb-6">
                       <TrendingUp className="w-5 h-5 text-accent" />
                       <h4 className="text-xs font-bold uppercase tracking-widest text-text/60">Market Health</h4>
@@ -1642,7 +1829,7 @@ export default function App() {
                   </div>
 
                   {/* Trending Topics (Sidebar Card) */}
-                  <div className="glass-panel p-8 rounded-[2rem]">
+                  <div className="glass-panel p-6 rounded-[2rem]">
                     <h4 className="font-bold mb-8 flex items-center gap-2 text-sm uppercase tracking-widest text-text/80">
                       <Flame className="w-5 h-5 text-accent" />
                       Intelligence Clusters
@@ -1658,7 +1845,17 @@ export default function App() {
                   </div>
                 </aside>
               </div>
-            )}
+            </div>
+          ) : (
+            <div className="col-span-full text-center py-24 glass-panel rounded-[3rem] border-dashed border-text/10 bg-white/5">
+              <Newspaper className="w-20 h-20 text-text/10 mx-auto mb-6 animate-pulse" />
+              <h3 className="text-xl font-black text-text/60 mb-2 uppercase tracking-[0.3em]">No Intelligence Found</h3>
+              <p className="text-text/40 font-medium max-w-sm mx-auto">Our Sentinel is currently scanning for market-shifting signals.</p>
+            </div>
+          )}
+        </section>
+      </div>
+    )}
             </AnimatePresence>
           </div>
         </main>
@@ -1675,7 +1872,7 @@ export default function App() {
               </div>
               
               <div className="flex gap-8 text-xs font-black text-text/30 uppercase tracking-widest">
-                {['Twitter', 'LinkedIn', 'GitHub'].map(social => (
+                {['LinkedIn'].map(social => (
                   <a key={social} href="#" className="hover:text-accent transition-colors">{social}</a>
                 ))}
               </div>
