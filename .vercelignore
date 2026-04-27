@@ -4,12 +4,10 @@ python_intelligence/
 intelligence_layer/
 python_intel/
 .python_intel/
-.github/
 python_service/
 bot_scripts/
-_bot_scripts/
 
-# Block Vercel's backend detection logic
+# Block Vercel's backend detection for Python
 *.py
 requirements.txt
 deps.txt
@@ -22,6 +20,7 @@ runtime.txt
 node_modules/
 dist/
 .env*
+.github/
 
 # Project specific files that Vercel might get confused by
 llms.txt
