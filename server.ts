@@ -82,6 +82,57 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
   }
 };
 
+// --- SEO & SITEMAP ROUTES (At Top to Prevent SPA Fallback) ---
+app.get("/robots.txt", (req, res) => {
+  const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+  res.setHeader('Content-Type', 'text/plain');
+  res.send(`User-agent: *
+Allow: /
+Sitemap: ${cleanBase}/sitemap.xml
+`);
+});
+
+app.get("/sitemap.xml", async (req, res) => {
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  
+  try {
+    const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+    const { data: articles, error } = await supabase.from("news_articles").select("id, updated_at, created_at").order("created_at", { ascending: false });
+    
+    if (error) throw error;
+
+    let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+  <url>
+    <loc>${cleanBase}/</loc>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>`;
+
+    if (articles) {
+      articles.forEach(article => {
+        const lastMod = (article.updated_at || article.created_at || new Date().toISOString()).split('T')[0];
+        sitemap += `
+  <url>
+    <loc>${cleanBase}/article/${article.id}</loc>
+    <lastmod>${lastMod}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>`;
+      });
+    }
+
+    sitemap += `\n</urlset>`;
+    return res.status(200).send(sitemap);
+  } catch (error: any) {
+    console.error("[SITEMAP-ERROR]", error);
+    // Return a valid empty sitemap instead of an error string to avoid HTML interpretation
+    const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+    return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${cleanBase}/</loc></url></urlset>`);
+  }
+});
+
 // --- CORE MIDDLEWARE START (CRITICAL ORDER) ---
 
 // 0. SUPREME BOT RESCUE (v48 Stealth Hardened)
@@ -217,50 +268,7 @@ app.get("/api/proxy-image*", (req, res) => {
   return fetchAndSendImage(imageUrl, res, req.headers['user-agent'] as string);
 });
 
-// --- SEO & SITEMAP ROUTES ---
-app.get("/robots.txt", (req, res) => {
-  const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-  res.type("text/plain");
-  res.send(`User-agent: *
-Allow: /
-Sitemap: ${cleanBase}/sitemap.xml
-`);
-});
-
-app.get("/sitemap.xml", async (req, res) => {
-  try {
-    const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-    const { data: articles } = await supabase.from("news_articles").select("id, updated_at, created_at").order("created_at", { ascending: false });
-    
-    let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${cleanBase}/</loc>
-    <changefreq>hourly</changefreq>
-    <priority>1.0</priority>
-  </url>`;
-
-    if (articles) {
-      articles.forEach(article => {
-        const lastMod = (article.updated_at || article.created_at || new Date().toISOString()).split('T')[0];
-        sitemap += `
-  <url>
-    <loc>${cleanBase}/article/${article.id}</loc>
-    <lastmod>${lastMod}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>`;
-      });
-    }
-
-    sitemap += `\n</urlset>`;
-    res.type("application/xml");
-    res.send(sitemap);
-  } catch (error) {
-    res.status(500).send("Error generating sitemap");
-  }
-});
-
+// --- OLD SEO ROUTES REMOVED ---
 app.get("/api/ping", (req, res) => {
   res.json({ status: "alive", timestamp: new Date().toISOString() });
 });
