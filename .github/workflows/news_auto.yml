@@ -18,6 +18,11 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Prep Python scripts
+        run: |
+          mv .github/python_intel/bot_engine.py.stashed .github/python_intel/bot_engine.py
+          mv .github/python_intel/newsletter.py.stashed .github/python_intel/newsletter.py
+
       - name: Install dependencies
         run: pip install -r .github/python_intel/deps.txt
 
