@@ -1,21 +1,24 @@
-# Ignore local dev and python services from Vercel build context
+# Ignore everything that isn't part of the core web app
 .github/
-node_modules/
-.env
-simple-server.ts
-test.js
-README.md
-llms.txt
-metadata.json
+.python_intel/
+python_service/
+bot_scripts/
+_bot_scripts/
+python_service/
 
-# Block any accidental python markers at root that trigger Vercel's detect logic
+# File patterns to block Vercel's backend detection
 *.py
 requirements.txt
 deps.txt
 Pipfile
 pyproject.toml
-.python_intel/
-.github/
-bot_scripts/
-_bot_scripts/
-python_service/
+
+# Other non-essential files
+README.md
+llms.txt
+metadata.json
+simple-server.ts
+test.js
+.env
+.env.example
+package-lock.json
