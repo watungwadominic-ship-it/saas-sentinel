@@ -1,5 +1,8 @@
 # Block Vercel from ever seeing these files
 src/python_intelligence/
+intelligence_layer/
+python_intelligence/
+python_intel/
 .python_intel/
 .github/
 python_service/
@@ -14,6 +17,7 @@ deps.txt
 Pipfile*
 pyproject.toml
 .python-version
+runtime.txt
 
 # Standard Node.js ignores
 node_modules/
