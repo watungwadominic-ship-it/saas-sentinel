@@ -1,8 +1,5 @@
 # Block Vercel from ever seeing these files
 src/python_intelligence/
-python_intelligence/
-intelligence_layer/
-python_intel/
 .python_intel/
 .github/
 python_service/
