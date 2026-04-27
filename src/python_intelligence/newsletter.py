@@ -21,10 +21,11 @@ def send_weekly_newsletter():
 
     # Fetch articles from the last 7 days
     now = datetime.now()
-    last_week = (now - timedelta(days=7)).isoformat()
+    last_week = (now - timedelta(days=7)).strftime('%Y-%m-%d')
     
     try:
-        url = f"{SUPABASE_URL}/rest/v1/news_articles?created_at=gte.{last_week}&order=created_at.desc"
+        # Use published_at for filtering as it is explicitly saved by the bot
+        url = f"{SUPABASE_URL}/rest/v1/news_articles?published_at=gte.{last_week}&order=published_at.desc"
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         articles = response.json()
@@ -45,20 +46,25 @@ def send_weekly_newsletter():
         <hr style="border: 1px solid #1e293b; margin: 30px 0;">
     """
 
-    for art in articles[:5]:
-        # FIXED: Added safe check for art and content
+    app_url = os.environ.get('SHARED_APP_URL', 'https://saas-sentinel.vercel.app').rstrip('/')
+
+    for art in articles[:8]: # Increased to 8 articles for a richer weekly digest
         if not art or not isinstance(art, dict):
             continue
             
         title = art.get('title', 'Unknown Intelligence Report')
         content = art.get('content') or art.get('summary') or "Analysis pending."
-        content_snippet = str(content)[:280] + "..." if len(str(content)) > 280 else str(content)
+        content_snippet = str(content)[:300] + "..." if len(str(content)) > 300 else str(content)
+        
+        # Use the same pathing logic as bot_engine.py
+        article_id = art.get('id')
+        article_url = f"{app_url}/news/v48/article/{article_id}/index.html" if article_id else app_url
         
         newsletter_html += f"""
         <div style="margin-bottom: 40px; background: rgba(30, 41, 59, 0.5); padding: 25px; border-radius: 15px; border: 1px solid #334155;">
-            <h2 style="color: #ffffff; margin-top: 0;">{title}</h2>
-            <p style="color: #94a3b8; line-height: 1.6;">{content_snippet}</p>
-            <a href="{os.environ.get('SHARED_APP_URL', 'https://saas-sentinel.vercel.app')}/article/{art.get('id', '')}" style="color: #f08924; font-weight: bold; text-decoration: none;">Read Full Analysis →</a>
+            <h2 style="color: #ffffff; margin-top: 0; font-size: 20px;">{title}</h2>
+            <p style="color: #94a3b8; line-height: 1.6; font-size: 14px;">{content_snippet}</p>
+            <a href="{article_url}" style="color: #f08924; font-weight: bold; text-decoration: none; font-size: 14px;">Read Full Analysis →</a>
         </div>
         """
 
