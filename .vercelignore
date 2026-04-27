@@ -1,31 +1,32 @@
 # Block Vercel from ever seeing these files
-.github/
-.python_intel/
-python_intel/
+src/python_intelligence/
 python_intelligence/
-src/scripts/bot_intel/
-src/bot_scripts/
+intelligence_layer/
+python_intel/
+.python_intel/
+.github/
 python_service/
 bot_scripts/
 _bot_scripts/
+scripts/
 
 # Block Vercel's backend detection logic
 *.py
 requirements.txt
 deps.txt
-Pipfile
+Pipfile*
 pyproject.toml
 .python-version
 
 # Standard Node.js ignores
 node_modules/
 dist/
-.env
-.env.local
+.env*
+.env.example
+package-lock.json
 
 # Project specific
 README.md
 llms.txt
 metadata.json
 server.ts
-package-lock.json
