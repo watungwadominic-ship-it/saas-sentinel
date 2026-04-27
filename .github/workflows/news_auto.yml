@@ -18,13 +18,8 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Prep Python scripts
-        run: |
-          mv .github/python_intel/bot_engine.py.stashed .github/python_intel/bot_engine.py
-          mv .github/python_intel/newsletter.py.stashed .github/python_intel/newsletter.py
-
       - name: Install dependencies
-        run: pip install -r .github/python_intel/deps.txt
+        run: pip install -r src/python_intelligence/deps.txt
 
       - name: Run News Bot
         env:
@@ -35,4 +30,4 @@ jobs:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
           SHARED_APP_URL: ${{ secrets.SHARED_APP_URL }}
-        run: python .github/python_intel/bot_engine.py
+        run: python src/python_intelligence/bot_engine.py
