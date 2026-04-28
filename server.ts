@@ -18,101 +18,35 @@ const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
 
-// Shared Image Proxy Helper
-const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: string = "") => {
-  if (!imageUrl) return res.status(400).send("Missing URL");
+// --- 1. PRIORITY ROUTES (Health & SEO) ---
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+app.get("/api/health", (req, res) => {
+  return res.status(200).json({ status: "ok", vercel: true });
+});
 
-  try {
-    console.log(`[PROXY-HELPER] Fetching: ${imageUrl}`);
-    const response = await fetch(imageUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': userAgentHint || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache'
-      }
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      // Don't log as error if it's an expected external failure (404, 503, etc)
-      if (response.status >= 400) {
-        console.warn(`[PROXY-HELPER-WARN] Image ${response.status} (${response.statusText}): ${imageUrl}`);
-        throw new Error(`Upstream ${response.status}`);
-      }
-      throw new Error(`Failed to fetch image: ${response.statusText}`);
-    }
-
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Robots-Tag", "noindex, nofollow"); 
-    
-    if (userAgentHint && userAgentHint.toLowerCase().includes('linkedin')) {
-      res.setHeader("X-LinkedIn-Ready", "true");
-    }
-    
-    // Clear cookies for image requests to prevent interference
-    res.setHeader('Set-Cookie', 'ais_bot_verified=true; Path=/; SameSite=None; Secure; Max-Age=3600; HttpOnly');
-
-    const arrayBuffer = await response.arrayBuffer();
-    return res.send(Buffer.from(arrayBuffer));
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    
-    const isUpstreamError = error.message.startsWith('Upstream');
-    const isTimeout = error.name === 'AbortError';
-    
-    if (isUpstreamError || isTimeout) {
-      console.log(`[PROXY-HELPER-INFO] Fallback triggered for: ${imageUrl} (${error.message})`);
-    } else {
-      console.error(`[PROXY-HELPER-ERROR] ${error.message} for ${imageUrl}`);
-    }
-
-    res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "no-cache");
-    return res.send(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
-  }
-};
-
-// --- SEO & SITEMAP ROUTES (At Top to Prevent SPA Fallback) ---
 app.get("/robots.txt", (req, res) => {
-  const host = req.get('host') || 'saas-sentinel.vercel.app';
-  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
+  const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
   res.setHeader('Content-Type', 'text/plain');
-  res.send(`User-agent: *
-Allow: /
-Sitemap: ${cleanBase}/sitemap.xml
-`);
+  res.send(`User-agent: *\nAllow: /\nSitemap: ${cleanBase}/sitemap.xml\n`);
 });
 
 app.get("/sitemap.xml", async (req, res) => {
-  // Use a strictly safe base URL
   const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
 
-  // Pre-set headers to ensure XML response even if it crashes later
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Cache-Control', 'public, max-age=3600'); 
   
   try {
-    console.log(`[SITEMAP] Generating for ${host} | Base: ${cleanBase}`);
-    
     const { data: articles, error } = await supabase
       .from("news_articles")
       .select("id, updated_at, created_at")
       .order("created_at", { ascending: false })
-      .limit(200); // Small limit to ensure speed
+      .limit(200);
     
     let sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -131,118 +65,68 @@ app.get("/sitemap.xml", async (req, res) => {
     sitemap += `\n</urlset>`;
     return res.status(200).send(sitemap.trim());
   } catch (err: any) {
-    console.error("[SITEMAP-FATAL]", err);
-    // Return minimal valid sitemap
-    return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>${cleanBase}/</loc>\n    <changefreq>hourly</changefreq>\n  </url>\n</urlset>`);
+    console.error("[SITEMAP-CATASTROPHIC]", err);
+    return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${cleanBase}/</loc></url>\n</urlset>`);
   }
 });
 
-// --- CORE MIDDLEWARE START (CRITICAL ORDER) ---
-
-// 0. SUPREME BOT RESCUE (v48 Stealth Hardened)
-app.all(['/_cookie_check.html', '/cookie_check', '/security_check'], async (req, res, next) => {
-  const userAgent = (req.headers["user-agent"] || "").toLowerCase();
-  const returnUrl = (req.query.return_url as string || req.query.return_path as string || "").trim();
-  
-  // High-priority LinkedIn/Social detection
-  const isLinkedIn = userAgent.includes('linkedin') || userAgent.includes('social-preview') || userAgent.includes('bot') || userAgent.includes('crawler');
-  const referer = (req.headers['referer'] || "").toLowerCase();
-  
-  if (!returnUrl && !isLinkedIn && !referer.includes('linkedin')) return next();
-
-  let decoded = returnUrl;
-  try { if (returnUrl) decoded = decodeURIComponent(returnUrl); } catch(e) {}
-  if (decoded.includes('%')) { try { decoded = decodeURIComponent(decoded); } catch(e) {} }
-
-  // Extract ID from anywhere possible (URL, referer, or platform context)
-  const idMatch = decoded.match(/\/(\d+)/) || 
-                  req.path.match(/\/(\d+)/) || 
-                  referer.match(/\/(\d+)/) ||
-                  decoded.match(/[?&]article_id=(\d+)/i);
-
-  if (idMatch) {
-     const articleId = idMatch[1];
-     console.log(`[RESCUE-V48] Hardened Intercept for ID: ${articleId} | Target: ${decoded.substring(0, 40)}`);
-     
-     if (decoded.includes('/og-image.jpg')) {
-        const { data } = await supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
-        if (data?.image_url) return fetchAndSendImage(data.image_url, res, userAgent);
-     }
-     
-     res.cookie('ais_bot_verified', 'true', { maxAge: 3600000, path: '/', sameSite: 'none', secure: true });
-     return serveBotMetadata(articleId, req, res, "v48-rescue");
-  }
-  next();
-});
-
-async function serveBotMetadata(articleId: string, req: any, res: any, version: string) {
-  let ogTitle = "SaaS Intelligence Sentinel";
-  let ogDesc = "Real-time market insights and AI-driven SaaS intelligence monitoring.";
-  let ogImage = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&h=630&auto=format&fit=crop";
-
+// --- 2. BOT METADATA RESCUE ---
+async function serveBotMetadata(articleId: string, req: any, res: any) {
   try {
     const { data: article } = await supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
-    if (article) {
-      ogTitle = (article.title || ogTitle).substring(0, 95);
-      ogDesc = (article.summary || article.content || "").substring(0, 250).replace(/[\r\n\t]/gm, " ").trim();
-      if (article.image_url) {
-        const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-        ogImage = `${cleanBase}/api/static-preview/${articleId}/og-image.jpg?v=${version}`;
-      }
-    }
-  } catch (e) {}
-
-  const escapeHtml = (str: string) => str.replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m] || m));
-  const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-  const canonicalUrl = `${cleanBase}/news/v48/article/${articleId}/index.html`;
-  
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>${escapeHtml(ogTitle)}</title>
-<meta name="description" content="${escapeHtml(ogDesc)}">
-<meta property="og:title" content="${escapeHtml(ogTitle)}">
-<meta property="og:site_name" content="SaaS Sentinel Intelligence">
-<meta property="og:description" content="${escapeHtml(ogDesc)}">
-<meta property="og:image" content="${escapeHtml(ogImage)}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:url" content="${canonicalUrl}">
-<meta property="og:type" content="article">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="robots" content="index, follow">
-<link rel="canonical" href="${canonicalUrl}" />
-<style>body{background:#fff;font-family:sans-serif;max-width:800px;margin:2rem auto;padding:1rem}img{width:100%;border-radius:12px;margin:1.5rem 0}h1{font-size:32px;margin-bottom:1rem}p{font-size:18px;line-height:1.6;color:#333}</style>
-</head><body><article><h1>${escapeHtml(ogTitle)}</h1><p>${escapeHtml(ogDesc)}</p><img src="${escapeHtml(ogImage)}"></article></body></html>`;
-
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.setHeader('X-Bot-Rescue', version);
-  return res.status(200).send(html);
+    const title = article?.title || "SaaS Intelligence Sentinel";
+    const desc = (article?.summary || article?.content || "Real-time SaaS market intelligence.").substring(0, 200);
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>${title}</title>
+      <meta property="og:title" content="${title}">
+      <meta property="og:description" content="${desc}">
+      <meta name="twitter:card" content="summary_large_image">
+    </head><body><h1>${title}</h1><p>${desc}</p></body></html>`;
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(html);
+  } catch (e) {
+    return res.status(500).send("Bot Rescue Failed");
+  }
 }
 
 app.use(async (req, res, next) => {
-  if (req.path.startsWith('/api/static-preview') || req.path.startsWith('/api/proxy-image') || req.path.startsWith('/assets/')) return next();
-  
   const userAgent = (req.headers["user-agent"] || "").toLowerCase();
-  const isRealBrowser = /\b(chrome|safari|firefox|edg|opera|opr|mobile|android|iphone|ipad)\b/i.test(userAgent) && userAgent.includes('mozilla');
-  const isSharePath = req.path.includes('/news/') || req.path.includes('/share/') || req.path.includes('/v');
-  const isDirectAppPath = req.path.startsWith('/article/');
-
-  // Fix human redirect loop: Only redirect legacy share paths to the clean app path
-  if (isRealBrowser && isSharePath && !isDirectAppPath) {
-    const idMatch = req.path.match(/\/(\d+)/);
-    if (idMatch) return res.redirect(`/article/${idMatch[1]}`);
-    return res.redirect('/');
-  }
-
-  // Bot rescue on any share-like path
-  if (!isRealBrowser && (isSharePath || isDirectAppPath)) {
-    const idMatch = req.path.match(/\/(\d+)/);
-    if (idMatch) return serveBotMetadata(idMatch[1], req, res, "v48-phantom");
+  const isBot = /bot|googlebot|crawler|linkedin|facebook|twitter|slack|whatsapp/i.test(userAgent);
+  if (isBot && req.path.startsWith('/article/')) {
+    const id = req.path.split('/').pop();
+    if (id && /^\d+$/.test(id)) return serveBotMetadata(id, req, res);
   }
   next();
 });
 
-// --- CORE MIDDLEWARE END ---
+// --- 3. IMAGE PROXY HELPERS ---
+const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: string = "") => {
+  if (!imageUrl) return res.status(400).send("Missing URL");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(imageUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': userAgentHint || 'SaaS Sentinel Bot 1.0',
+        'Accept': 'image/*,*/*;q=0.8'
+      }
+    });
+
+    clearTimeout(timeoutId);
+    if (!response.ok) throw new Error(`Upstream ${response.status}`);
+
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    const arrayBuffer = await response.arrayBuffer();
+    return res.send(Buffer.from(arrayBuffer));
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    res.setHeader("Content-Type", "image/png");
+    return res.send(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
+  }
+};
 
 // ROUTES (Simplified & Grouped)
 app.get("/api/static-preview/:articleId/og-image.jpg", async (req, res) => {
@@ -361,27 +245,30 @@ if (distPath || isProduction) {
 
   app.use(express.static(finalDistPath, { index: false }));
 
-  app.get('/api/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV, vercel: !!process.env.VERCEL }));
-
-  app.get('*', (req, res, next) => {
-    // API safety
-    if (req.path.startsWith('/api')) return res.status(404).json({ error: 'API route not found' });
-    // SEO safety - if we reached here for these paths, it means the top-level routes failed to respond
+  app.get('*', (req, res) => {
+    if (process.env.VERCEL) {
+      return res.status(404).send("Not found");
+    }
+    
+    if (req.path.startsWith('/api')) return res.status(404).json({ error: 'Endpoint not found' });
+    
     if (req.path === '/sitemap.xml' || req.path === '/robots.txt') {
-       return res.status(404).send("SEO file not generated");
+       return res.status(404).send("SEO Route Mismatch");
     }
 
     const indexFile = path.join(finalDistPath, 'index.html');
-    if (fs.existsSync(indexFile)) {
-      res.setHeader('Content-Type', 'text/html');
-      return res.sendFile(indexFile);
-    } else {
-      res.status(500).send(`<html><body><h1>500: Build Artifacts Missing</h1><p>Environment: ${process.env.VERCEL ? 'Vercel' : 'Manual'}</p><p>Tried: ${finalDistPath}</p></body></html>`);
-    }
+    if (fs.existsSync(indexFile)) return res.sendFile(indexFile);
+    res.status(500).send("Main bundle missing");
   });
 }
 
-// --- START SERVER (Vite Dev Server Logic Wrapped) ---
+// Global Error Handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("[SERVER-FATAL]", err);
+  res.status(500).json({ error: "Internal Server Error" });
+});
+
+// --- START SERVER ---
 async function startViteDevServer() {
   if (isProduction || process.env.VERCEL) return;
   console.log("[SERVER] Starting Vite Dev Server...");
