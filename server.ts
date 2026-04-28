@@ -10,7 +10,9 @@ import { saveNewsArticle } from "./src/services/news_articles";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
+if (!process.env.VERCEL) {
+  dotenv.config();
+}
 
 console.log("🚀 SaaS Sentinel Server Starting...");
 
@@ -21,10 +23,12 @@ app.use(express.json());
 // --- 1. PRIORITY ROUTES (Health & SEO) ---
 
 app.get("/api/health", (req, res) => {
-  return res.status(200).json({ status: "ok", vercel: true });
+  console.log(`[HEALTH] Requested: ${req.path}`);
+  return res.status(200).json({ status: "ok", vercel: true, node: process.version });
 });
 
-app.get("/robots.txt", (req, res) => {
+app.get(["/robots.txt", "/api/robots.txt"], (req, res) => {
+  console.log(`[ROBOTS] Requested: ${req.path}`);
   const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
@@ -32,7 +36,8 @@ app.get("/robots.txt", (req, res) => {
   res.send(`User-agent: *\nAllow: /\nSitemap: ${cleanBase}/sitemap.xml\n`);
 });
 
-app.get("/sitemap.xml", async (req, res) => {
+app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req, res) => {
+  console.log(`[SITEMAP] Requested: ${req.path}`);
   const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
