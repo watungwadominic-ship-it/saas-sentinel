@@ -397,7 +397,7 @@ function ArchivePage({ onSelect }: { onSelect: (article: Article) => void }) {
 
   useEffect(() => {
     const loadArchive = async () => {
-      const data = await fetchNewsArticles([]); // Fetch all
+      const data = await fetchNewsArticles([], 100); // Fetch up to 100 for archive
       setArchiveArticles(data);
       setLoading(false);
     };
@@ -632,10 +632,15 @@ function AnalysisImage({ src, alt, className = "", rounded = "rounded-[2.5rem]" 
   // Use our proxy for all external images to bypass hotlink protection and AIS restrictions
   const getProxiedUrl = (url?: string) => {
     if (!url) return fallbackImage;
-    if (url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co')) return url;
+    // Unsplash handles IDs too, let's normalize
+    let targetUrl = url;
+    if (!url.startsWith('http') && url.length > 5 && !url.includes('.')) {
+      targetUrl = `https://images.unsplash.com/photo-${url}?auto=format&fit=crop&q=80&w=1200`;
+    }
+
+    if (targetUrl.startsWith('/') || targetUrl.includes('localhost') || targetUrl.includes('supabase.co')) return targetUrl;
     
-    // Remove cache buster to allow browser caching
-    return `/api/proxy-image?url=${encodeURIComponent(url)}&force_bot=true&ls=1&_bot=1`;
+    return `/api/proxy-image?url=${encodeURIComponent(targetUrl)}`;
   };
 
   const imageUrl = error || !src ? fallbackImage : getProxiedUrl(src);
@@ -1224,8 +1229,8 @@ export default function App() {
     async function loadArticles() {
       setLoading(true);
       try {
-        // Fetch all rows from database
-        const data = await fetchNewsArticles();
+        // Fetch initial batch for speed
+        const data = await fetchNewsArticles([], 12);
         
         if (data && data.length > 0) {
           setArticles(data);
