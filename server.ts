@@ -286,9 +286,10 @@ startViteDevServer();
 
 export default app;
 
-const PORT = 3000;
-if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+const PORT = process.env.PORT || 3000;
+// We listen if we are NOT on Vercel (where it's serverless)
+if (!process.env.VERCEL) {
+  app.listen(Number(PORT), "0.0.0.0", () => {
+    console.log(`🚀 Server fully operational on port ${PORT}`);
   });
 }
