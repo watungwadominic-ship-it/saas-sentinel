@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { Article } from '../types';
 
-export async function fetchNewsArticles(categories?: string[]): Promise<Article[]> {
+export async function fetchNewsArticles(categories?: string[], limit: number = 20): Promise<Article[]> {
   let query = (supabase
     .from('news_articles') as any)
     .select('*');
@@ -10,7 +10,9 @@ export async function fetchNewsArticles(categories?: string[]): Promise<Article[
     query = query.in('category', categories);
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false });
+  const { data, error } = await query
+    .order('created_at', { ascending: false })
+    .limit(limit);
 
   if (error) {
     console.error('Error fetching news articles:', error);
