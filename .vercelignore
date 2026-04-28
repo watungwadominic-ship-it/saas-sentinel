@@ -1,4 +1,5 @@
 # Ignore background scripts and legacy intelligence layer
+_background_v2/
 .background_intel/
 src/intelligence_background/
 intelligence_background/
@@ -9,8 +10,7 @@ python_intel/
 .python_intel/
 python_service/
 bot_scripts/
-
-# Block Vercel's backend detection for Python
+*.py_source
 *.py
 requirements.txt
 deps.txt
