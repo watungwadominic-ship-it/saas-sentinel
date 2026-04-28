@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './services/supabase';
 import { Article } from './types';
 import { generateArticle, fetchTopSaaSNews, parseNewsIntoStories } from './services/gemini';
@@ -624,7 +624,7 @@ function Sidebar({
   );
 }
 
-function AnalysisImage({ src, alt, className = "", rounded = "rounded-[2.5rem]" }: { src?: string, alt: string, className?: string, rounded?: string }) {
+const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded-[2.5rem]" }: { src?: string, alt: string, className?: string, rounded?: string }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const fallbackImage = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2426'; // Tech Abstract
@@ -664,7 +664,7 @@ function AnalysisImage({ src, alt, className = "", rounded = "rounded-[2.5rem]" 
       />
     </div>
   );
-}
+});
 
 function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: () => void }) {
   // Helper to parse breakdown points if they are JSON strings
@@ -1403,7 +1403,7 @@ export default function App() {
     }
   };
 
-  const filteredArticles = articles.filter(article => {
+  const filteredArticles = useMemo(() => articles.filter(article => {
     const query = searchQuery.toLowerCase();
     const title = (article.title || '').toLowerCase();
     const content = (article.content || '').toLowerCase();
@@ -1414,9 +1414,9 @@ export default function App() {
            content.includes(query) ||
            summary.includes(query) ||
            category.includes(query);
-  });
+  }), [articles, searchQuery]);
 
-  const displayedArticles = filteredArticles.slice(0, visibleCount);
+  const displayedArticles = useMemo(() => filteredArticles.slice(0, visibleCount), [filteredArticles, visibleCount]);
 
   return (
     <div className="min-h-screen relative transition-colors duration-500">
