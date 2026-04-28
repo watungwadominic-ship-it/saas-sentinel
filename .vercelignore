@@ -1,4 +1,5 @@
 # Ignore background scripts and legacy intelligence layer
+.background_intel/
 src/intelligence_background/
 intelligence_background/
 src/python_intelligence/
