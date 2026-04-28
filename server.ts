@@ -1,34 +1,46 @@
+import * as dotenv from "dotenv";
 import express from "express";
 import path from "path";
 import fs from "fs";
-import dotenv from "dotenv";
 import { fileURLToPath } from 'url';
-import { supabase } from "./src/services/supabase";
-import { fetchTopSaaSNews, parseNewsIntoStories, generateArticle } from "./src/services/gemini";
-import { saveNewsArticle } from "./src/services/news_articles";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
+// Conditional dotenv - only for local dev
 if (!process.env.VERCEL) {
   dotenv.config();
 }
 
-console.log("🚀 SaaS Sentinel Server Starting...");
+console.log("🚀 SaaS Sentinel Server Initializing...");
+
+// Lazy imports to prevent boot crashes on Vercel
+let supabase: any;
+let gemini: any;
+let news_articles: any;
 
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
 
-// --- 1. PRIORITY ROUTES (Health & SEO) ---
-
+// Routes that don't need heavy services
 app.get("/api/health", (req, res) => {
-  console.log(`[HEALTH] Requested: ${req.path}`);
-  return res.status(200).json({ status: "ok", vercel: true, node: process.version });
+  return res.status(200).json({ status: "ok", vercel: !!process.env.VERCEL, node: process.version });
 });
 
+// Helper to get services safely
+async function getServices() {
+  if (!supabase) {
+    const sb = await import("./src/services/supabase");
+    supabase = sb.supabase;
+  }
+  if (!gemini) {
+    gemini = await import("./src/services/gemini");
+  }
+  if (!news_articles) {
+    news_articles = await import("./src/services/news_articles");
+  }
+  return { supabase, ...gemini, ...news_articles };
+}
+
 app.get(["/robots.txt", "/api/robots.txt"], (req, res) => {
-  console.log(`[ROBOTS] Requested: ${req.path}`);
   const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
@@ -37,48 +49,40 @@ app.get(["/robots.txt", "/api/robots.txt"], (req, res) => {
 });
 
 app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req, res) => {
-  console.log(`[SITEMAP] Requested: ${req.path}`);
+  const { supabase: _supabase } = await getServices();
   const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
-
-  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Cache-Control', 'public, max-age=3600'); 
   
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
   try {
-    const { data: articles, error } = await supabase
+    const { data: articles, error } = await _supabase
       .from("news_articles")
       .select("id, updated_at, created_at")
       .order("created_at", { ascending: false })
       .limit(200);
     
     let sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${cleanBase}/</loc>
-    <changefreq>hourly</changefreq>
-    <priority>1.0</priority>
-  </url>`;
+  <url><loc>${cleanBase}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`;
 
-    if (!error && articles && Array.isArray(articles)) {
+    if (!error && articles) {
       articles.forEach((article: any) => {
         const lastMod = (article.updated_at || article.created_at || new Date().toISOString()).split('T')[0];
-        sitemap += `\n  <url>\n    <loc>${cleanBase}/article/${article.id}</loc>\n    <lastmod>${lastMod}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`;
+        sitemap += `\n  <url><loc>${cleanBase}/article/${article.id}</loc><lastmod>${lastMod}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`;
       });
     }
-
     sitemap += `\n</urlset>`;
-    return res.status(200).send(sitemap.trim());
-  } catch (err: any) {
-    console.error("[SITEMAP-CATASTROPHIC]", err);
-    return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${cleanBase}/</loc></url>\n</urlset>`);
+    return res.send(sitemap);
+  } catch (err) {
+    return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${cleanBase}/</loc></url>\n</urlset>`);
   }
 });
 
 // --- 2. BOT METADATA RESCUE ---
 async function serveBotMetadata(articleId: string, req: any, res: any) {
   try {
-    const { data: article } = await supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
+    const { supabase: _supabase } = await getServices();
+    const { data: article } = await _supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
     const title = article?.title || "SaaS Intelligence Sentinel";
     const desc = (article?.summary || article?.content || "Real-time SaaS market intelligence.").substring(0, 200);
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -137,7 +141,8 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
 app.get("/api/static-preview/:articleId/og-image.jpg", async (req, res) => {
   const { articleId } = req.params;
   try {
-    const { data: article } = await supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
+    const { supabase: _supabase } = await getServices();
+    const { data: article } = await _supabase.from("news_articles").select("image_url").eq("id", articleId).maybeSingle();
     if (article?.image_url) {
       return fetchAndSendImage(article.image_url, res, req.headers['user-agent'] as string);
     }
@@ -167,22 +172,25 @@ app.get("/api/ping", (req, res) => {
 });
 
 app.get("/api/news", async (req, res) => {
-  const { data } = await supabase.from("news_articles").select("*").order("created_at", { ascending: false });
+  const { supabase: _supabase } = await getServices();
+  const { data } = await _supabase.from("news_articles").select("*").order("created_at", { ascending: false });
   res.json(data);
 });
 
 app.get("/api/news/:id", async (req, res) => {
-  const { data } = await supabase.from("news_articles").select("*").eq("id", req.params.id).maybeSingle();
+  const { supabase: _supabase } = await getServices();
+  const { data } = await _supabase.from("news_articles").select("*").eq("id", req.params.id).maybeSingle();
   res.json(data);
 });
 
 app.all("/api/cron/fetch-news", async (req, res) => {
   try {
-    const rawNews = await fetchTopSaaSNews();
-    const stories = await parseNewsIntoStories(rawNews);
+    const services = await getServices();
+    const rawNews = await services.fetchTopSaaSNews();
+    const stories = await services.parseNewsIntoStories(rawNews);
     if (stories?.[0]) {
-      const articleData = await generateArticle(stories[0].title, stories[0].snippet);
-      await saveNewsArticle({ ...articleData, source: "SaaS Sentinel", readTime: "4 min read" });
+      const articleData = await services.generateArticle(stories[0].title, stories[0].snippet);
+      await services.saveNewsArticle({ ...articleData, source: "SaaS Sentinel", readTime: "4 min read" });
       res.json({ success: true });
     } else res.json({ success: false });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
