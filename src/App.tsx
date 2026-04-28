@@ -632,10 +632,15 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
   // Use our proxy for all external images to bypass hotlink protection and AIS restrictions
   const getProxiedUrl = (url?: string) => {
     if (!url) return fallbackImage;
-    // Unsplash handles IDs too, let's normalize
+    // Default fallback
     let targetUrl = url;
-    if (!url.startsWith('http') && url.length > 5 && !url.includes('.')) {
-      targetUrl = `https://images.unsplash.com/photo-${url}?auto=format&fit=crop&q=80&w=1200`;
+    
+    // Convert relative or Unsplash IDs
+    if (!url.startsWith('http')) {
+      if (url.length > 5 && !url.includes('.')) {
+        // Optimized Unsplash transform for faster cards
+        targetUrl = `https://images.unsplash.com/photo-${url}?auto=format&fit=crop&q=60&w=800`;
+      }
     }
 
     if (targetUrl.startsWith('/') || targetUrl.includes('localhost') || targetUrl.includes('supabase.co')) return targetUrl;
@@ -655,12 +660,13 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
         alt={alt}
         className={`w-full h-full object-cover transition-opacity duration-700 ${loading ? 'opacity-0' : 'opacity-100'}`}
         onLoad={() => setLoading(false)}
+        loading="lazy"
+        referrerPolicy="no-referrer"
         onError={() => {
           console.warn(`[IMAGE-WARN] Failed to load resource, falling back: ${src}`);
           setError(true);
           setLoading(false);
         }}
-        referrerPolicy="no-referrer"
       />
     </div>
   );
