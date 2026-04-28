@@ -84,7 +84,9 @@ const fetchAndSendImage = async (imageUrl: string, res: any, userAgentHint: stri
 
 // --- SEO & SITEMAP ROUTES (At Top to Prevent SPA Fallback) ---
 app.get("/robots.txt", (req, res) => {
-  const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+  const host = req.get('host') || 'saas-sentinel.vercel.app';
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
   res.setHeader('Content-Type', 'text/plain');
   res.send(`User-agent: *
 Allow: /
@@ -93,14 +95,25 @@ Sitemap: ${cleanBase}/sitemap.xml
 });
 
 app.get("/sitemap.xml", async (req, res) => {
+  // Set headers early to prevent HTML interpretation on failure
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   
+  const host = req.get('host') || 'saas-sentinel.vercel.app';
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
+
   try {
-    const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
-    const { data: articles, error } = await supabase.from("news_articles").select("id, updated_at, created_at, title").order("created_at", { ascending: false });
+    const { data: articles, error } = await supabase
+      .from("news_articles")
+      .select("id, updated_at, created_at, title")
+      .order("created_at", { ascending: false })
+      .limit(1000);
     
-    if (error) throw error;
+    if (error) {
+      console.error("[SITEMAP-DB-ERROR]", error);
+      throw error;
+    }
 
     let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
@@ -110,12 +123,21 @@ app.get("/sitemap.xml", async (req, res) => {
     <priority>1.0</priority>
   </url>`;
 
-    if (articles) {
+    if (articles && Array.isArray(articles)) {
       articles.forEach((article: any) => {
-        const lastMod = (article.updated_at || article.created_at || new Date().toISOString()).split('T')[0];
-        const title = (article.title || "Latest Intelligence").substring(0, 100);
-        
-        sitemap += `
+        try {
+          const dateRaw = article.updated_at || article.created_at || new Date().toISOString();
+          const dateObj = new Date(dateRaw);
+          // Fallback to now if invalid date
+          const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
+          
+          const lastMod = validDate.toISOString().split('T')[0];
+          const pubDate = validDate.toISOString();
+          const safeTitle = (article.title || "SaaS Intelligence Sentinel").replace(/[&<>"']/g, (m) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
+          }[m] || m));
+
+          sitemap += `
   <url>
     <loc>${cleanBase}/article/${article.id}</loc>
     <lastmod>${lastMod}</lastmod>
@@ -126,19 +148,21 @@ app.get("/sitemap.xml", async (req, res) => {
         <news:name>SaaS Sentinel</news:name>
         <news:language>en</news:language>
       </news:publication>
-      <news:publication_date>${article.created_at || new Date().toISOString()}</news:publication_date>
-      <news:title>${title.replace(/[<>&"']/g, "")}</news:title>
+      <news:publication_date>${pubDate}</news:publication_date>
+      <news:title>${safeTitle}</news:title>
     </news:news>
   </url>`;
+        } catch (innerErr) {
+          // Skip malformed entries
+        }
       });
     }
 
     sitemap += `\n</urlset>`;
-    return res.status(200).send(sitemap);
+    return res.status(200).send(sitemap.trim());
   } catch (error: any) {
-    console.error("[SITEMAP-ERROR]", error);
-    // Return a valid empty sitemap instead of an error string to avoid HTML interpretation
-    const cleanBase = (process.env.SHARED_APP_URL || `https://${req.get('host')}`).replace(/\/$/, '');
+    console.error("[SITEMAP-FATAL-ERROR]", error);
+    // Return a valid minimal sitemap instead of crashing or returning HTML
     return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${cleanBase}/</loc></url></urlset>`);
   }
 });
