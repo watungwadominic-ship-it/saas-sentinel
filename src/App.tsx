@@ -1422,7 +1422,11 @@ export default function App() {
            category.includes(query);
   }), [articles, searchQuery]);
 
-  const displayedArticles = useMemo(() => filteredArticles.slice(0, visibleCount), [filteredArticles, visibleCount]);
+  // Use a smaller slice for initial rendering if articles are many
+  const displayedArticles = useMemo(() => {
+    const subset = filteredArticles.slice(0, visibleCount);
+    return subset;
+  }, [filteredArticles, visibleCount]);
 
   return (
     <div className="min-h-screen relative transition-colors duration-500">
