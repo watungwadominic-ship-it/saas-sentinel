@@ -12,8 +12,8 @@ const getEnv = (key: string, fallback: string) => {
   return fallback;
 };
 
-const supabaseUrl = getEnv('SUPABASE_URL', getEnv('VITE_SUPABASE_URL', 'https://dpwkojtfeoxlpyevutfc.supabase.co'));
-const supabaseKey = getEnv('SUPABASE_KEY', getEnv('VITE_SUPABASE_KEY', 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE'));
+const supabaseUrl = getEnv('SUPABASE_URL', getEnv('VITE_SUPABASE_URL', 'https://dpwkojtfeoxlpyevutfc.supabase.co')) || 'https://dpwkojtfeoxlpyevutfc.supabase.co';
+const supabaseKey = getEnv('SUPABASE_KEY', getEnv('VITE_SUPABASE_KEY', 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE')) || 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
 
 // createClient doesn't crash on startup if strings are provided, even if invalid.
 export const supabase = createClient(supabaseUrl, supabaseKey);
