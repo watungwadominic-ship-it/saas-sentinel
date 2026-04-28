@@ -95,49 +95,45 @@ Sitemap: ${cleanBase}/sitemap.xml
 });
 
 app.get("/sitemap.xml", async (req, res) => {
+  // Use a strictly safe base URL
   const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
 
+  // Pre-set headers to ensure XML response even if it crashes later
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Cache-Control', 'public, max-age=3600'); // 1h cache
+  res.setHeader('Cache-Control', 'public, max-age=3600'); 
   
   try {
+    console.log(`[SITEMAP] Generating for ${host} | Base: ${cleanBase}`);
+    
     const { data: articles, error } = await supabase
       .from("news_articles")
       .select("id, updated_at, created_at")
       .order("created_at", { ascending: false })
-      .limit(300); // Further reduced to ensure speed
+      .limit(200); // Small limit to ensure speed
     
-    if (error) throw error;
-
-    let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    let sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>${cleanBase}/</loc>
     <changefreq>hourly</changefreq>
     <priority>1.0</priority>
   </url>`;
 
-    if (articles && Array.isArray(articles)) {
+    if (!error && articles && Array.isArray(articles)) {
       articles.forEach((article: any) => {
         const lastMod = (article.updated_at || article.created_at || new Date().toISOString()).split('T')[0];
-        sitemap += `
-  <url>
-    <loc>${cleanBase}/article/${article.id}</loc>
-    <lastmod>${lastMod}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>`;
+        sitemap += `\n  <url>\n    <loc>${cleanBase}/article/${article.id}</loc>\n    <lastmod>${lastMod}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`;
       });
     }
 
     sitemap += `\n</urlset>`;
     return res.status(200).send(sitemap.trim());
-  } catch (error: any) {
-    console.error("[SITEMAP-FAIL]", error);
-    return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${cleanBase}/</loc></url></urlset>`);
+  } catch (err: any) {
+    console.error("[SITEMAP-FATAL]", err);
+    // Return minimal valid sitemap
+    return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>${cleanBase}/</loc>\n    <changefreq>hourly</changefreq>\n  </url>\n</urlset>`);
   }
 });
 
@@ -365,11 +361,15 @@ if (distPath || isProduction) {
 
   app.use(express.static(finalDistPath, { index: false }));
 
-  app.get('*', (req, res) => {
+  app.get('/api/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV, vercel: !!process.env.VERCEL }));
+
+  app.get('*', (req, res, next) => {
     // API safety
     if (req.path.startsWith('/api')) return res.status(404).json({ error: 'API route not found' });
-    // SEO safety
-    if (req.path === '/sitemap.xml' || req.path === '/robots.txt') return next();
+    // SEO safety - if we reached here for these paths, it means the top-level routes failed to respond
+    if (req.path === '/sitemap.xml' || req.path === '/robots.txt') {
+       return res.status(404).send("SEO file not generated");
+    }
 
     const indexFile = path.join(finalDistPath, 'index.html');
     if (fs.existsSync(indexFile)) {
