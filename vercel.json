@@ -1,14 +1,8 @@
 {
   "version": 2,
-  "framework": "vite",
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "outputDirectory": "dist",
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "vercel-node@latest"
-    }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/sitemap.xml", "destination": "/api/index" },
