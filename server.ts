@@ -16,17 +16,22 @@ let _gemini: any;
 let _news_articles: any;
 
 async function getServices() {
-  if (!_supabase) {
-    const sb = await import("./src/services/supabase");
-    _supabase = sb.supabase;
+  try {
+    if (!_supabase) {
+      const sb = await import("./src/services/supabase");
+      _supabase = sb.supabase;
+    }
+    if (!_gemini) {
+      _gemini = await import("./src/services/gemini");
+    }
+    if (!_news_articles) {
+      _news_articles = await import("./src/services/news_articles");
+    }
+    return { supabase: _supabase, ..._gemini, ..._news_articles };
+  } catch (err) {
+    console.error("CRITICAL: Failed to load services", err);
+    throw err;
   }
-  if (!_gemini) {
-    _gemini = await import("./src/services/gemini");
-  }
-  if (!_news_articles) {
-    _news_articles = await import("./src/services/news_articles");
-  }
-  return { supabase: _supabase, ..._gemini, ..._news_articles };
 }
 
 // 2. CORE SYSTEM ROUTES (FASTEST)
@@ -89,6 +94,7 @@ app.get("/api/news", async (req, res) => {
       .limit(limit);
     
     if (error) throw error;
+    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
     res.json(data);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
