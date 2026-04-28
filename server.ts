@@ -95,28 +95,25 @@ Sitemap: ${cleanBase}/sitemap.xml
 });
 
 app.get("/sitemap.xml", async (req, res) => {
-  // Set headers early to prevent HTML interpretation on failure
-  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  
-  const host = req.get('host') || 'saas-sentinel.vercel.app';
-  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
+  const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const cleanBase = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
 
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'public, max-age=3600'); // 1h cache
+  
   try {
     const { data: articles, error } = await supabase
       .from("news_articles")
-      .select("id, updated_at, created_at, title")
+      .select("id, updated_at, created_at")
       .order("created_at", { ascending: false })
-      .limit(1000);
+      .limit(300); // Further reduced to ensure speed
     
-    if (error) {
-      console.error("[SITEMAP-DB-ERROR]", error);
-      throw error;
-    }
+    if (error) throw error;
 
     let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>${cleanBase}/</loc>
     <changefreq>hourly</changefreq>
@@ -125,44 +122,21 @@ app.get("/sitemap.xml", async (req, res) => {
 
     if (articles && Array.isArray(articles)) {
       articles.forEach((article: any) => {
-        try {
-          const dateRaw = article.updated_at || article.created_at || new Date().toISOString();
-          const dateObj = new Date(dateRaw);
-          // Fallback to now if invalid date
-          const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
-          
-          const lastMod = validDate.toISOString().split('T')[0];
-          const pubDate = validDate.toISOString();
-          const safeTitle = (article.title || "SaaS Intelligence Sentinel").replace(/[&<>"']/g, (m) => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
-          }[m] || m));
-
-          sitemap += `
+        const lastMod = (article.updated_at || article.created_at || new Date().toISOString()).split('T')[0];
+        sitemap += `
   <url>
     <loc>${cleanBase}/article/${article.id}</loc>
     <lastmod>${lastMod}</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-    <news:news>
-      <news:publication>
-        <news:name>SaaS Sentinel</news:name>
-        <news:language>en</news:language>
-      </news:publication>
-      <news:publication_date>${pubDate}</news:publication_date>
-      <news:title>${safeTitle}</news:title>
-    </news:news>
+    <priority>0.7</priority>
   </url>`;
-        } catch (innerErr) {
-          // Skip malformed entries
-        }
       });
     }
 
     sitemap += `\n</urlset>`;
     return res.status(200).send(sitemap.trim());
   } catch (error: any) {
-    console.error("[SITEMAP-FATAL-ERROR]", error);
-    // Return a valid minimal sitemap instead of crashing or returning HTML
+    console.error("[SITEMAP-FAIL]", error);
     return res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${cleanBase}/</loc></url></urlset>`);
   }
 });
@@ -391,38 +365,12 @@ if (distPath || isProduction) {
 
   app.use(express.static(finalDistPath, { index: false }));
 
-  // Debug endpoint
-  app.get('/api/debug-path', (req, res) => {
-    try {
-      const exists = !!finalDistPath && fs.existsSync(finalDistPath);
-      const files = exists ? fs.readdirSync(finalDistPath) : [];
-      const rootFiles = fs.readdirSync(process.cwd());
-      const serverDir = fs.readdirSync(__dirname);
-      const apiDir = fs.existsSync(path.join(process.cwd(), 'api')) ? fs.readdirSync(path.join(process.cwd(), 'api')) : [];
-      
-      res.json({
-        cwd: process.cwd(),
-        dirname: __dirname,
-        finalDistPath,
-        exists,
-        hasIndex: !!finalDistPath && fs.existsSync(path.join(finalDistPath, 'index.html')),
-        files,
-        rootFiles,
-        serverDir,
-        apiDir,
-        env: {
-          NODE_ENV: process.env.NODE_ENV,
-          VERCEL: !!process.env.VERCEL
-        }
-      });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message, stack: e.stack });
-    }
-  });
-
   app.get('*', (req, res) => {
+    // API safety
     if (req.path.startsWith('/api')) return res.status(404).json({ error: 'API route not found' });
-    
+    // SEO safety
+    if (req.path === '/sitemap.xml' || req.path === '/robots.txt') return next();
+
     const indexFile = path.join(finalDistPath, 'index.html');
     if (fs.existsSync(indexFile)) {
       res.setHeader('Content-Type', 'text/html');
@@ -431,17 +379,28 @@ if (distPath || isProduction) {
       res.status(500).send(`<html><body><h1>500: Build Artifacts Missing</h1><p>Environment: ${process.env.VERCEL ? 'Vercel' : 'Manual'}</p><p>Tried: ${finalDistPath}</p></body></html>`);
     }
   });
-} else if (!process.env.VERCEL) {
-  console.log("[SERVER] Starting Vite Dev Server...");
-  const { createServer: createViteServer } = await import("vite");
-  const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
-  app.use(vite.middlewares);
 }
+
+// --- START SERVER (Vite Dev Server Logic Wrapped) ---
+async function startViteDevServer() {
+  if (isProduction || process.env.VERCEL) return;
+  console.log("[SERVER] Starting Vite Dev Server...");
+  try {
+    const { createServer: createViteServer } = await import("vite");
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
+    app.use(vite.middlewares);
+  } catch (e) {
+    console.warn("[SERVER] Vite import failed. This is expected in production/Vercel.");
+  }
+}
+
+// Start dev server if applicable
+startViteDevServer();
 
 export default app;
 
 const PORT = 3000;
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
