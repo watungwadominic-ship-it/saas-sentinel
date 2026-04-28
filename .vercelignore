@@ -1,6 +1,16 @@
-# Ignore background scripts and legacy intelligence layer
-_background_v2/
+# Hard ignore all Python artifacts
 .background_intel/
+**/*.py
+**/*.py_source
+**/deps.txt
+**/deps.txt_source
+**/requirements.txt
+**/pyproject.toml
+**/Pipfile*
+**/.python-version
+**/runtime.txt
+
+# Legacy paths
 src/intelligence_background/
 intelligence_background/
 src/python_intelligence/
@@ -10,14 +20,6 @@ python_intel/
 .python_intel/
 python_service/
 bot_scripts/
-*.py_source
-*.py
-requirements.txt
-deps.txt
-Pipfile*
-pyproject.toml
-.python-version
-runtime.txt
 
 # Standard Node.js ignores
 node_modules/
