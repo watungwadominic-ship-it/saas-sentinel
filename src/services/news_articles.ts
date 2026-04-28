@@ -1,7 +1,25 @@
 import { supabase } from './supabase';
 import { Article } from '../types';
+import { mapRowToArticle } from './article_utils';
 
 export async function fetchNewsArticles(categories?: string[], limit: number = 20): Promise<Article[]> {
+  try {
+    // Attempt to use our cached API if possible
+    const isProduction = typeof window !== 'undefined' && 
+                        (window.location.hostname.includes('vercel.app') || 
+                         window.location.hostname.includes('europe-west2.run.app'));
+    
+    if (isProduction && (!categories || categories.length === 0)) {
+      const response = await fetch(`/api/news?limit=${limit}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.map(mapRowToArticle);
+      }
+    }
+  } catch (e) {
+    console.warn('API fetch failed, falling back to direct Supabase', e);
+  }
+
   let query = (supabase
     .from('news_articles') as any)
     .select('*');
@@ -19,56 +37,7 @@ export async function fetchNewsArticles(categories?: string[], limit: number = 2
     return [];
   }
 
-  return (data || []).map((row: any) => {
-    // Handle legacy JSON summaries or malformed strings
-    let summary = row.summary;
-    if (typeof summary === 'string' && (summary.startsWith('{') || summary.startsWith('['))) {
-      try {
-        const parsed = JSON.parse(summary);
-        summary = parsed.summary || parsed.feed_summary || (Array.isArray(parsed) ? parsed[0] : summary);
-      } catch (e) {
-        // Not valid JSON, keep as is
-      }
-    }
-
-    // Fallback for content
-    const content = row.content || row.analysis_content || '';
-    const contentStr = typeof content === 'string' ? content : '';
-
-    // Handle verdict and sentinel_take if they are embedded in content
-    let verdict = row.verdict;
-    let sentinel_take = row.sentinel_take;
-
-    if (!verdict && contentStr.includes('**Strategic Verdict:**')) {
-      const parts = contentStr.split('**Strategic Verdict:**');
-      if (parts.length > 1) {
-        const afterVerdict = parts[1].split('**Sentinel\'s Take:**')[0].trim();
-        verdict = afterVerdict;
-      }
-    }
-
-    if (!sentinel_take && contentStr.includes('**Sentinel\'s Take:**')) {
-      const parts = contentStr.split('**Sentinel\'s Take:**');
-      if (parts.length > 1) {
-        sentinel_take = parts[1].trim();
-      }
-    }
-
-    return {
-      id: row.id,
-      title: row.title || 'Untitled Report',
-      content: contentStr,
-      summary: summary || (contentStr ? contentStr.substring(0, 150) + '...' : 'No content available.'),
-      category: row.category || 'Intelligence',
-      date: row.published_at || row.created_at || new Date().toISOString(),
-      readTime: row.read_time || '5 min read',
-      source: row.source || 'SaaS Sentinel',
-      image_url: row.image_url,
-      breakdown: Array.isArray(row.breakdown) ? row.breakdown : [],
-      sentinel_take: sentinel_take,
-      verdict: verdict
-    };
-  });
+  return (data || []).map(mapRowToArticle);
 }
 
 export async function saveNewsArticle(article: Partial<Article>) {
@@ -118,6 +87,23 @@ export async function saveNewsArticle(article: Partial<Article>) {
 export async function fetchArticleById(id: string): Promise<Article | null> {
   console.log(`[DEBUG] fetchArticleById called with id: ${id}`);
   try {
+    // Attempt to use cached API
+    const isProduction = typeof window !== 'undefined' && 
+                        (window.location.hostname.includes('vercel.app') || 
+                         window.location.hostname.includes('europe-west2.run.app'));
+    
+    if (isProduction) {
+      const response = await fetch(`/api/news/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        return mapRowToArticle(data);
+      }
+    }
+  } catch (e) {
+    console.warn('API single article fetch failed', e);
+  }
+
+  try {
     if (!supabase) {
       console.error('[DEBUG] Supabase client is not initialized');
       return null;
@@ -139,56 +125,7 @@ export async function fetchArticleById(id: string): Promise<Article | null> {
       return null;
     }
 
-    const row = data as any;
-    
-    // Handle legacy JSON summaries or malformed strings
-    let summary = row.summary;
-    if (typeof summary === 'string' && (summary.startsWith('{') || summary.startsWith('['))) {
-      try {
-        const parsed = JSON.parse(summary);
-        summary = parsed.summary || parsed.feed_summary || (Array.isArray(parsed) ? parsed[0] : summary);
-      } catch (e) {
-        // Not valid JSON, keep as is
-      }
-    }
-
-    // Fallback for content
-    const content = row.content || row.analysis_content || '';
-    const contentStr = typeof content === 'string' ? content : '';
-
-    // Handle verdict and sentinel_take if they are embedded in content
-    let verdict = row.verdict;
-    let sentinel_take = row.sentinel_take;
-
-    if (!verdict && contentStr.includes('**Strategic Verdict:**')) {
-      const parts = contentStr.split('**Strategic Verdict:**');
-      if (parts.length > 1) {
-        const afterVerdict = parts[1].split('**Sentinel\'s Take:**')[0].trim();
-        verdict = afterVerdict;
-      }
-    }
-
-    if (!sentinel_take && contentStr.includes('**Sentinel\'s Take:**')) {
-      const parts = contentStr.split('**Sentinel\'s Take:**');
-      if (parts.length > 1) {
-        sentinel_take = parts[1].trim();
-      }
-    }
-
-    return {
-      id: row.id,
-      title: row.title || 'Untitled Report',
-      content: contentStr,
-      summary: summary || (contentStr ? contentStr.substring(0, 150) + '...' : 'No content available.'),
-      category: row.category || 'Intelligence',
-      date: row.published_at || row.created_at || new Date().toISOString(),
-      readTime: row.read_time || '5 min read',
-      source: row.source || 'SaaS Sentinel',
-      image_url: row.image_url,
-      breakdown: Array.isArray(row.breakdown) ? row.breakdown : [],
-      sentinel_take: sentinel_take,
-      verdict: verdict
-    };
+    return mapRowToArticle(data);
   } catch (err: any) {
     console.error(`[DEBUG] Unexpected error in fetchArticleById for id ${id}:`, err.message || err);
     return null;
