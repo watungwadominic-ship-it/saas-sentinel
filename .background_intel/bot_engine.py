@@ -416,7 +416,10 @@ if __name__ == "__main__":
             try:
                 from newsletter import send_weekly_newsletter
             except ImportError:
-                from src.python_intelligence.newsletter import send_weekly_newsletter
+                import os, sys
+                sys.path.append(os.path.dirname(__file__))
+                import newsletter
+                send_weekly_newsletter = newsletter.send_weekly_newsletter
             send_weekly_newsletter()
         except Exception as e:
             print(f"⚠️ Weekly Digest Trigger Failed: {e}")
