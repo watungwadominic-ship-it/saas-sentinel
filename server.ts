@@ -6,41 +6,29 @@ import { fileURLToPath } from 'url';
 // SaaS Sentinel - Vercel Optimized Entry Point
 console.log("🚀 SaaS Sentinel initializing...");
 
+// Static imports for better Vercel tracing
+import { supabase } from "./src/services/supabase";
+import * as gemini from "./src/services/gemini";
+import * as newsArticles from "./src/services/news_articles";
+
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
 
-// 1. SERVICES (LAZY LOADED)
-let _supabase: any;
-let _gemini: any;
-let _news_articles: any;
-
+// 1. SERVICES HELPER
 async function getServices() {
-  try {
-    if (!_supabase) {
-      const sb = await import("./src/services/supabase");
-      _supabase = sb.supabase;
-    }
-    if (!_gemini) {
-      _gemini = await import("./src/services/gemini");
-    }
-    if (!_news_articles) {
-      _news_articles = await import("./src/services/news_articles");
-    }
-    return { supabase: _supabase, ..._gemini, ..._news_articles };
-  } catch (err) {
-    console.error("CRITICAL: Failed to load services", err);
-    throw err;
-  }
+  return { supabase, ...gemini, ...newsArticles };
 }
 
 // 2. CORE SYSTEM ROUTES (FASTEST)
 app.get("/api/health", (req, res) => {
+  console.log("Health check pulse...");
   res.json({ 
     status: "ok", 
     vercel: !!process.env.VERCEL, 
     time: new Date().toISOString(),
-    node: process.version
+    node: process.version,
+    env: process.env.NODE_ENV
   });
 });
 
@@ -158,7 +146,14 @@ app.get("/api/proxy-image", async (req, res) => {
 });
 
 // 5. STATIC SERVING (FOR NON-VERCEL ENVS)
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+let __dirname = "";
+try {
+  __dirname = path.dirname(fileURLToPath(import.meta.url));
+} catch (e) {
+  // Safe fallback for Vercel
+  __dirname = process.cwd();
+}
+
 if (!process.env.VERCEL) {
   const dist = path.resolve(__dirname, "dist");
   if (fs.existsSync(dist)) {
