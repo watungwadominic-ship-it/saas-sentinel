@@ -8,6 +8,7 @@ export interface Article {
   readTime: string;
   source: string;
   image_url?: string;
+  image?: string;
   // Analysis specific fields
   breakdown?: string[];
   sentinel_take?: string;
