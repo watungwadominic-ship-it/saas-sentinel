@@ -6,17 +6,17 @@ import { fileURLToPath } from 'url';
 // SaaS Sentinel - Vercel Optimized Entry Point
 console.log("🚀 SaaS Sentinel initializing...");
 
-// Static imports for Vercel tracing
-import { supabase } from "./src/services/supabase";
-import * as gemini from "./src/services/gemini";
-import * as newsArticles from "./src/services/news_articles";
-
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
 
-// 1. SERVICES HELPER (Pre-loaded for Vercel)
+// 1. SERVICES HELPER (Lazy loaded for Vercel stability)
 async function getServices() {
+  const [{ supabase }, gemini, newsArticles] = await Promise.all([
+    import("./src/services/supabase"),
+    import("./src/services/gemini"),
+    import("./src/services/news_articles")
+  ]);
   return { supabase, ...gemini, ...newsArticles };
 }
 
