@@ -6,18 +6,21 @@ import { fileURLToPath } from 'url';
 // SaaS Sentinel - Vercel Optimized Entry Point
 console.log("🚀 SaaS Sentinel initializing...");
 
-// Static imports for better Vercel tracing
-import { supabase } from "./src/services/supabase";
-import * as gemini from "./src/services/gemini";
-import * as newsArticles from "./src/services/news_articles";
-
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
 
-// 1. SERVICES HELPER
+// 1. SERVICES HELPER (Dynamic for Vercel)
 async function getServices() {
-  return { supabase, ...gemini, ...newsArticles };
+  try {
+    const sb = await import("./src/services/supabase");
+    const gemini = await import("./src/services/gemini");
+    const newsArticles = await import("./src/services/news_articles");
+    return { supabase: sb.supabase, ...gemini, ...newsArticles };
+  } catch (err) {
+    console.error("CRITICAL: Failed to load services", err);
+    throw err;
+  }
 }
 
 // 2. CORE SYSTEM ROUTES (FASTEST)
@@ -165,7 +168,12 @@ if (!process.env.VERCEL) {
   }
 }
 
-// 6. EXPORT & LISTEN
+// 6. EXPORT & LISTEN / ERROR HANDLING
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Express Error:", err);
+  res.status(500).json({ error: "Express Router Failure", details: err.message });
+});
+
 export default app;
 
 if (!process.env.VERCEL) {
