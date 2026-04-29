@@ -145,38 +145,63 @@ app.get("/api/proxy-image", async (req, res) => {
   }
 });
 
-// 5. STATIC SERVING (FOR NON-VERCEL ENVS)
-let __dirname = "";
-try {
-  __dirname = path.dirname(fileURLToPath(import.meta.url));
-} catch (e) {
-  // Safe fallback for Vercel
-  __dirname = process.cwd();
-}
+// 5. VITE MIDDLEWARE & STATIC SERVING
+async function startServer() {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    try {
+      console.log("🛠️ Setting up Vite middleware...");
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.error("Vite failed to initialize, falling back to static:", e);
+    }
+  } 
+  
+  if (!process.env.VERCEL) {
+    const dist = path.resolve(process.cwd(), "dist");
+    
+    console.log(`📂 Serving static from: ${dist}`);
+    app.use(express.static(dist, { index: false }));
+    
+    app.get("*", (req: any, res: any, next: any) => {
+      // Skip API
+      if (req.path.startsWith("/api")) return next();
+      
+      const indexPath = path.join(dist, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        // In dev with Vite middleware, we shouldn't reach here for frontend routes
+        // unless Vite failed or it's a real 404
+        if (process.env.NODE_ENV !== "production") {
+          return next();
+        }
+        res.status(404).send("Frontend assets not built. Run npm run build.");
+      }
+    });
+  }
 
-if (!process.env.VERCEL) {
-  const dist = path.resolve(__dirname, "dist");
-  if (fs.existsSync(dist)) {
-    app.use(express.static(dist));
-    app.get("*", (req, res) => {
-      if (req.path.startsWith("/api")) return res.status(404).end();
-      res.sendFile(path.join(dist, "index.html"));
+  // 6. ERROR HANDLING & LISTEN
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("Express Error:", err);
+    res.status(500).json({ error: "Express Router Failure", details: err.message });
+  });
+
+  if (!process.env.VERCEL) {
+    const PORT = parseInt(process.env.PORT || "3000", 10);
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`📡 Sentinel active at http://0.0.0.0:${PORT}`);
     });
   }
 }
 
-// 6. EXPORT & LISTEN / ERROR HANDLING
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error("Express Error:", err);
-  res.status(500).json({ error: "Express Router Failure", details: err.message });
+startServer().catch(err => {
+  console.error("Failed to start server:", err);
 });
 
 export default app;
-
-if (!process.env.VERCEL) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`📡 Sentinel locally active at http://localhost:${PORT}`);
-  });
-}
 
