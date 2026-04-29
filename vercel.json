@@ -1,14 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "outputDirectory": "dist",
-  "functions": {
-    "api/index.ts": {
-      "memory": 1024,
-      "maxDuration": 25
-    }
-  },
+  "builds": [
+    { "src": "package.json", "use": "@vercel/node" },
+    { "src": "api/index.ts", "use": "@vercel/node" }
+  ],
   "rewrites": [
     { "source": "/api/health", "destination": "/api/index.ts" },
     { "source": "/api/(.*)", "destination": "/api/index.ts" },
