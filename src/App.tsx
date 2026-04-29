@@ -627,31 +627,30 @@ function Sidebar({
 const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded-[2.5rem]" }: { src?: string, alt: string, className?: string, rounded?: string }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const fallbackImage = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2426'; // Tech Abstract
+  const fallbackImage = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=2426'; // Archive fallback
 
-  // Use our proxy for all external images to bypass hotlink protection and AIS restrictions
-  const getProxiedUrl = (url?: string) => {
+  // Use raw URLs for external images if they are trusted (Unsplash), else proxy
+  const getImageUrl = (url?: string) => {
     if (!url) return fallbackImage;
-    // Default fallback
-    let targetUrl = url;
     
-    // Convert relative or Unsplash IDs
-    if (!url.startsWith('http')) {
-      if (url.length > 5 && !url.includes('.')) {
-        // Optimized Unsplash transform for faster cards
-        targetUrl = `https://images.unsplash.com/photo-${url}?auto=format&fit=crop&q=60&w=800`;
-      }
+    // If it's a full Unsplash URL, use it directly as they are reliable
+    if (url.includes('images.unsplash.com')) return url;
+    
+    // Handle Unsplash IDs
+    if (!url.startsWith('http') && url.length > 5 && !url.includes('.')) {
+       return `https://images.unsplash.com/photo-${url}?auto=format&fit=crop&q=80&w=1200`;
     }
 
-    if (targetUrl.startsWith('/') || targetUrl.includes('localhost') || targetUrl.includes('supabase.co')) return targetUrl;
+    if (url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co')) return url;
     
-    return `/api/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+    // For other external sources, use proxy to avoid CORS/Hotlink issues
+    return `/api/proxy-image?url=${encodeURIComponent(url)}`;
   };
 
-  const imageUrl = error || !src ? fallbackImage : getProxiedUrl(src);
+  const imageUrl = error || !src ? fallbackImage : getImageUrl(src);
 
   return (
-    <div className={`relative w-full aspect-video overflow-hidden bg-[#1e293b] ${rounded} border border-white/20 shadow-2xl ${className}`}>
+    <div className={`relative w-full aspect-video overflow-hidden bg-slate-200 dark:bg-slate-800 ${rounded} border border-text/10 shadow-2xl ${className}`}>
       {loading && (
         <div className="absolute inset-0 z-10 animate-shimmer" />
       )}
@@ -804,7 +803,7 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#F27D26]/20 to-transparent blur-2xl opacity-50 group-hover:opacity-75 transition-opacity" />
               
-              <div className="relative glass-panel !bg-[#0D0D15] rounded-[2rem] md:rounded-[3rem] p-8 md:p-14 border-[#F27D26]/20 overflow-hidden min-h-[auto] md:min-h-[300px] flex flex-col justify-center">
+              <div className="relative glass-panel rounded-[2rem] md:rounded-[3rem] p-8 md:p-14 border-accent/20 overflow-hidden min-h-[auto] md:min-h-[300px] flex flex-col justify-center">
                 <div className="absolute -right-20 -top-20 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity hidden md:block">
                   <Brain className="w-[300px] md:w-[400px] h-[300px] md:h-[400px] text-white" />
                 </div>
@@ -858,7 +857,7 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
         {/* Sidebar Column */}
         <aside className="space-y-6 md:space-y-8">
           {/* Revenue Implications Card */}
-          <div className="glass-panel !bg-[#12121A] rounded-[2rem] md:rounded-[2.5rem] p-8 md:p-10 border-white/10 shadow-2xl">
+          <div className="glass-panel rounded-[2rem] md:rounded-[2.5rem] p-8 md:p-10 border-text/10 shadow-2xl">
             <h3 className="text-[9px] md:text-[10px] font-black text-text/40 uppercase tracking-[0.4em] mb-8 md:mb-10 flex items-center gap-4">
               Revenue Implications
               <div className="h-px flex-1 bg-white/5" />
@@ -893,7 +892,7 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
           </div>
 
           {/* Market Impact Card */}
-          <div className="glass-panel !bg-[#12121A] rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border-white/10 shadow-2xl">
+          <div className="glass-panel rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border-text/10 shadow-2xl">
             <h3 className="text-[8px] md:text-[9px] font-black text-text uppercase tracking-[0.3em] md:tracking-[0.4em] mb-6 md:mb-8">Market Impact</h3>
             <div className="space-y-3 md:space-y-4">
               <div className="flex items-center justify-between p-4 md:p-5 bg-white/5 rounded-xl md:rounded-2xl border border-white/10">
@@ -923,7 +922,7 @@ function FeaturedInsightCard({ article, onClick }: { article: Article, onClick: 
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mb-12 glass-panel !bg-[#0D0D15] !rounded-[3rem] overflow-hidden border-white/5 shadow-2xl group cursor-pointer group hover:border-[#F27D26]/20 transition-all duration-700"
+      className="mb-12 glass-panel !rounded-[3rem] overflow-hidden border-text/5 shadow-2xl group cursor-pointer group hover:border-accent/20 transition-all duration-700"
       onClick={onClick}
     >
       <div className="flex flex-col xl:flex-row min-h-[450px] xl:max-h-[600px]">
