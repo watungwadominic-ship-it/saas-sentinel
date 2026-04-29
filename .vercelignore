@@ -9,6 +9,10 @@
 **/Pipfile*
 **/.python-version
 **/runtime.txt
+scripts/*.py
+src/scripts/*.py
+api/*.py
+.github/workflows/*.py
 
 # Legacy paths
 src/intelligence_background/
