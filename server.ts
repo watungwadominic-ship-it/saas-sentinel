@@ -14,6 +14,7 @@ app.use(express.json());
 import { supabase } from "./src/services/supabase";
 import * as gemini from "./src/services/gemini";
 import * as newsArticles from "./src/services/news_articles";
+import { postToThreads } from "./src/services/threads";
 
 // 2. CORE SYSTEM ROUTES (FASTEST)
 app.get("/api/health", (req, res) => {
@@ -108,9 +109,20 @@ app.all("/api/cron/fetch-news", async (req, res) => {
     const stories = await gemini.parseNewsIntoStories(rawNews);
     if (stories?.[0]) {
       const articleData = await gemini.generateArticle(stories[0].title, stories[0].snippet);
-      await newsArticles.saveNewsArticle({ ...articleData, source: "SaaS Sentinel", readTime: "4 min read" });
-      res.json({ success: true });
-    } else res.json({ success: false });
+      const saved = await newsArticles.saveNewsArticle({ ...articleData, source: "SaaS Sentinel", readTime: "4 min read" });
+      
+      // Automated post to Threads if configured
+      if (saved && saved[0]) {
+        console.log(`[BOT] News saved: ${saved[0].title}. Attempting Threads post...`);
+        try {
+          await postToThreads(saved[0]);
+        } catch (postError) {
+          console.error("[BOT] Threads post failed:", postError);
+        }
+      }
+      
+      res.json({ success: true, title: stories[0].title });
+    } else res.json({ success: false, reason: "No stories found" });
   } catch (e: any) { 
     console.error("Cron Error:", e);
     res.status(500).json({ error: e.message }); 
