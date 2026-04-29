@@ -1,5 +1,5 @@
 # Hard ignore all Python artifacts
-python_scripts/
+src/python/
 .background_intel/
 **/*.py
 **/deps.txt
