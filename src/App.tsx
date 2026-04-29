@@ -633,7 +633,7 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
   const getImageUrl = (url?: string) => {
     if (!url) return fallbackImage;
     
-    // If it's a full Unsplash URL, use it directly as they are reliable
+    // If it's a full Unsplash URL, use it directly
     if (url.includes('images.unsplash.com')) return url;
     
     // Handle Unsplash IDs
@@ -643,7 +643,7 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
 
     if (url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co')) return url;
     
-    // For other external sources, use proxy to avoid CORS/Hotlink issues
+    // For other external sources, use proxy
     return `/api/proxy-image?url=${encodeURIComponent(url)}`;
   };
 
@@ -731,14 +731,14 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
         Back to intelligence
       </button>
 
-      {/* Hero Image */}
-      <div className="mb-12">
-        <AnalysisImage 
-          src={article.image_url} 
-          alt={article.title} 
-          className="aspect-[21/9] rounded-[2rem] border-white/10 shadow-2xl"
-        />
-      </div>
+        {/* Hero Image */}
+        <div className="mb-12">
+          <AnalysisImage 
+            src={article.image_url || article.image} 
+            alt={article.title} 
+            className="aspect-[21/9] rounded-[2rem] border-text/10 shadow-2xl"
+          />
+        </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-8 xl:gap-12 items-start">
         {/* Main Column */}
@@ -824,8 +824,8 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
 
           {/* Strategic Outlook Card */}
           <section>
-            <div className="glass-panel !bg-white/5 rounded-[2rem] md:rounded-[3rem] p-8 md:p-16 xl:p-20 border-white/10 text-center relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="glass-panel !bg-bg/40 rounded-[2rem] md:rounded-[3rem] p-8 md:p-16 xl:p-20 border-text/10 text-center relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10 space-y-4 md:space-y-6">
                 <span className="text-[9px] md:text-[10px] font-black text-text/30 uppercase tracking-[0.5em] block">Strategic Outlook</span>
                 <p className="text-xl md:text-3xl xl:text-4xl font-black text-text leading-[1.2] tracking-tighter xl:max-w-[90%] mx-auto">
@@ -929,7 +929,7 @@ function FeaturedInsightCard({ article, onClick }: { article: Article, onClick: 
         {/* Image Section */}
         <div className="w-full xl:w-[40%] relative overflow-hidden">
           <AnalysisImage 
-            src={article.image_url} 
+            src={article.image_url || article.image} 
             alt={article.title} 
             rounded="rounded-none"
             className="!border-none !shadow-none group-hover:scale-110 transition-transform duration-1000 h-full w-full object-cover"
@@ -974,7 +974,7 @@ function FeaturedInsightCard({ article, onClick }: { article: Article, onClick: 
             <div className="pt-8 border-t border-white/5 flex items-center justify-between">
               <div className="flex -space-x-2">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className="w-8 h-8 rounded-full border-2 border-[#0D0D15] bg-white/5 flex items-center justify-center">
+                  <div key={i} className="w-8 h-8 rounded-full border-2 border-bg-nav bg-white/5 flex items-center justify-center">
                     <UserIcon className="w-3.5 h-3.5 text-white/20" />
                   </div>
                 ))}
@@ -1680,12 +1680,12 @@ export default function App() {
                                 initial={{ opacity: 0, y: 30 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true, margin: "-50px" }}
-                                className="group glass-panel !bg-white/5 hover:!bg-white/10 !rounded-[2.5rem] cursor-pointer flex flex-col h-full transition-all duration-500 border-white/5 hover:border-white/20 shadow-xl overflow-hidden"
+                                className="group glass-panel !bg-bg hover:!bg-card-hover !rounded-[2.5rem] cursor-pointer flex flex-col h-full transition-all duration-500 border-text/5 hover:border-accent/20 shadow-xl overflow-hidden"
                                 onClick={() => setSelectedArticle(article)}
                               >
                                 <div className="relative aspect-[16/10] overflow-hidden shrink-0">
                                   <AnalysisImage 
-                                    src={article.image_url} 
+                                    src={article.image_url || article.image} 
                                     alt={article.title} 
                                     rounded="rounded-none"
                                     className="!border-none !shadow-none group-hover:scale-105 transition-transform duration-700"
