@@ -2,6 +2,7 @@ import express from 'express';
 import { supabase } from "../src/services/supabase";
 import * as gemini from "../src/services/gemini";
 import * as newsArticles from "../src/services/news_articles";
+import { postToThreads } from "../src/services/threads";
 
 const app = express();
 
@@ -93,6 +94,36 @@ app.get("/api/news/:id", async (req, res) => {
     if (error) throw error;
     res.json(data);
   } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.all("/api/cron/fetch-news", async (req, res) => {
+  try {
+    console.log("Vercel Cron triggered...");
+    const rawNews = await gemini.fetchTopSaaSNews();
+    const stories = await gemini.parseNewsIntoStories(rawNews);
+    
+    if (stories?.[0]) {
+      const articleData = await gemini.generateArticle(stories[0].title, stories[0].snippet);
+      const saved = await newsArticles.saveNewsArticle({ ...articleData, source: "SaaS Sentinel", readTime: "4 min read" });
+      
+      if (saved && saved[0]) {
+        console.log(`[BOT] News saved: ${saved[0].title}. Attempting Threads post...`);
+        try {
+          await postToThreads(saved[0]);
+        } catch (postError) {
+          console.error("[BOT] Threads post failed:", postError);
+        }
+        res.json({ success: true, title: saved[0].title });
+      } else {
+        res.json({ success: false, reason: "Failed to save or already exists" });
+      }
+    } else {
+      res.json({ success: false, reason: "No stories found" });
+    }
+  } catch (e: any) {
+    console.error("Vercel Cron Error:", e);
     res.status(500).json({ error: e.message });
   }
 });
