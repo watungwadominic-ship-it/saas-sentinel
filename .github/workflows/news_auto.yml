@@ -11,4 +11,4 @@ jobs:
         with:
           python-version: '3.10'
       - name: Run Bot
-        run: python python_scripts/bot_engine.py
+        run: python src/python/bot_engine.py
