@@ -176,6 +176,20 @@ def analyze_with_groq(article):
         print(f"❌ Groq Analysis Error: {e}")
         return None
 
+def to_unicode_bold(text):
+    """Converts standard text to Unicode bold characters for social media."""
+    # Maps A-Z and a-z to bold equivalents
+    bold_map = {
+        'A': '𝗔', 'B': '𝗕', 'C': '𝗖', 'D': '𝗗', 'E': '𝗘', 'F': '𝗙', 'G': '𝗚', 'H': '𝗛', 'I': '𝗜', 
+        'J': '𝗝', 'K': '𝗞', 'L': '𝗟', 'M': '𝗠', 'N': '𝗡', 'O': '𝗢', 'P': '𝗣', 'Q': '𝗤', 'R': '𝗥', 
+        'S': '𝗦', 'T': '𝗧', 'U': '𝗨', 'V': '𝗩', 'W': '𝗪', 'X': '𝗫', 'Y': '𝗬', 'Z': '𝗭',
+        'a': '𝗮', 'b': '𝗯', 'c': '𝗰', 'd': '𝗱', 'e': '𝗲', 'f': '𝗳', 'g': '𝗴', 'h': '𝗵', 'i': '𝗶', 
+        'j': '𝗷', 'k': '𝗸', 'l': '𝗹', 'm': '𝗺', 'n': '𝗻', 'o': '𝗼', 'p': '𝗽', 'q': '𝗾', 'r': '𝗿', 
+        's': '𝘀', 't': '𝘁', 'u': '𝘂', 'v': '𝘃', 'w': '𝘄', 'x': '𝘅', 'y': '𝘆', 'z': '𝘇',
+        '0': '𝟬', '1': '𝟭', '2': '𝟮', '3': '𝟯', '4': '𝟰', '5': '𝟱', '6': '𝟲', '7': '𝟳', '8': '𝟴', '9': '𝟵'
+    }
+    return "".join(bold_map.get(c, c) for c in text)
+
 def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     if not LINKEDIN_ACCESS_TOKEN or not LINKEDIN_PERSON_URN:
         return
@@ -185,7 +199,9 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     
     print(f"📡 Sending to LinkedIn: {article_title[:50]}...")
     
-    commentary = f"📡 SaaS Intelligence: {article_title}\n\n{article_summary}\n\nRead more on SaaS Sentinel: {sharing_url}\n\n#SaaS #AI #MarketIntel"
+    # Make headline bold for maximum visual impact
+    bold_headline = to_unicode_bold(f"SaaS Intelligence: {article_title}")
+    commentary = f"📡 {bold_headline}\n\n{article_summary}\n\nRead more on SaaS Sentinel: {sharing_url}\n\n#SaaS #AI #MarketIntel"
     
     author_urn = get_clean_author_urn()
     post_url = "https://api.linkedin.com/v2/ugcPosts"
