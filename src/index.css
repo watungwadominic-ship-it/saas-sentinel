@@ -13,19 +13,19 @@
   --animate-shimmer: shimmer 1.5s infinite linear;
 
   /* Light Theme (Default) */
-  --color-bg: #d6d3cb;
-  --color-text: #333333;
+  --color-bg: #f8f9fa;
+  --color-text: #1a1a1a;
   --color-accent: #f08924;
-  --color-ticker-bg: #b8b5ad;
-  --color-nav-bg: #e8e4db;
-  --color-sidebar-bg: #6d6a63;
-  --color-nav-text: #8a8a8a;
-  --color-sidebar-text: #ffffff;
-  --color-glass: rgba(232, 228, 219, 0.85);
-  --color-glass-border: rgba(255, 255, 255, 0.2);
-  --color-glass-pill: rgba(255, 255, 255, 0.3);
-  --color-sunlight: rgba(255, 255, 255, 0.6);
-  --color-card-hover: rgba(255, 255, 255, 0.5);
+  --color-ticker-bg: #ffffff;
+  --color-nav-bg: #ffffff;
+  --color-sidebar-bg: #f1f3f5;
+  --color-nav-text: #495057;
+  --color-sidebar-text: #212529;
+  --color-glass: rgba(255, 255, 255, 0.8);
+  --color-glass-border: rgba(0, 0, 0, 0.08);
+  --color-glass-pill: rgba(255, 255, 255, 0.6);
+  --color-sunlight: rgba(240, 137, 36, 0.05);
+  --color-card-hover: rgba(255, 255, 255, 0.95);
 
   --animate-spin-slow: spin 3s linear infinite;
 }
@@ -58,18 +58,21 @@
     color: var(--color-text);
     font-size: clamp(2rem, 8vw, 4.5rem);
     @apply font-black tracking-tighter leading-[0.9];
+    font-weight: 950 !important;
   }
 
   h2 {
     color: var(--color-text);
     font-size: clamp(1.5rem, 5vw, 2.5rem);
     @apply font-black tracking-tight leading-tight;
+    font-weight: 900 !important;
   }
 
   h3 {
     color: var(--color-text);
     font-size: clamp(1.125rem, 3vw, 1.5rem);
-    @apply font-bold;
+    @apply font-black tracking-tight;
+    font-weight: 850 !important;
   }
 }
 
