@@ -198,19 +198,19 @@ function AboutPage() {
       exit={{ opacity: 0, y: -20 }}
       className="max-w-[1200px] mx-auto py-12 px-4 md:px-8"
     >
-      <div className="glass-panel p-8 md:p-16 rounded-[3rem] border-white/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-12 opacity-5">
+      <div className="glass-panel p-6 md:p-16 rounded-[2rem] md:rounded-[3rem] border-text/10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-12 opacity-5 hidden lg:block">
           <Brain className="w-64 h-64 text-accent" />
         </div>
         
         <div className="relative z-10">
-          <div className="flex flex-col md:flex-row items-center gap-8 mb-16 pb-12 border-b border-text/10">
-            <div className="bg-accent p-6 rounded-[2rem] shadow-2xl shadow-accent/20">
-              <Newspaper className="w-16 h-16 text-white" />
+          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8 mb-12 md:mb-16 pb-12 border-b border-text/10">
+            <div className="bg-accent p-5 md:p-6 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl shadow-accent/20">
+              <Newspaper className="w-12 h-12 md:w-16 md:h-16 text-white" />
             </div>
             <div className="text-center md:text-left">
-              <h1 className="text-5xl md:text-7xl font-black text-text tracking-tighter mb-4">About SaaS Sentinel</h1>
-              <p className="text-accent font-black text-sm uppercase tracking-[0.4em]">Elite B2B Market Intelligence & Strategic Analysis</p>
+              <h1 className="text-4xl md:text-7xl font-black text-text tracking-tighter mb-2 md:mb-4 leading-tight">About SaaS Sentinel</h1>
+              <p className="text-accent font-black text-[10px] md:text-sm uppercase tracking-[0.4em]">Elite B2B Market Intelligence & Strategic Analysis</p>
             </div>
           </div>
 
@@ -227,15 +227,20 @@ function AboutPage() {
               </section>
 
               <section>
-                <h2 className="text-3xl font-black text-text mb-6">Founder Authority</h2>
-                <div className="flex items-start gap-6 p-8 glass-panel rounded-[2rem] bg-accent/5 border-accent/10">
-                  <div className="w-20 h-20 rounded-full bg-accent/20 shrink-0 flex items-center justify-center border border-accent/30 overflow-hidden shadow-xl">
-                    <UserIcon className="w-10 h-10 text-accent" />
+                <h2 className="text-2xl md:text-3xl font-black text-text mb-4 md:mb-6 leading-tight">Founder Authority</h2>
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 p-6 md:p-8 glass-panel rounded-[2rem] bg-accent/5 border-accent/10">
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-accent/30 shadow-xl shrink-0">
+                    <AnalysisImage 
+                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800" 
+                      alt="Dominic Watungwa"
+                      rounded="rounded-none"
+                      className="!h-full !w-full"
+                    />
                   </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-text mb-2">Dominic Watungwa</h3>
-                    <p className="text-accent font-bold text-xs uppercase tracking-widest mb-4">Lead Developer & Chief Strategist</p>
-                    <p className="text-text/70 leading-relaxed">
+                  <div className="text-center sm:text-left flex-1">
+                    <h3 className="text-xl md:text-2xl font-black text-text mb-1">Dominic Watungwa</h3>
+                    <p className="text-accent font-bold text-[10px] md:text-xs uppercase tracking-widest mb-4">Lead Developer & Chief Strategist</p>
+                    <p className="text-sm md:text-base text-text/70 leading-relaxed">
                       Dominic is the architect behind SaaS Sentinel's proprietary analysis framework. With a deep background in software engineering and market dynamics, he ensures that every intelligence briefing meets the highest standards of technical and strategic rigor.
                     </p>
                   </div>
@@ -243,23 +248,23 @@ function AboutPage() {
               </section>
             </div>
 
-            <aside className="lg:col-span-5 space-y-8">
-              <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-white/5">
-                <h3 className="text-xl font-black text-text mb-6 flex items-center gap-3">
-                  <ShieldCheck className="w-6 h-6 text-emerald-500" />
+            <aside className="lg:col-span-5 space-y-6 md:space-y-8">
+              <div className="glass-panel p-6 md:p-8 rounded-[2.5rem] border-text/10 bg-text/5">
+                <h3 className="text-lg md:text-xl font-black text-text mb-4 md:mb-6 flex items-center gap-3">
+                  <ShieldCheck className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" />
                   Editorial Policy
                 </h3>
-                <p className="text-sm text-text/60 leading-relaxed mb-6">
+                <p className="text-xs md:text-sm text-text/60 leading-relaxed mb-6">
                   Integrity is our primary asset. Every briefing published on SaaS Sentinel undergoes a rigorous multi-stage verification process:
                 </p>
-                <ul className="space-y-4">
+                <ul className="space-y-3 md:space-y-4">
                   {[
                     "AI-Driven Signal Validation",
                     "Cross-Reference against Financial Data",
                     "Human-Lead Strategic Peer Review",
                     "99% Reliability Benchmark"
                   ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-3 text-xs font-black text-text/80 uppercase tracking-widest">
+                    <li key={i} className="flex items-center gap-3 text-[10px] md:text-xs font-black text-text/80 uppercase tracking-widest">
                       <div className="w-1.5 h-1.5 rounded-full bg-accent" />
                       {item}
                     </li>
@@ -267,18 +272,18 @@ function AboutPage() {
                 </ul>
               </div>
 
-              <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-white/5">
-                <h3 className="text-xl font-black text-text mb-4">Core Values</h3>
-                <div className="grid grid-cols-2 gap-4">
+              <div className="glass-panel p-6 md:p-8 rounded-[2.5rem] border-text/10 bg-text/5">
+                <h3 className="text-lg md:text-xl font-black text-text mb-4">Core Values</h3>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
                   {[
                     { label: 'Accuracy', val: '100%' },
                     { label: 'Integrity', val: 'Absolute' },
-                    { label: 'Privacy', val: 'Zero-Knowledge' },
+                    { label: 'Privacy', val: 'Protected' },
                     { label: 'Impact', val: 'High' }
                   ].map((v, i) => (
-                    <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                      <p className="text-[10px] font-black text-text/40 uppercase mb-1">{v.label}</p>
-                      <p className="text-sm font-black text-accent tracking-widest uppercase">{v.val}</p>
+                    <div key={i} className="p-3 md:p-4 rounded-2xl bg-white/5 border border-white/5">
+                      <p className="text-[9px] md:text-[10px] font-black text-text/40 uppercase mb-1">{v.label}</p>
+                      <p className="font-black text-text text-xs md:text-sm">{v.val}</p>
                     </div>
                   ))}
                 </div>
@@ -286,21 +291,21 @@ function AboutPage() {
             </aside>
           </div>
 
-          <div className="text-center border-t border-text/10 pt-20 mb-20">
-            <h2 className="text-[10px] font-black text-text/40 uppercase tracking-[0.5em] mb-8">Contact & Transparency</h2>
-            <div className="max-w-2xl mx-auto space-y-6">
-              <p className="text-lg text-text/60">
+          <div className="text-center border-t border-text/10 pt-16 md:pt-20 mb-16 md:mb-20">
+            <h2 className="text-[9px] md:text-[10px] font-black text-text/40 uppercase tracking-[0.5em] mb-6 md:mb-8">Contact & Transparency</h2>
+            <div className="max-w-2xl mx-auto space-y-6 px-4 md:px-0">
+              <p className="text-base md:text-lg text-text/60 leading-relaxed">
                 We maintain an open-door policy for high-level inquiries, tips, and strategic partnerships.
               </p>
-              <div className="inline-flex flex-col items-center gap-4">
+              <div className="inline-flex flex-col items-center gap-4 w-full sm:w-auto">
                 <a 
                   href="mailto:watungwadominic@gmail.com" 
-                  className="px-12 py-6 bg-accent text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-accent/30 hover:scale-105 hover:bg-accent/90 transition-all active:scale-95 flex items-center gap-4"
+                  className="w-full sm:w-auto px-8 md:px-12 py-5 md:py-6 bg-accent text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-lg md:text-xl shadow-2xl shadow-accent/30 hover:scale-105 hover:bg-accent/90 transition-all active:scale-95 flex items-center justify-center gap-4"
                 >
-                  <Mail className="w-7 h-7" />
+                  <Mail className="w-6 h-6 md:w-7 md:h-7" />
                   watungwadominic@gmail.com
                 </a>
-                <p className="text-[10px] font-bold text-text/30 uppercase tracking-[0.2em]">Official Strategic Inquiries Only</p>
+                <p className="text-[9px] md:text-[10px] font-bold text-text/30 uppercase tracking-[0.2em]">Official Strategic Inquiries Only</p>
               </div>
             </div>
           </div>
@@ -423,25 +428,25 @@ function ArchivePage({ onSelect }: { onSelect: (article: Article) => void }) {
       exit={{ opacity: 0, y: -20 }}
       className="max-w-[1200px] mx-auto py-12 px-4 md:px-8"
     >
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12">
+      <div className="flex flex-col md:flex-row items-center md:items-end justify-between gap-6 mb-12">
         <div className="flex items-center gap-4">
           <div className="bg-accent/10 p-3 rounded-2xl border border-accent/20">
             <Archive className="w-8 h-8 text-accent" />
           </div>
           <div>
-            <h1 className="text-4xl font-black text-text tracking-tight text-center md:text-left">Digital Library</h1>
-            <p className="text-text/40 font-bold text-sm uppercase tracking-widest mt-1 text-center md:text-left">Archive of SaaS Sentinel Intelligence</p>
+            <h1 className="text-3xl md:text-4xl font-black text-text tracking-tight text-center md:text-left">Intelligence Archive</h1>
+            <p className="text-text/40 font-bold text-[10px] md:text-sm uppercase tracking-widest mt-1 text-center md:text-left">Secure Vault of SaaS Sentinel History</p>
           </div>
         </div>
         
-        <div className="relative group">
+        <div className="relative group w-full md:w-auto">
           <select 
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="glass-button !px-8 !py-3 !text-xs font-black uppercase tracking-widest appearance-none pr-12"
+            className="glass-button !w-full !px-8 !py-3 !text-xs font-black uppercase tracking-widest appearance-none pr-12 text-center md:text-left"
           >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
+            <option value="newest">Newest Intelligence</option>
+            <option value="oldest">Historical Order</option>
           </select>
           <ChevronRight className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-text/40 pointer-events-none" />
         </div>
@@ -656,11 +661,11 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
 
     if (url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co')) return url;
     
-    // For other external sources, try proxy as last resort
+    // For other external sources, try proxy
     return `/api/proxy-image?url=${encodeURIComponent(url)}`;
   };
 
-  const imageUrl = error || !src ? fallbackImage : getImageUrl(src);
+  const imageUrl = !src ? fallbackImage : getImageUrl(src);
 
   return (
     <div className={`relative w-full aspect-video overflow-hidden bg-slate-200 dark:bg-slate-800 ${rounded} border border-text/10 shadow-lg ${className}`}>
@@ -668,14 +673,13 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
         <div className="absolute inset-0 z-10 animate-shimmer" />
       )}
       <img
-        src={imageUrl}
+        src={error ? fallbackImage : imageUrl}
         alt={alt}
         className={`w-full h-full object-cover transition-all duration-700 ${loading ? 'opacity-0 scale-110' : 'opacity-100 scale-100'}`}
         onLoad={() => setLoading(false)}
         loading="lazy"
         referrerPolicy="no-referrer"
         onError={(e) => {
-          // If the image failed and it wasn't the fallback yet, try fallback
           if (!error) {
             console.warn(`[IMAGE-WARN] Failed to load: ${src}`);
             setError(true);
