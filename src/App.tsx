@@ -468,17 +468,17 @@ function ArchivePage({ onSelect }: { onSelect: (article: Article) => void }) {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="glass-card !p-4 md:!p-8 cursor-pointer group hover:!bg-white/10 transition-all"
+              className="glass-card !p-3 md:!p-8 cursor-pointer group hover:!bg-white/10 transition-all border border-text/5 hover:border-accent/20"
               onClick={() => onSelect(article)}
             >
               {/* Desktop View */}
               <div className="hidden md:flex gap-8 items-center">
                 <div className="w-32 h-32 rounded-2xl overflow-hidden shrink-0">
-                  <img 
-                    src={article.image_url || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=2426'} 
+                  <AnalysisImage 
+                    src={article.image_url || article.image} 
                     alt={article.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    referrerPolicy="no-referrer"
+                    rounded="rounded-none"
+                    className="!border-none !shadow-none !h-full !w-full group-hover:scale-110 transition-transform duration-700"
                   />
                 </div>
                 <div className="flex-1">
@@ -503,18 +503,28 @@ function ArchivePage({ onSelect }: { onSelect: (article: Article) => void }) {
                 </div>
               </div>
 
-              {/* Mobile View (Slim Card) */}
-              <div className="flex md:hidden items-center justify-between gap-4">
+              {/* Mobile View (Enhanced for Visual Impact) */}
+              <div className="flex md:hidden items-center gap-4">
+                <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-text/5">
+                   <AnalysisImage 
+                    src={article.image_url || article.image} 
+                    alt={article.title}
+                    rounded="rounded-none"
+                    className="!border-none !shadow-none !h-full !w-full"
+                  />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[8px] font-bold text-accent uppercase tracking-widest">{article.category}</span>
-                    <span className="text-[8px] text-text/30 font-bold">• {formatDate(article.date)}</span>
+                    <span className="text-[8px] font-black text-accent uppercase tracking-[0.2em]">{article.category}</span>
+                    <span className="text-[8px] text-text/20 font-bold tracking-widest">• {formatDate(article.date)}</span>
                   </div>
-                  <h3 className="text-sm font-black text-text truncate group-hover:text-accent transition-colors">
+                  <h3 className="text-[13px] font-black text-text leading-tight line-clamp-2 group-hover:text-accent transition-colors">
                     {article.title}
                   </h3>
                 </div>
-                <ChevronRight className="w-4 h-4 text-text/20 shrink-0" />
+                <div className="w-8 h-8 rounded-full bg-accent/5 flex items-center justify-center shrink-0">
+                  <ChevronRight className="w-4 h-4 text-accent" />
+                </div>
               </div>
             </motion.div>
           ))
@@ -555,7 +565,7 @@ function Sidebar({
 }: any) {
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-72 bg-[var(--color-sidebar-bg)] dark:bg-black/50 backdrop-blur-2xl border-r border-white/10 z-[120] hidden lg:flex flex-col p-8 shadow-2xl">
+    <aside className="fixed left-0 top-0 bottom-0 w-72 bg-bg-nav dark:bg-black/50 backdrop-blur-2xl border-r border-text/5 z-[120] hidden lg:flex flex-col p-8 shadow-2xl">
       <div className="flex flex-col gap-4 mb-12">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
           <div className="bg-accent p-2.5 rounded-xl shadow-lg shadow-accent/20">
@@ -629,12 +639,15 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
   const [error, setError] = useState(false);
   const fallbackImage = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=2426'; // Archive fallback
 
-  // Use raw URLs for external images if they are trusted (Unsplash), else proxy
+  // Robust URL resolver
   const getImageUrl = (url?: string) => {
     if (!url) return fallbackImage;
     
-    // If it's a full Unsplash URL, use it directly
-    if (url.includes('images.unsplash.com')) return url;
+    // Always trust Unsplash directly
+    if (url.includes('images.unsplash.com')) {
+      // Ensure we have good quality but manageable size
+      return url.includes('w=') ? url : `${url}&auto=format&fit=crop&q=80&w=1200`;
+    }
     
     // Handle Unsplash IDs
     if (!url.startsWith('http') && url.length > 5 && !url.includes('.')) {
@@ -643,28 +656,31 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
 
     if (url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co')) return url;
     
-    // For other external sources, use proxy
+    // For other external sources, try proxy as last resort
     return `/api/proxy-image?url=${encodeURIComponent(url)}`;
   };
 
   const imageUrl = error || !src ? fallbackImage : getImageUrl(src);
 
   return (
-    <div className={`relative w-full aspect-video overflow-hidden bg-slate-200 dark:bg-slate-800 ${rounded} border border-text/10 shadow-2xl ${className}`}>
+    <div className={`relative w-full aspect-video overflow-hidden bg-slate-200 dark:bg-slate-800 ${rounded} border border-text/10 shadow-lg ${className}`}>
       {loading && (
         <div className="absolute inset-0 z-10 animate-shimmer" />
       )}
       <img
         src={imageUrl}
         alt={alt}
-        className={`w-full h-full object-cover transition-opacity duration-700 ${loading ? 'opacity-0' : 'opacity-100'}`}
+        className={`w-full h-full object-cover transition-all duration-700 ${loading ? 'opacity-0 scale-110' : 'opacity-100 scale-100'}`}
         onLoad={() => setLoading(false)}
         loading="lazy"
         referrerPolicy="no-referrer"
-        onError={() => {
-          console.warn(`[IMAGE-WARN] Failed to load resource, falling back: ${src}`);
-          setError(true);
-          setLoading(false);
+        onError={(e) => {
+          // If the image failed and it wasn't the fallback yet, try fallback
+          if (!error) {
+            console.warn(`[IMAGE-WARN] Failed to load: ${src}`);
+            setError(true);
+            setLoading(false);
+          }
         }}
       />
     </div>
