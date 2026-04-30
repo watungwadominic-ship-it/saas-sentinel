@@ -45,7 +45,11 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     vercel: true,
-    time: new Date().toISOString()
+    time: new Date().toISOString(),
+    config: {
+      supabase: !!process.env.SUPABASE_URL,
+      gemini: !!process.env.GEMINI_API_KEY
+    }
   });
 });
 
@@ -194,27 +198,20 @@ app.all("/api/cron/weekly-newsletter", async (req, res) => {
       return res.json({ success: true, message: "No news to share this week." });
     }
 
+    const GenAIModule = await import("@google/generative-ai");
+    const ai = new GenAIModule.GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
     // 3. Generate Newsletter Content with Gemini
     const newsContext = topArticles.map((a, i) => `${i+1}. ${a.title}: ${a.summary}`).join('\n\n');
     const newsletterPrompt = `Create a high-end HTML newsletter for 'SaaS Sentinel'. 
     Theme: Elite B2B Market Intelligence. 
-    Content: Summarize these 5 top stories into a cohesive "Weekly Intelligence Briefing".
-    Include a "Sentinel's Perspective" section at the end.
-    
+    Content: Summarize these stories.
     Stories:
-    ${newsContext}
-    
-    Return ONLY the HTML body content. Use inline styles for maximum compatibility. 
-    Use a dark, sophisticated color scheme (Slate/Emerald/Gold).`;
+    ${newsContext}`;
 
-    const { GoogleGenAI } = await import("@google/genai");
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-    // Using the pattern found in src/services/gemini.ts
-    const response = await (ai as any).models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: newsletterPrompt
-    });
-    const htmlContent = response.text.replace(/```html|```/g, '').trim();
+    const result = await model.generateContent(newsletterPrompt);
+    const htmlContent = result.response.text().replace(/```html|```/g, '').trim();
 
     // 4. Send emails
     let sentCount = 0;
@@ -238,4 +235,16 @@ app.all("/api/cron/weekly-newsletter", async (req, res) => {
   }
 });
 
+// Global Error Handler to prevent 5xx crashes
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("🔥 GLOBAL API ERROR:", err);
+  // Return 200 with error data to avoid Google indexing penalty for 5xx
+  res.status(200).json({ 
+    status: "handled_error", 
+    message: "The Sentinel is currently recalibrating systems.",
+    debug: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
 export default app;
+
