@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const getApiKey = () => {
   if (typeof process !== 'undefined' && process.env) {
@@ -12,20 +11,23 @@ const getApiKey = () => {
   return '';
 };
 
-let aiInstance: GoogleGenerativeAI | null = null;
-const getAI = () => {
-  if (!aiInstance) {
+// Use dynamic imports inside functions to avoid top-level resolution issues on Vercel
+const getAI = async () => {
+  try {
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const key = getApiKey();
     if (!key) return null;
-    aiInstance = new GoogleGenerativeAI(key);
+    return new GoogleGenerativeAI(key);
+  } catch (e) {
+    console.error("Failed to load @google/generative-ai", e);
+    return null;
   }
-  return aiInstance;
 };
 
 export async function fetchTopSaaSNews(topArticlesContext?: string) {
   try {
-    const ai = getAI();
-    if (!ai) throw new Error("Gemini API key missing");
+    const ai = await getAI();
+    if (!ai) throw new Error("Gemini API key missing or SDK failed to load");
     
     const modelName = "gemini-1.5-flash";
     const query = "(SaaS OR 'Enterprise AI' OR 'Cloud Computing') AND (Launch OR Funding OR Update)";
@@ -41,36 +43,41 @@ export async function fetchTopSaaSNews(topArticlesContext?: string) {
 }
 
 export async function generateArticle(headline: string, snippet: string) {
-  const ai = getAI();
-  if (!ai) throw new Error("Gemini API key missing");
-  
-  const model = ai.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
-    generationConfig: { responseMimeType: "application/json" }
-  });
-  
-  const prompt = `Act as an Elite Senior SaaS Market Analyst. Analyze: ${headline}. Snippet: ${snippet}`;
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-
   try {
+    const ai = await getAI();
+    if (!ai) throw new Error("Gemini API key missing or SDK failed to load");
+    
+    const model = ai.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: { responseMimeType: "application/json" }
+    });
+    
+    const prompt = `Act as an Elite Senior SaaS Market Analyst. Analyze: ${headline}. Snippet: ${snippet}`;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
     return JSON.parse(text);
   } catch (e) {
-    return { title: headline, content: text };
+    console.error("Failed to generate article", e);
+    return { title: headline, content: snippet || "" };
   }
 }
 
 export async function parseNewsIntoStories(rawNews: string) {
-  const ai = getAI();
-  if (!ai) throw new Error("Gemini API key missing");
-  
-  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
-  const prompt = `Extract news stories from: ${rawNews}`;
-
-  const result = await model.generateContent(prompt);
   try {
+    const ai = await getAI();
+    if (!ai) throw new Error("Gemini API key missing or SDK failed to load");
+    
+    const model = ai.getGenerativeModel({ 
+      model: "gemini-1.5-flash", 
+      generationConfig: { responseMimeType: "application/json" } 
+    });
+    const prompt = `Extract news stories from: ${rawNews}`;
+
+    const result = await model.generateContent(prompt);
     return JSON.parse(result.response.text());
   } catch (e) {
+    console.error("Failed to parse news", e);
     return [];
   }
 }
