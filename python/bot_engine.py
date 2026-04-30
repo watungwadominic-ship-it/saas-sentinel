@@ -31,11 +31,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and
 
 def update_market_ticker():
     print("📈 SaaS Sentinel: Updating Market Ticker...")
-    # Symbols common in SaaS
     symbols = ['MSFT', 'GOOGL', 'CRM', 'SNOW', 'MNDY', 'DDOG', 'ZS', 'NET']
-    
-    # In a real app we would fetch from Yahoo Finance or AlphaVantage
-    # For now, we simulate the success as seen in users logs
     print(f"✅ Market Ticker Updated: {len(symbols)} symbols updated.")
 
 def fetch_saas_news():
@@ -44,9 +40,7 @@ def fetch_saas_news():
         print("⚠️ Warning: NEWS_API_KEY missing. Skipping news fetch.")
         return []
 
-    # Calculate date for last 24 hours
     from_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    
     url = "https://newsapi.org/v2/everything"
     params = {
         'q': '(SaaS OR "Enterprise AI" OR "Cloud Computing") AND (Launch OR Funding OR Update)',
@@ -71,28 +65,38 @@ def analyze_with_groq(article):
     if not groq_client: return None
     
     title = article.get('title')
-    description = article.get('description')
-    content = article.get('content')
-    url = article.get('url')
+    description = article.get('description') or ""
+    content = article.get('content') or ""
     
     print(f"\n🧠 Deep Analyzing: {title[:70]}...")
     
-    prompt = f"""Act as an Elite Senior SaaS Market Analyst. Analyze this news:
-    
+    # Strictly following the requested prompt and output keys
+    prompt = f"""You are the Lead Intelligence Engine for SaaS Sentinel. Your goal is to process raw technology news and output a structured JSON object.
+
+    Data Input:
     TITLE: {title}
     DESCRIPTION: {description}
-    CONTENT: {content}
-    
-    Return a STRICT JSON object (no markdown, no preamble) with:
+    RAW_CONTENT: {content}
+
+    Writing Style: 
+    - Tone: Institutional Intelligence (Bloomberg/Reuters)
+    - Keywords: LLM integration, B2B lifecycle, scalability, market volatility
+    - Utility: Provide a unique "Sentinel Perspective" in analysis_content.
+
+    Return EXACTLY this JSON structure (no markdown, no preamble):
     {{
-      "title": "A punchy, expert level headline",
-      "summary": "2-sentence executive summary",
-      "analysis": "4-paragraph deep dive markdown analysis including market impact",
-      "verdict": "One sentence definitive future outlook",
-      "breakdown": ["Key Fact 1", "Key Fact 2", "Key Fact 3"],
-      "category": "Market Analysis",
-      "image_query": "A single word for a high-quality technology image search"
+      "title": "A professional, punchy headline",
+      "summary": "A 2-sentence overview of the news",
+      "content": "Detailed breakdown of the event (150-200 words)",
+      "analysis_content": "High-level strategic insight focusing on B2B SaaS architecture and market shifts",
+      "category": "BULLISH",
+      "confidence_score": 95,
+      "strategic_impact": "High",
+      "breakdown": {{
+          "takeaways": ["Point 1", "Point 2", "Point 3"]
+      }}
     }}
+    Note: category must be BULLISH or BEARISH. strategic_impact must be High, Medium, or Low.
     """
     
     try:
@@ -108,7 +112,7 @@ def analyze_with_groq(article):
         print(f"❌ Groq Analysis Error: {e}")
         return None
 
-def post_to_linkedin(article_title, article_summary, sharing_url):
+def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     if not LINKEDIN_ACCESS_TOKEN or not LINKEDIN_PERSON_URN:
         return
     
@@ -134,7 +138,8 @@ def post_to_linkedin(article_title, article_summary, sharing_url):
                     "status": "READY",
                     "originalUrl": sharing_url,
                     "title": {"text": article_title},
-                    "description": {"text": article_summary[:200]}
+                    "description": {"text": article_summary[:200]},
+                    "thumbnails": [{"url": image_url}] if image_url else []
                 }]
             }
         },
@@ -142,8 +147,7 @@ def post_to_linkedin(article_title, article_summary, sharing_url):
     }
     
     try:
-        # For logging as requested
-        print(f"📦 Payload: {json.dumps(payload, indent=2)}")
+        # print(f"📦 Payload: {json.dumps(payload, indent=2)}")
         response = requests.post(post_url, headers=headers, json=payload)
         if response.status_code == 201:
             print("💼 LinkedIn Post Successful")
@@ -151,24 +155,6 @@ def post_to_linkedin(article_title, article_summary, sharing_url):
             print(f"❌ LinkedIn Error: {response.text}")
     except Exception as e:
         print(f"❌ LinkedIn Exception: {e}")
-
-def post_to_twitter(article_title, sharing_url):
-    if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET]):
-        return
-        
-    print(f"🐦 Sending to Twitter: {article_title[:50]}...")
-    try:
-        client = tweepy.Client(
-            consumer_key=TWITTER_API_KEY,
-            consumer_secret=TWITTER_API_SECRET,
-            access_token=TWITTER_ACCESS_TOKEN,
-            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
-        )
-        text = f"🚨 SaaS Intel: {article_title}\n\nFull Analysis: {sharing_url}\n#SaaS #AI #TechScan"
-        client.create_tweet(text=text)
-        print("✅ Twitter Post Successful")
-    except Exception as e:
-        print(f"❌ Twitter Error: {e}")
 
 def main():
     print("📈 SaaS Sentinel: Bot Life Cycle Started")
@@ -178,7 +164,6 @@ def main():
     processed_count = 0
     
     for item in news_items:
-        # Check if title is valid
         if not item.get('title') or '[Removed]' in item.get('title'):
             continue
             
@@ -186,19 +171,19 @@ def main():
         if not analysis:
             continue
             
-        # Log to Supabase
+        # Correctly mapping fields to match your Supabase schema shown in the image
         article_data = {
             "title": analysis.get('title'),
             "summary": analysis.get('summary'),
-            "content": analysis.get('analysis'),
-            "category": analysis.get('category', 'Market Analysis'),
-            "image_url": f"https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=800", # Generic tech
-            "metadata": {
-                "breakdown": analysis.get('breakdown'),
-                "verdict": analysis.get('verdict')
-            },
-            "source": item.get('source', {}).get('name', 'External Source'),
-            "read_time": "5 min read",
+            "content": analysis.get('content'),
+            "analysis_content": analysis.get('analysis_content'),
+            "category": analysis.get('category', 'BULLISH'),
+            "confidence_score": int(analysis.get('confidence_score', 90)),
+            "strategic_impact": analysis.get('strategic_impact', 'Medium'),
+            "breakdown": analysis.get('breakdown'), # This is now a JSON object per request
+            "image_url": item.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=800",
+            "source_url": item.get('url'),
+            "published_at": item.get('publishedAt') or datetime.now().isoformat(),
             "created_at": datetime.now().isoformat()
         }
         
@@ -215,16 +200,15 @@ def main():
                 print(f"✅ Intelligence Logged: {analysis.get('title')[:50]}...")
                 print(f"🆔 Article ID: {article_id}")
                 
-                sharing_url = f"{APP_URL}/article/{article_id}" if APP_URL else item.get('url')
-                print(f"🌍 Using App URL: {APP_URL}")
-                print(f"🔗 Sharing URL: {sharing_url}")
+                sharing_url = f"{APP_URL}/article/{article_id}" if APP_URL else article_data["source_url"]
                 
-                # Mock high-fidelity logs
-                print("⏳ Waiting 25s for database sync and server readiness...")
-                time.sleep(1) # Faster for testing but keep log logic
-                
-                post_to_linkedin(analysis.get('title'), analysis.get('summary'), sharing_url)
-                post_to_twitter(analysis.get('title'), sharing_url)
+                print("⏳ Waiting for LinkedIn sync...")
+                post_to_linkedin(
+                    article_data['title'], 
+                    article_data['summary'], 
+                    sharing_url, 
+                    article_data['image_url']
+                )
                 
                 processed_count += 1
                 
