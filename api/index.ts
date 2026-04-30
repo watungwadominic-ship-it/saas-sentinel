@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { supabase } from "../src/services/supabase";
 import * as gemini from "../src/services/gemini";
 import * as newsArticles from "../src/services/news_articles";
@@ -42,7 +42,7 @@ async function sendEmail(to: string, subject: string, html: string) {
   }
 }
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (req: Request, res: Response) => {
   res.json({ 
     status: 'ok', 
     vercel: true,
@@ -54,7 +54,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get(["/robots.txt", "/api/robots.txt"], (req, res) => {
+app.get(["/robots.txt", "/api/robots.txt"], (req: Request, res: Response) => {
   const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
   const base = `${protocol}://${host}`;
@@ -62,7 +62,7 @@ app.get(["/robots.txt", "/api/robots.txt"], (req, res) => {
   res.send(`User-agent: *\nAllow: /\nSitemap: ${base}/sitemap.xml\n`);
 });
 
-app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req, res) => {
+app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response) => {
   try {
     const host = req.get('host') || 'saas-sentinel-cyan.vercel.app';
     const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
@@ -95,7 +95,7 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req, res) => {
 });
 
 // Proxy image to bypass CORS and prevent direct hotlinking crashes
-app.get("/api/proxy-image", async (req, res) => {
+app.get("/api/proxy-image", async (req: Request, res: Response) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) return res.status(400).send("No URL");
   try {
@@ -110,7 +110,7 @@ app.get("/api/proxy-image", async (req, res) => {
   }
 });
 
-app.get("/api/news", async (req, res, next) => {
+app.get("/api/news", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { data, error } = await supabase
       .from("news_articles")
@@ -124,7 +124,7 @@ app.get("/api/news", async (req, res, next) => {
   }
 });
 
-app.get("/api/news/:id", async (req, res, next) => {
+app.get("/api/news/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { data, error } = await supabase
       .from("news_articles")
@@ -138,7 +138,7 @@ app.get("/api/news/:id", async (req, res, next) => {
   }
 });
 
-app.all("/api/cron/fetch-news", async (req, res, next) => {
+app.all("/api/cron/fetch-news", async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("Vercel Cron triggered...");
     const rawNews = await gemini.fetchTopSaaSNews();
@@ -169,7 +169,7 @@ app.all("/api/cron/fetch-news", async (req, res, next) => {
 });
 
 // Weekly Intelligence Newsletter Cron
-app.all("/api/cron/weekly-newsletter", async (req, res, next) => {
+app.all("/api/cron/weekly-newsletter", async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("Weekly Newsletter Cron triggered...");
     
@@ -236,7 +236,7 @@ app.all("/api/cron/weekly-newsletter", async (req, res, next) => {
 });
 
 // Global Error Handler to prevent 5xx crashes
-app.use((err: any, req: any, res: any, next: any) => {
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error("🔥 GLOBAL API ERROR:", err);
   // Return 200 with error data to avoid Google indexing penalty for 5xx
   res.status(200).json({ 
@@ -247,4 +247,5 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 export default app;
+
 
