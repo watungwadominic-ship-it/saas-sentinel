@@ -3,7 +3,6 @@ import { supabase } from "../src/services/supabase";
 import * as gemini from "../src/services/gemini";
 import * as newsArticles from "../src/services/news_articles";
 import { postToThreads } from "../src/services/threads";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import nodemailer from 'nodemailer';
 
@@ -68,22 +67,27 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
     const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
     const base = `${protocol}://${host}`;
     
-    const { data: articles } = await supabase
-      .from("news_articles")
-      .select("id, updated_at, created_at")
-      .order("created_at", { ascending: false })
-      .limit(100);
+    let articles = [];
+    try {
+      const { data } = await supabase
+        .from("news_articles")
+        .select("id, updated_at, created_at")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      articles = data || [];
+    } catch (e) {
+      console.error("Supabase fail in sitemap", e);
+    }
     
     let sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
     sitemap += `\n  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`;
     sitemap += `\n  <url><loc>${base}/archive</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`;
 
-    if (articles) {
-      articles.forEach((a: any) => {
-        const mod = (a.updated_at || a.created_at || new Date().toISOString()).split('T')[0];
-        sitemap += `\n  <url><loc>${base}/article/${a.id}</loc><lastmod>${mod}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`;
-      });
-    }
+    articles.forEach((a: any) => {
+      const mod = (a.updated_at || a.created_at || new Date().toISOString()).split('T')[0];
+      sitemap += `\n  <url><loc>${base}/article/${a.id}</loc><lastmod>${mod}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`;
+    });
+    
     sitemap += `\n</urlset>`;
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
     return res.send(sitemap);
@@ -199,6 +203,7 @@ app.all("/api/cron/weekly-newsletter", async (req: Request, res: Response, next:
       return res.json({ success: true, message: "No news to share this week." });
     }
 
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
     
