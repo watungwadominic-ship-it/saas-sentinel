@@ -593,6 +593,24 @@ function Sidebar({
           Archive
         </button>
         
+        <div className="pt-8 pb-4">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-text/30 px-4 mb-4">Intelligence Archive</h3>
+          <div className="space-y-4 px-2">
+            {[
+              { id: 'weekly-reports', label: 'Intelligence Briefings', icon: Mail, color: 'text-accent' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => { setShowArchive(true); setSelectedArticle(null); }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-bold text-text/50 hover:bg-white/5 hover:text-text transition-all text-left"
+              >
+                <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        
         <button 
           onClick={() => { setShowAbout(true); setSelectedArticle(null); setShowPrivacy(false); setShowArchive(false); }}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${showAbout ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
