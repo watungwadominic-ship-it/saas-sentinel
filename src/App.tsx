@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Analytics } from '@vercel/analytics/react';
+import { inject } from '@vercel/analytics';
 import { supabase } from './services/supabase';
 import { Article } from './types';
 import { generateArticle, fetchTopSaaSNews, parseNewsIntoStories } from './services/gemini';
@@ -294,9 +294,9 @@ function AboutPage() {
               <div className="inline-flex flex-col items-center gap-4 w-full sm:w-auto">
                 <a 
                   href="mailto:watungwadominic@gmail.com" 
-                  className="w-full sm:w-auto px-6 md:px-12 py-4 md:py-6 bg-accent text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-[10px] md:text-xl shadow-2xl shadow-accent/30 hover:scale-105 hover:bg-accent/90 transition-all active:scale-95 flex items-center justify-center gap-4 border border-white/10"
+                  className="w-full sm:w-auto px-6 md:px-12 py-3 md:py-6 bg-accent text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-[9px] md:text-xl shadow-2xl shadow-accent/30 hover:scale-105 hover:bg-accent/90 transition-all active:scale-95 flex items-center justify-center gap-2 md:gap-4 border border-white/10 z-50 cursor-pointer"
                 >
-                  <Mail className="w-4 h-4 md:w-7 md:h-7" />
+                  <Mail className="w-3.5 h-3.5 md:w-7 md:h-7" />
                   watungwadominic@gmail.com
                 </a>
                 <p className="text-[9px] md:text-[10px] font-bold text-text/30 uppercase tracking-[0.2em]">Official Strategic Inquiries Only</p>
@@ -597,7 +597,8 @@ function Sidebar({
           <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-text/30 px-4 mb-4">Intelligence Archive</h3>
           <div className="space-y-4 px-2">
             {[
-              { id: 'weekly-reports', label: 'Intelligence Briefings', icon: Mail, color: 'text-accent' }
+              { id: 'weekly-reports', label: 'Intelligence Briefings', icon: Mail, color: 'text-accent' },
+              { id: 'strategic-analysis', label: 'Strategic Analysis', icon: Activity, color: 'text-emerald-500' }
             ].map((item) => (
               <button
                 key={item.id}
@@ -1115,6 +1116,9 @@ export default function App() {
 
   // Check for cookie consent
   useEffect(() => {
+    // Initialize Vercel Analytics
+    inject();
+    
     const consent = localStorage.getItem('cookie-consent');
     // Check if we are viewing a specific article to avoid distracting new users immediately
     const params = new URLSearchParams(window.location.search);
@@ -1485,7 +1489,6 @@ export default function App() {
 
   return (
     <>
-      <Analytics />
       <div className="min-h-screen relative transition-colors duration-500">
         {/* Background Gradients */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
