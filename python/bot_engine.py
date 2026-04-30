@@ -127,8 +127,13 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
         "X-Restli-Protocol-Version": "2.0.0"
     }
     
+    # Ensure author URN is correctly formatted
+    author_urn = LINKEDIN_PERSON_URN
+    if not author_urn.startswith("urn:li:"):
+        author_urn = f"urn:li:person:{author_urn}"
+    
     payload = {
-        "author": f"urn:li:person:{LINKEDIN_PERSON_URN}",
+        "author": author_urn,
         "lifecycleState": "PUBLISHED",
         "specificContent": {
             "com.linkedin.ugc.ShareContent": {
