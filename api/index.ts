@@ -4,42 +4,10 @@ import * as gemini from "../src/services/gemini";
 import * as newsArticles from "../src/services/news_articles";
 import { postToThreads } from "../src/services/threads";
 
-import nodemailer from 'nodemailer';
-
 const app = express();
+app.use(express.json());
 
-// Helper to send email
-async function sendEmail(to: string, subject: string, html: string) {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = parseInt(process.env.SMTP_PORT || '465');
-
-  if (!user || !pass) {
-    console.warn(`[MAIL-WARN] SMTP credentials missing. Skipping email to ${to}`);
-    return false;
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass }
-  });
-
-  try {
-    await transporter.sendMail({
-      from: `"SaaS Sentinel Intelligence" <${user}>`,
-      to,
-      subject,
-      html
-    });
-    return true;
-  } catch (error) {
-    console.error(`[MAIL-ERROR] Failed to send to ${to}:`, error);
-    return false;
-  }
-}
+console.log("🚀 Sentinel API booting up...");
 
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ 
@@ -98,23 +66,7 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
   }
 });
 
-// Proxy image to bypass CORS and prevent direct hotlinking crashes
-app.get("/api/proxy-image", async (req: Request, res: Response) => {
-  const imageUrl = req.query.url as string;
-  if (!imageUrl) return res.status(400).send("No URL");
-  try {
-    const response = await fetch(imageUrl, { headers: { 'User-Agent': 'SaaS-Sentinel-Bot/1.0' } });
-    if (!response.ok) throw new Error();
-    const buffer = await response.arrayBuffer();
-    res.setHeader("Content-Type", response.headers.get("content-type") || "image/jpeg");
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    return res.send(Buffer.from(buffer));
-  } catch (e) {
-    return res.redirect(imageUrl);
-  }
-});
-
-app.get("/api/news", async (req: Request, res: Response, next: NextFunction) => {
+app.get(["/api/news", "/news"], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { data, error } = await supabase
       .from("news_articles")
@@ -128,7 +80,7 @@ app.get("/api/news", async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
-app.get("/api/news/:id", async (req: Request, res: Response, next: NextFunction) => {
+app.get(["/api/news/:id", "/news/:id"], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { data, error } = await supabase
       .from("news_articles")
@@ -142,9 +94,9 @@ app.get("/api/news/:id", async (req: Request, res: Response, next: NextFunction)
   }
 });
 
-app.all("/api/cron/fetch-news", async (req: Request, res: Response, next: NextFunction) => {
+app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log("Vercel Cron triggered...");
+    console.log("Vercel Cron fetch-news triggered...");
     const rawNews = await gemini.fetchTopSaaSNews();
     const stories = await gemini.parseNewsIntoStories(rawNews);
     
@@ -172,12 +124,10 @@ app.all("/api/cron/fetch-news", async (req: Request, res: Response, next: NextFu
   }
 });
 
-// Weekly Intelligence Newsletter Cron
-app.all("/api/cron/weekly-newsletter", async (req: Request, res: Response, next: NextFunction) => {
+app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("Weekly Newsletter Cron triggered...");
     
-    // 1. Fetch all subscribers
     const { data: subscribers, error: subError } = await supabase
       .from('subscribers')
       .select('email');
@@ -187,7 +137,6 @@ app.all("/api/cron/weekly-newsletter", async (req: Request, res: Response, next:
       return res.json({ success: true, message: "No subscribers to notify." });
     }
 
-    // 2. Fetch top news from the last 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
@@ -203,54 +152,84 @@ app.all("/api/cron/weekly-newsletter", async (req: Request, res: Response, next:
       return res.json({ success: true, message: "No news to share this week." });
     }
 
+    // Dynamic import for content generation since it's the only place and needs heavy SDK
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
     
-    // 3. Generate Newsletter Content with Gemini
     const newsContext = topArticles.map((a, i) => `${i+1}. ${a.title}: ${a.summary}`).join('\n\n');
-    const newsletterPrompt = `Create a high-end HTML newsletter for 'SaaS Sentinel'. 
+    const newsletterPrompt = `Create a high-end HTML newsletter briefing for 'SaaS Sentinel'. 
     Theme: Elite B2B Market Intelligence. 
-    Content: Summarize these stories.
-    Stories:
+    Content: Summarize these stories:
     ${newsContext}`;
 
     const result = await model.generateContent(newsletterPrompt);
     const htmlContent = result.response.text().replace(/```html|```/g, '').trim();
 
-    // 4. Send emails
+    const nodemailer = await import('nodemailer');
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const port = parseInt(process.env.SMTP_PORT || '465');
+
+    const transporter = nodemailer.default.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass }
+    });
+
     let sentCount = 0;
-    const subject = `Weekly Intelligence: ${topArticles[0].title.substring(0, 40)}...`;
+    const subject = `Weekly Intelligence Brief: ${topArticles[0].title.substring(0, 50)}...`;
     
     for (const sub of subscribers) {
-      const success = await sendEmail(sub.email, subject, htmlContent);
-      if (success) sentCount++;
+      try {
+        await transporter.sendMail({
+          from: `"SaaS Sentinel" <${user}>`,
+          to: sub.email,
+          subject,
+          html: htmlContent
+        });
+        sentCount++;
+      } catch (err) {
+        console.error(`Failed to send to ${sub.email}`, err);
+      }
     }
     
-    res.json({ 
-      success: true, 
-      recipients: subscribers.length,
-      sent: sentCount,
-      articleCount: topArticles.length,
-      message: `Newsletter briefing sent to ${sentCount} elite subscribers.`
-    });
+    res.json({ success: true, sent: sentCount, message: `Newsletter briefing sent to elite subscribers.` });
   } catch (e: any) {
     console.error("Newsletter Cron Error:", e);
     next(e);
   }
 });
 
-// Global Error Handler to prevent 5xx crashes
+// Proxy image bypass
+app.get(["/api/proxy-image", "/proxy-image"], async (req: Request, res: Response) => {
+  const imageUrl = req.query.url as string;
+  if (!imageUrl) return res.status(400).send("No URL");
+  try {
+    const response = await fetch(imageUrl, { headers: { 'User-Agent': 'SaaS-Sentinel-Bot/1.0' } });
+    if (!response.ok) throw new Error();
+    const buffer = await response.arrayBuffer();
+    res.setHeader("Content-Type", response.headers.get("content-type") || "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return res.send(Buffer.from(buffer));
+  } catch (e) {
+    return res.redirect(imageUrl);
+  }
+});
+
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error("🔥 GLOBAL API ERROR:", err);
-  // Return 200 with error data to avoid Google indexing penalty for 5xx
+  console.error("🔥 Global API Catch:", err);
   res.status(200).json({ 
     status: "handled_error", 
-    message: "The Sentinel is currently recalibrating systems.",
+    message: "Sentinel recalibrating.",
     debug: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
 export default app;
+
+
 
 
