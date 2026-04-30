@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Trigger Newsletter API
         run: |
-          URL="${{ secrets.APP_URL || 'https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app' }}"
+          URL="${{ secrets.SHARED_APP_URL || 'https://ais-pre-k2zyhx7iw4f2x55hvxwlzg-10310046101.europe-west2.run.app' }}"
           echo "Triggering newsletter at $URL/api/cron/weekly-newsletter"
           curl -X POST "$URL/api/cron/weekly-newsletter" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
