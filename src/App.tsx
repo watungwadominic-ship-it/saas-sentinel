@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './services/supabase';
 import { Article } from './types';
 import { generateArticle, fetchTopSaaSNews, parseNewsIntoStories } from './services/gemini';
@@ -1465,7 +1466,9 @@ export default function App() {
   }, [filteredArticles, visibleCount]);
 
   return (
-    <div className="min-h-screen relative transition-colors duration-500">
+    <>
+      <Analytics />
+      <div className="min-h-screen relative transition-colors duration-500">
         {/* Background Gradients */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100%] h-[100%] bg-sunlight opacity-60" />
@@ -2034,6 +2037,7 @@ export default function App() {
       </div>
     </div>
   </div>
+    </>
   );
 }
 
