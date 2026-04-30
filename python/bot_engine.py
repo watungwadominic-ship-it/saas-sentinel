@@ -29,6 +29,70 @@ TWITTER_ACCESS_TOKEN_SECRET = os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
+def get_clean_author_urn():
+    if not LINKEDIN_PERSON_URN: return None
+    author_urn = LINKEDIN_PERSON_URN
+    if "urn:li:member:" in author_urn:
+        idx = author_urn.find("urn:li:member:")
+        return author_urn[idx:]
+    if "urn:li:person:" in author_urn:
+        idx = author_urn.find("urn:li:person:")
+        return author_urn[idx:]
+    if not author_urn.startswith("urn:li:"):
+        return f"urn:li:person:{author_urn}"
+    return author_urn
+
+def upload_image_to_linkedin(image_url):
+    if not LINKEDIN_ACCESS_TOKEN or not LINKEDIN_PERSON_URN:
+        return None
+        
+    print(f"🖼️ Preparing high-fidelity image for LinkedIn: {image_url}")
+    
+    try:
+        # 1. Download image
+        img_res = requests.get(image_url, timeout=15)
+        if img_res.status_code != 200:
+            return None
+        img_data = img_res.content
+
+        # 2. Register upload
+        author_urn = get_clean_author_urn()
+        register_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
+        headers = {
+            "Authorization": f"Bearer {LINKEDIN_ACCESS_TOKEN}",
+            "X-Restli-Protocol-Version": "2.0.0"
+        }
+        
+        payload = {
+            "registerUploadRequest": {
+                "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                "owner": author_urn,
+                "serviceRelationships": [{
+                    "relationshipType": "OWNER",
+                    "identifier": "urn:li:userGeneratedContent"
+                }]
+            }
+        }
+        
+        reg_res = requests.post(register_url, headers=headers, json=payload)
+        reg_data = reg_res.json()
+        
+        if 'value' not in reg_data:
+            print(f"❌ LinkedIn Image Register Fail: {reg_data}")
+            return None
+            
+        upload_url = reg_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
+        asset_urn = reg_data['value']['asset']
+        
+        # 3. Upload binary
+        requests.put(upload_url, headers={"Authorization": f"Bearer {LINKEDIN_ACCESS_TOKEN}"}, data=img_data)
+        
+        print(f"✅ Image Asset Registered: {asset_urn}")
+        return asset_urn
+    except Exception as e:
+        print(f"❌ Image Upload Process Error: {e}")
+        return None
+
 def update_market_ticker():
     print("📈 SaaS Sentinel: Updating Market Ticker...")
     symbols = ['MSFT', 'GOOGL', 'CRM', 'SNOW', 'MNDY', 'DDOG', 'ZS', 'NET']
@@ -116,10 +180,14 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     if not LINKEDIN_ACCESS_TOKEN or not LINKEDIN_PERSON_URN:
         return
     
+    # Attempt to upload image for "Large Image" post
+    asset_urn = upload_image_to_linkedin(image_url)
+    
     print(f"📡 Sending to LinkedIn: {article_title[:50]}...")
     
     commentary = f"📡 SaaS Intelligence: {article_title}\n\n{article_summary}\n\nRead more on SaaS Sentinel: {sharing_url}\n\n#SaaS #AI #MarketIntel"
     
+    author_urn = get_clean_author_urn()
     post_url = "https://api.linkedin.com/v2/ugcPosts"
     headers = {
         "Authorization": f"Bearer {LINKEDIN_ACCESS_TOKEN}",
@@ -127,15 +195,23 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
         "X-Restli-Protocol-Version": "2.0.0"
     }
     
-    # Ensure author URN is correctly formatted
-    author_urn = LINKEDIN_PERSON_URN
-    if not author_urn.startswith("urn:li:"):
-        author_urn = f"urn:li:person:{author_urn}"
-    
-    payload = {
-        "author": author_urn,
-        "lifecycleState": "PUBLISHED",
-        "specificContent": {
+    # If image upload succeeded, use IMAGE category for big picture
+    # otherwise fallback to ARTICLE for rich link preview
+    if asset_urn:
+        share_content = {
+            "com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {"text": commentary},
+                "shareMediaCategory": "IMAGE",
+                "media": [{
+                    "status": "READY",
+                    "media": asset_urn,
+                    "title": {"text": article_title},
+                    "description": {"text": article_summary[:200]}
+                }]
+            }
+        }
+    else:
+        share_content = {
             "com.linkedin.ugc.ShareContent": {
                 "shareCommentary": {"text": commentary},
                 "shareMediaCategory": "ARTICLE",
@@ -143,16 +219,19 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
                     "status": "READY",
                     "originalUrl": sharing_url,
                     "title": {"text": article_title},
-                    "description": {"text": article_summary[:200]},
-                    "thumbnails": [{"url": image_url}] if image_url else []
+                    "description": {"text": article_summary[:200]}
                 }]
             }
-        },
+        }
+    
+    payload = {
+        "author": author_urn,
+        "lifecycleState": "PUBLISHED",
+        "specificContent": share_content,
         "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
     }
     
     try:
-        # print(f"📦 Payload: {json.dumps(payload, indent=2)}")
         response = requests.post(post_url, headers=headers, json=payload)
         if response.status_code == 201:
             print("💼 LinkedIn Post Successful")
