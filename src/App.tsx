@@ -230,14 +230,6 @@ function AboutPage() {
               <section>
                 <h2 className="text-2xl md:text-3xl font-black text-text mb-4 md:mb-6 leading-tight">Founder Authority</h2>
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 p-6 md:p-8 glass-panel rounded-[2rem] bg-accent/5 border-accent/10">
-                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-accent/30 shadow-xl shrink-0">
-                    <AnalysisImage 
-                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800" 
-                      alt="Dominic Watungwa"
-                      rounded="rounded-none"
-                      className="!h-full !w-full"
-                    />
-                  </div>
                   <div className="text-center sm:text-left flex-1">
                     <h3 className="text-xl md:text-2xl font-black text-text mb-1">Dominic Watungwa</h3>
                     <p className="text-accent font-bold text-[10px] md:text-xs uppercase tracking-widest mb-4">Lead Developer & Chief Strategist</p>
@@ -301,9 +293,9 @@ function AboutPage() {
               <div className="inline-flex flex-col items-center gap-4 w-full sm:w-auto">
                 <a 
                   href="mailto:watungwadominic@gmail.com" 
-                  className="w-full sm:w-auto px-8 md:px-12 py-5 md:py-6 bg-accent text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-lg md:text-xl shadow-2xl shadow-accent/30 hover:scale-105 hover:bg-accent/90 transition-all active:scale-95 flex items-center justify-center gap-4"
+                  className="w-full sm:w-auto px-6 md:px-12 py-4 md:py-6 bg-accent text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-[10px] md:text-xl shadow-2xl shadow-accent/30 hover:scale-105 hover:bg-accent/90 transition-all active:scale-95 flex items-center justify-center gap-4 border border-white/10"
                 >
-                  <Mail className="w-6 h-6 md:w-7 md:h-7" />
+                  <Mail className="w-4 h-4 md:w-7 md:h-7" />
                   watungwadominic@gmail.com
                 </a>
                 <p className="text-[9px] md:text-[10px] font-bold text-text/30 uppercase tracking-[0.2em]">Official Strategic Inquiries Only</p>
@@ -600,25 +592,6 @@ function Sidebar({
           Archive
         </button>
         
-        <div className="pt-8 pb-4">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-text/30 px-4 mb-4">Intelligence Archive</h3>
-          <div className="space-y-4 px-2">
-            {[
-              { id: 'weekly-intel', label: 'Weekly Reports', icon: Mail, color: 'text-accent' },
-              { id: 'funding', label: 'Recent Funding', icon: Activity, color: 'text-emerald-500' }
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => { setShowArchive(true); setSelectedArticle(null); }}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-bold text-text/50 hover:bg-white/5 hover:text-text transition-all text-left"
-              >
-                <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <button 
           onClick={() => { setShowAbout(true); setSelectedArticle(null); setShowPrivacy(false); setShowArchive(false); }}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${showAbout ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
