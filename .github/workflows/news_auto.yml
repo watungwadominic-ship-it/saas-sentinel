@@ -16,6 +16,8 @@ jobs:
           pip install -r python/requirements.txt
       - name: Run Bot
         env:
-          APP_URL: ${{ secrets.SHARED_APP_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SHARED_APP_URL: ${{ secrets.SHARED_APP_URL }}
         run: python python/bot_engine.py
