@@ -3,6 +3,7 @@ import { supabase } from "../src/services/supabase";
 import * as gemini from "../src/services/gemini";
 import * as newsArticles from "../src/services/news_articles";
 import { postToThreads } from "../src/services/threads";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import nodemailer from 'nodemailer';
 
@@ -109,7 +110,7 @@ app.get("/api/proxy-image", async (req, res) => {
   }
 });
 
-app.get("/api/news", async (req, res) => {
+app.get("/api/news", async (req, res, next) => {
   try {
     const { data, error } = await supabase
       .from("news_articles")
@@ -119,11 +120,11 @@ app.get("/api/news", async (req, res) => {
     if (error) throw error;
     res.json(data);
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 });
 
-app.get("/api/news/:id", async (req, res) => {
+app.get("/api/news/:id", async (req, res, next) => {
   try {
     const { data, error } = await supabase
       .from("news_articles")
@@ -133,11 +134,11 @@ app.get("/api/news/:id", async (req, res) => {
     if (error) throw error;
     res.json(data);
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 });
 
-app.all("/api/cron/fetch-news", async (req, res) => {
+app.all("/api/cron/fetch-news", async (req, res, next) => {
   try {
     console.log("Vercel Cron triggered...");
     const rawNews = await gemini.fetchTopSaaSNews();
@@ -163,12 +164,12 @@ app.all("/api/cron/fetch-news", async (req, res) => {
     }
   } catch (e: any) {
     console.error("Vercel Cron Error:", e);
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 });
 
 // Weekly Intelligence Newsletter Cron
-app.all("/api/cron/weekly-newsletter", async (req, res) => {
+app.all("/api/cron/weekly-newsletter", async (req, res, next) => {
   try {
     console.log("Weekly Newsletter Cron triggered...");
     
@@ -198,8 +199,7 @@ app.all("/api/cron/weekly-newsletter", async (req, res) => {
       return res.json({ success: true, message: "No news to share this week." });
     }
 
-    const GenAIModule = await import("@google/generative-ai");
-    const ai = new GenAIModule.GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     // 3. Generate Newsletter Content with Gemini
@@ -231,7 +231,7 @@ app.all("/api/cron/weekly-newsletter", async (req, res) => {
     });
   } catch (e: any) {
     console.error("Newsletter Cron Error:", e);
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 });
 
