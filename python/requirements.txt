@@ -1,5 +1,6 @@
 # Project requirements
-google-generativeai
+groq
 supabase
 python-dotenv
 requests
+tweepy
