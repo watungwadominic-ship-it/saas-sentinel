@@ -45,7 +45,7 @@ export function mapRowToArticle(row: any): Article {
     readTime: row.read_time || '5 min read',
     source: row.source || 'SaaS Sentinel',
     image_url: row.image_url,
-    breakdown: Array.isArray(row.breakdown) ? row.breakdown : [],
+    breakdown: row.breakdown,
     sentinel_take: sentinel_take,
     verdict: verdict
   };
