@@ -136,6 +136,9 @@ def analyze_with_groq(article):
     
     # Strictly following the requested prompt and output keys
     prompt = f"""You are the Lead Intelligence Engine for SaaS Sentinel. Your goal is to process raw technology news and output a structured JSON object.
+    
+    STRICT CATEGORY FILTER: Only process news if it is explicitly about B2B SaaS, Enterprise Software, Cloud Infrastructure, or Fintech. 
+    EXCLUDE: Consumer electronics, smartphones, gaming, or general retail.
 
     Data Input:
     TITLE: {title}
@@ -156,11 +159,9 @@ def analyze_with_groq(article):
       "category": "BULLISH",
       "confidence_score": 95,
       "strategic_impact": "High",
-      "breakdown": {{
-          "takeaways": ["Point 1", "Point 2", "Point 3"]
-      }}
+      "breakdown": ["Implication 1", "Implication 2", "Implication 3", "Implication 4"]
     }}
-    Note: category must be BULLISH or BEARISH. strategic_impact must be High, Medium, or Low.
+    Note: category must be BULLISH or BEARISH. strategic_impact must be High, Medium, or Low. breakdown must be a list of 4 strings.
     """
     
     try:
