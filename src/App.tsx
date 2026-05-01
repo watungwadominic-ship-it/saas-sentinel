@@ -761,6 +761,29 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
   const sentiment = (article.category || '').toUpperCase().includes('BULLISH') ? 'BULLISH' : 
                     (article.category || '').toUpperCase().includes('BEARISH') ? 'BEARISH' : 'NEUTRAL';
 
+  const getBreakdown = (article: Article) => {
+    if (!article.breakdown) return [];
+    if (typeof article.breakdown === 'string') {
+      try {
+        const parsed = JSON.parse(article.breakdown);
+        if (Array.isArray(parsed)) return parsed;
+        if (parsed.takeaways && Array.isArray(parsed.takeaways)) return parsed.takeaways;
+      } catch (e) {
+        // If it's just a string, maybe it's one item or just text
+        return [article.breakdown];
+      }
+    }
+    if (Array.isArray(article.breakdown)) return article.breakdown;
+    // Handle object with takeaways key if stored as object in DB
+    if (typeof article.breakdown === 'object' && article.breakdown !== null) {
+      const obj = article.breakdown as any;
+      if (Array.isArray(obj.takeaways)) return obj.takeaways;
+    }
+    return [];
+  };
+
+  const breakdownPoints = getBreakdown(article);
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -912,8 +935,8 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
             </h3>
             
             <div className="space-y-8">
-              {Array.isArray(article.breakdown) && article.breakdown.length > 0 ? (
-                article.breakdown.map((point, i) => (
+              {breakdownPoints.length > 0 ? (
+                breakdownPoints.map((point, i) => (
                   <div key={i} className="flex gap-5 group">
                     <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-text/60 font-black text-[11px] group-hover:bg-accent group-hover:text-white transition-all group-hover:border-accent">
                       {i + 1}
@@ -1071,10 +1094,10 @@ export default function App() {
   const [showCookieConsent, setShowCookieConsent] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
 
-  const [visibleCount, setVisibleCount] = useState(12);
+  const [visibleCount, setVisibleCount] = useState(30);
 
   const loadMore = () => {
-    setVisibleCount(prev => prev + 12);
+    setVisibleCount(prev => prev + 30);
   };
 
   // Dynamic SEO Metadata
@@ -1289,7 +1312,7 @@ export default function App() {
       setLoading(true);
       try {
         // Fetch initial batch for speed
-        const data = await fetchNewsArticles([], 12);
+        const data = await fetchNewsArticles([], 30);
         
         if (data && data.length > 0) {
           setArticles(data);
