@@ -1,26 +1,17 @@
 import express, { Request, Response, NextFunction } from 'express';
+import { supabase } from "../src/services/supabase";
+import * as gemini from "../src/services/gemini";
+import * as newsArticles from "../src/services/news_articles";
+import { postToThreads } from "../src/services/threads";
 
 const app = express();
 app.use(express.json());
 
-// Lazy service loaders to prevent top-level crashes in Vercel environment
-const loadSupabase = async () => {
-  const { supabase } = await import("../src/services/supabase");
-  return supabase;
-};
-
-const loadGemini = async () => {
-  return await import("../src/services/gemini");
-};
-
-const loadNewsArticles = async () => {
-  return await import("../src/services/news_articles");
-};
-
-const loadThreads = async () => {
-  const { postToThreads } = await import("../src/services/threads");
-  return { postToThreads };
-};
+// Logger to see what Vercel passes to us
+app.use((req, res, next) => {
+  console.log(`[Sentintel API] ${req.method} ${req.url} (Original: ${req.originalUrl})`);
+  next();
+});
 
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ 
@@ -30,15 +21,21 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-app.get(["/robots.txt", "/api/robots.txt"], (req: Request, res: Response) => {
+app.get('/robots.txt', (req, res) => serveRobots(req, res));
+app.get('/api/robots.txt', (req, res) => serveRobots(req, res));
+
+function serveRobots(req: Request, res: Response) {
   const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const base = `${protocol}://${host}`;
   res.setHeader('Content-Type', 'text/plain');
   res.send(`User-agent: *\nAllow: /\nSitemap: ${base}/sitemap.xml\n`);
-});
+}
 
-app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response) => {
+app.get('/sitemap.xml', (req, res) => serveSitemap(req, res));
+app.get('/api/sitemap.xml', (req, res) => serveSitemap(req, res));
+
+async function serveSitemap(req: Request, res: Response) {
   try {
     const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
     const protocol = req.headers['x-forwarded-proto'] || 'https';
@@ -46,7 +43,6 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
     
     let articles = [];
     try {
-      const supabase = await loadSupabase();
       const { data } = await supabase
         .from("news_articles")
         .select("id, updated_at, created_at")
@@ -74,13 +70,12 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
   } catch (err: any) {
     console.error("Sitemap Generation Error:", err);
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>/</loc><comment>Sitemap Generation Error: ${err.message || 'Check logs'}</comment></url>\n</urlset>`);
+    return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>/</loc></url>\n</urlset>`);
   }
-});
+}
 
-app.get(["/api/news", "/news"], async (req: Request, res: Response, next: NextFunction) => {
+app.get(['/api/news', '/news'], async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = await loadSupabase();
     const { data, error } = await supabase
       .from("news_articles")
       .select("*")
@@ -93,9 +88,8 @@ app.get(["/api/news", "/news"], async (req: Request, res: Response, next: NextFu
   }
 });
 
-app.get(["/api/news/:id", "/news/:id"], async (req: Request, res: Response, next: NextFunction) => {
+app.get(['/api/news/:id', '/news/:id'], async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = await loadSupabase();
     const { data, error } = await supabase
       .from("news_articles")
       .select("*")
@@ -108,13 +102,13 @@ app.get(["/api/news/:id", "/news/:id"], async (req: Request, res: Response, next
   }
 });
 
-app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: Response, next: NextFunction) => {
+// Explicit Cron routes
+app.all('/api/cron/fetch-news', handleFetchNews);
+app.all('/cron/fetch-news', handleFetchNews);
+
+async function handleFetchNews(req: Request, res: Response, next: NextFunction) {
   try {
     console.log("Vercel Cron fetch-news triggered...");
-    const gemini = await loadGemini();
-    const newsArticles = await loadNewsArticles();
-    const threads = await loadThreads();
-
     const rawNews = await gemini.fetchTopSaaSNews();
     const stories = await gemini.parseNewsIntoStories(rawNews);
     
@@ -125,7 +119,7 @@ app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: 
       if (saved && saved[0]) {
         console.log(`[BOT] News saved: ${saved[0].title}. Attempting Threads post...`);
         try {
-          await threads.postToThreads(saved[0]);
+          await postToThreads(saved[0]);
         } catch (postError) {
           console.error("[BOT] Threads post failed:", postError);
         }
@@ -140,12 +134,14 @@ app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: 
     console.error("Vercel Cron Error:", e);
     next(e);
   }
-});
+}
 
-app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: Request, res: Response, next: NextFunction) => {
+app.all('/api/cron/weekly-newsletter', handleNewsletter);
+app.all('/cron/weekly-newsletter', handleNewsletter);
+
+async function handleNewsletter(req: Request, res: Response, next: NextFunction) {
   try {
     console.log("Weekly Newsletter Cron triggered...");
-    const supabase = await loadSupabase();
     const { data: subscribers, error: subError } = await supabase
       .from('subscribers')
       .select('email');
@@ -155,13 +151,9 @@ app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: 
       return res.json({ success: true, message: "No subscribers to notify." });
     }
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
     const { data: topArticles, error: articleError } = await supabase
       .from('news_articles')
       .select('title, summary, id')
-      .gt('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(5);
 
@@ -170,41 +162,32 @@ app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: 
       return res.json({ success: true, message: "No news to share this week." });
     }
 
-    const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const ai = new (await import("@google/generative-ai")).GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const newsContext = topArticles.map((a, i) => `${i+1}. ${a.title}: ${a.summary}`).join('\n\n');
     const newsletterPrompt = `Create a high-end HTML newsletter briefing for 'SaaS Sentinel'. 
     Theme: Elite B2B Market Intelligence. 
-    Content: Summarize these stories:
-    ${newsContext}`;
+    Content: Summarize these stories:\n\n${newsContext}`;
 
     const result = await model.generateContent(newsletterPrompt);
     const htmlContent = result.response.text().replace(/```html|```/g, '').trim();
 
     const nodemailer = await import('nodemailer');
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const port = parseInt(process.env.SMTP_PORT || '465');
-
     const transporter = nodemailer.default.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass }
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '465'),
+      secure: true,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
     });
 
     let sentCount = 0;
-    const subject = `Weekly Intelligence Brief: ${topArticles[0].title.substring(0, 50)}...`;
-    
     for (const sub of subscribers) {
       try {
         await transporter.sendMail({
-          from: `"SaaS Sentinel" <${user}>`,
+          from: `"SaaS Sentinel" <${process.env.SMTP_USER}>`,
           to: sub.email,
-          subject,
+          subject: `Weekly Intelligence Brief: ${topArticles[0].title.substring(0, 50)}...`,
           html: htmlContent
         });
         sentCount++;
@@ -213,14 +196,14 @@ app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: 
       }
     }
     
-    res.json({ success: true, sent: sentCount, message: `Newsletter briefing sent to elite subscribers.` });
+    res.json({ success: true, sent: sentCount });
   } catch (e: any) {
     console.error("Newsletter Cron Error:", e);
     next(e);
   }
-});
+}
 
-app.get(["/api/proxy-image", "/proxy-image"], async (req: Request, res: Response) => {
+app.get(['/api/proxy-image', '/proxy-image'], async (req: Request, res: Response) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) return res.status(400).send("No URL");
   try {
@@ -235,12 +218,23 @@ app.get(["/api/proxy-image", "/proxy-image"], async (req: Request, res: Response
   }
 });
 
+// Debug 404 handler
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: "Route not found in Sentinel API", 
+    path: req.path,
+    url: req.url,
+    method: req.method,
+    originalUrl: req.originalUrl
+  });
+});
+
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error("🔥 Global API Catch:", err);
-  res.status(200).json({ 
-    status: "handled_error", 
+  res.status(500).json({ 
+    status: "error", 
     message: "Sentinel recalibrating.",
-    debug: process.env.NODE_ENV === 'development' ? err.message : undefined
+    debug: err.message
   });
 });
 
