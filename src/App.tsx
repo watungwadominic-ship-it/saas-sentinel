@@ -721,17 +721,24 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
 
 function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: () => void }) {
   // Helper to parse breakdown points if they are JSON strings
-  const parsePoint = (point: string) => {
+  const parsePoint = (point: any) => {
+    if (typeof point === 'object' && point !== null) {
+      return point.takeaway || point.point || point.description || JSON.stringify(point);
+    }
+    if (typeof point !== 'string') return String(point);
+    
     try {
-      const parsed = JSON.parse(point);
-      if (parsed.takeaway) return parsed.takeaway;
-      if (parsed.point) return parsed.point;
-      if (parsed.description) return parsed.description;
+      if (point.startsWith('{')) {
+        const parsed = JSON.parse(point);
+        return parsed.takeaway || parsed.point || parsed.description || point;
+      }
       return point;
     } catch (e) {
       return point;
     }
-  };  const parseSentinelContent = (content: string | undefined) => {
+  };
+
+  const parseSentinelContent = (content: string | undefined) => {
     if (!content) return { main: '', verdict: '', take: '' };
     
     const verdictMarker = '**Strategic Verdict:**';
