@@ -31,9 +31,9 @@ async function callGemini(prompt: string, jsonMode = false) {
   }
   
   const genAI = new GoogleGenerativeAI(key);
-  // Using gemini-1.5-flash as it is the most stable identifier
+  // Using gemini-1.5-flash-latest as it is more specific and often fixes the 404
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: "gemini-1.5-flash-latest",
     ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
   });
   
@@ -78,8 +78,22 @@ app.get(['/api/news/:id', '/news/:id'], async (req, res) => {
 // Using a more flexible route pattern to ensure Vercel and direct calls both reach the handler
 app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], async (req, res) => {
   try {
-    console.log("[Sentinel] Starting fetch-news cron...");
     const supabase = getSupabase();
+    
+    // DAILY LIMIT CHECK: Don't produce more than 3 articles per day total
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const { count } = await supabase
+      .from('news_articles')
+      .select('id', { count: 'exact', head: true })
+      .gt('created_at', todayStart.toISOString());
+
+    if (count !== null && count >= 3) {
+      console.log(`[Sentinel] Daily limit reached (${count}/3). Skipping news generation.`);
+      return res.json({ success: false, reason: "Daily limit of 3 articles reached" });
+    }
+
+    console.log(`[Sentinel] Starting fetch-news cron (Current day count: ${count || 0})...`);
     
     const searchPrompt = `Search for the top 3 most significant B2B SaaS and Enterprise AI news stories from the last 24 hours. Focus on: Funding (Series A+), Major Product Launches, M&A, and AI infrastructure breakthroughs. Provide summaries.`;
     const rawNews = await callGemini(searchPrompt);
