@@ -22,15 +22,20 @@ const getGeminiKey = () => process.env.VITE_USER_GEMINI_API_KEY || process.env.G
 
 // --- HELPERS ---
 
-async function getGeminiModel(mimeType?: string) {
-  const { GoogleGenerativeAI } = await import("@google/generative-ai");
+async function callGemini(prompt: string, jsonMode = false) {
+  const { GoogleGenAI } = await import("@google/genai");
   const key = getGeminiKey();
   if (!key) throw new Error("GEMINI_API_KEY is missing");
-  const genAI = new GoogleGenerativeAI(key);
-  return genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
-    ...(mimeType ? { generationConfig: { responseMimeType: mimeType } } : {})
+  
+  const ai = new GoogleGenAI({ apiKey: key });
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: jsonMode ? { responseMimeType: "application/json" } : undefined
   });
+  
+  if (!response.text) throw new Error("Empty response from Gemini");
+  return response.text;
 }
 
 // --- API ROUTES ---
@@ -62,22 +67,18 @@ app.get(['/api/news/:id', '/news/:id'], async (req, res) => {
 app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], async (req, res) => {
   try {
     console.log("[Sentinel] Starting fetch-news cron...");
-    const model = await getGeminiModel();
     const searchPrompt = `Search for the top 3 most significant SaaS news stories from the last 24 hours. Focus on: Funding, Major Product Launches, and AI breakthroughs.`;
-    const searchResult = await model.generateContent(searchPrompt);
-    const rawNews = searchResult.response.text();
+    const rawNews = await callGemini(searchPrompt);
 
-    const parser = await getGeminiModel("application/json");
     const parsePrompt = `Extract news stories from this text: "${rawNews}". Return an array of objects: [{ "title": "...", "snippet": "..." }]`;
-    const parseResult = await parser.generateContent(parsePrompt);
-    const stories = JSON.parse(parseResult.response.text());
+    const storiesRaw = await callGemini(parsePrompt, true);
+    const stories = JSON.parse(storiesRaw);
 
     if (stories && stories[0]) {
-      const generator = await getGeminiModel("application/json");
       const genPrompt = `Act as an Elite SaaS Analyst. Write a detailed report on: "${stories[0].title}". Context: "${stories[0].snippet}". 
       Required JSON fields: title, summary, content, category (e.g. Funding, AI, Growth), sentinel_take, verdict.`;
-      const genResult = await generator.generateContent(genPrompt);
-      const articleData = JSON.parse(genResult.response.text());
+      const articleDataRaw = await callGemini(genPrompt, true);
+      const articleData = JSON.parse(articleDataRaw);
 
       // Save to Supabase
       const { data: saved, error: saveError } = await getSupabase().from('news_articles').insert([{
@@ -122,10 +123,9 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
     
     if (!articles?.length) return res.json({ success: true, message: "No fresh content" });
 
-    const model = await getGeminiModel();
     const prompt = `Create a high-end HTML newsletter for 'SaaS Sentinel'. Summarize these:\n${articles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}`;
-    const result = await model.generateContent(prompt);
-    const html = result.response.text().replace(/```html|```/g, '').trim();
+    const htmlRaw = await callGemini(prompt);
+    const html = htmlRaw.replace(/```html|```/g, '').trim();
 
     const nodemailer = await import('nodemailer');
     const transporter = nodemailer.default.createTransport({
