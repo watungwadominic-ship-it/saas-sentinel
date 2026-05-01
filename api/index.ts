@@ -25,20 +25,29 @@ const getGeminiKey = () => process.env.VITE_USER_GEMINI_API_KEY || process.env.G
 async function callGemini(prompt: string, jsonMode = false) {
   const { GoogleGenerativeAI } = await import("@google/generative-ai");
   const key = getGeminiKey();
-  if (!key) throw new Error("GEMINI_API_KEY is missing");
+  if (!key) {
+    console.error("[Sentinel] GEMINI_API_KEY IS MISSING");
+    throw new Error("GEMINI_API_KEY is missing");
+  }
   
   const genAI = new GoogleGenerativeAI(key);
+  // Using gemini-1.5-flash-latest as it is often more reliable than the short alias in some Vercel regions
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: "gemini-1.5-flash-latest",
     ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
   });
   
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  const text = response.text();
-  
-  if (!text) throw new Error("Empty response from Gemini");
-  return text;
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    if (!text) throw new Error("Empty response from Gemini");
+    return text;
+  } catch (error: any) {
+    console.error("[Sentinel] Gemini Call Failed:", error);
+    throw error;
+  }
 }
 
 // --- API ROUTES ---
