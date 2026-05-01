@@ -1,4 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
+// We use standard relative imports without extensions. 
+// Vercel's @vercel/node builder handles the resolution of these files.
 import { supabase } from "../src/services/supabase";
 import * as gemini from "../src/services/gemini";
 import * as newsArticles from "../src/services/news_articles";
@@ -7,9 +9,9 @@ import { postToThreads } from "../src/services/threads";
 const app = express();
 app.use(express.json());
 
-// Logger to see what Vercel passes to us
+// Logger for debugging Vercel behavior
 app.use((req, res, next) => {
-  console.log(`[Sentintel API] ${req.method} ${req.url} (Original: ${req.originalUrl})`);
+  console.log(`[Sentinel API] ${req.method} ${req.url}`);
   next();
 });
 
@@ -17,12 +19,13 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ 
     status: 'ok', 
     vercel: true,
-    time: new Date().toISOString()
+    time: new Date().toISOString(),
+    env: process.env.NODE_ENV
   });
 });
 
-app.get('/robots.txt', (req, res) => serveRobots(req, res));
-app.get('/api/robots.txt', (req, res) => serveRobots(req, res));
+app.get('/robots.txt', serveRobots);
+app.get('/api/robots.txt', serveRobots);
 
 function serveRobots(req: Request, res: Response) {
   const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
@@ -32,8 +35,8 @@ function serveRobots(req: Request, res: Response) {
   res.send(`User-agent: *\nAllow: /\nSitemap: ${base}/sitemap.xml\n`);
 }
 
-app.get('/sitemap.xml', (req, res) => serveSitemap(req, res));
-app.get('/api/sitemap.xml', (req, res) => serveSitemap(req, res));
+app.get('/sitemap.xml', serveSitemap);
+app.get('/api/sitemap.xml', serveSitemap);
 
 async function serveSitemap(req: Request, res: Response) {
   try {
@@ -102,9 +105,7 @@ app.get(['/api/news/:id', '/news/:id'], async (req: Request, res: Response, next
   }
 });
 
-// Explicit Cron routes
-app.all('/api/cron/fetch-news', handleFetchNews);
-app.all('/cron/fetch-news', handleFetchNews);
+app.all(['/api/cron/fetch-news', '/cron/fetch-news'], handleFetchNews);
 
 async function handleFetchNews(req: Request, res: Response, next: NextFunction) {
   try {
@@ -125,19 +126,18 @@ async function handleFetchNews(req: Request, res: Response, next: NextFunction) 
         }
         res.json({ success: true, title: saved[0].title });
       } else {
-        res.json({ success: false, reason: "Failed to save or already exists" });
+        res.json({ success: false, reason: "Already exists or failed to save" });
       }
     } else {
       res.json({ success: false, reason: "No stories found" });
     }
   } catch (e: any) {
-    console.error("Vercel Cron Error:", e);
+    console.error("Fetch News Cron Error:", e);
     next(e);
   }
 }
 
-app.all('/api/cron/weekly-newsletter', handleNewsletter);
-app.all('/cron/weekly-newsletter', handleNewsletter);
+app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter'], handleNewsletter);
 
 async function handleNewsletter(req: Request, res: Response, next: NextFunction) {
   try {
@@ -148,27 +148,30 @@ async function handleNewsletter(req: Request, res: Response, next: NextFunction)
       
     if (subError) throw subError;
     if (!subscribers || subscribers.length === 0) {
-      return res.json({ success: true, message: "No subscribers to notify." });
+      return res.json({ success: true, message: "No subscribers." });
     }
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const { data: topArticles, error: articleError } = await supabase
       .from('news_articles')
       .select('title, summary, id')
+      .gt('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(5);
 
     if (articleError) throw articleError;
     if (!topArticles || topArticles.length === 0) {
-      return res.json({ success: true, message: "No news to share this week." });
+      return res.json({ success: true, message: "No fresh news this week." });
     }
 
-    const ai = new (await import("@google/generative-ai")).GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const newsContext = topArticles.map((a, i) => `${i+1}. ${a.title}: ${a.summary}`).join('\n\n');
-    const newsletterPrompt = `Create a high-end HTML newsletter briefing for 'SaaS Sentinel'. 
-    Theme: Elite B2B Market Intelligence. 
-    Content: Summarize these stories:\n\n${newsContext}`;
+    const newsletterPrompt = `Create a high-end HTML newsletter briefing for 'SaaS Sentinel'. Summarize these stories:\n\n${newsContext}`;
 
     const result = await model.generateContent(newsletterPrompt);
     const htmlContent = result.response.text().replace(/```html|```/g, '').trim();
@@ -187,12 +190,12 @@ async function handleNewsletter(req: Request, res: Response, next: NextFunction)
         await transporter.sendMail({
           from: `"SaaS Sentinel" <${process.env.SMTP_USER}>`,
           to: sub.email,
-          subject: `Weekly Intelligence Brief: ${topArticles[0].title.substring(0, 50)}...`,
+          subject: `Elite SaaS Intelligence: ${topArticles[0].title.substring(0, 40)}...`,
           html: htmlContent
         });
         sentCount++;
       } catch (err) {
-        console.error(`Failed to send to ${sub.email}`, err);
+        console.error(`Send error to ${sub.email}`, err);
       }
     }
     
@@ -207,7 +210,7 @@ app.get(['/api/proxy-image', '/proxy-image'], async (req: Request, res: Response
   const imageUrl = req.query.url as string;
   if (!imageUrl) return res.status(400).send("No URL");
   try {
-    const response = await fetch(imageUrl, { headers: { 'User-Agent': 'SaaS-Sentinel-Bot/1.0' } });
+    const response = await fetch(imageUrl, { headers: { 'User-Agent': 'SaaS-Sentinel/1.0' } });
     if (!response.ok) throw new Error();
     const buffer = await response.arrayBuffer();
     res.setHeader("Content-Type", response.headers.get("content-type") || "image/jpeg");
@@ -218,23 +221,18 @@ app.get(['/api/proxy-image', '/proxy-image'], async (req: Request, res: Response
   }
 });
 
-// Debug 404 handler
+// Fallback/Not Found
 app.use((req, res) => {
-  res.status(404).json({ 
-    error: "Route not found in Sentinel API", 
-    path: req.path,
-    url: req.url,
-    method: req.method,
-    originalUrl: req.originalUrl
-  });
+  res.status(404).json({ error: "Route not found", path: req.path });
 });
 
+// Error handling
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error("🔥 Global API Catch:", err);
+  console.error("🔥 Global Error Handler:", err);
   res.status(500).json({ 
     status: "error", 
     message: "Sentinel recalibrating.",
-    debug: err.message
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
   });
 });
 
