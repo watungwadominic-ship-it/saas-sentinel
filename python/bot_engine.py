@@ -258,6 +258,18 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
 
 def main():
     print("📈 SaaS Sentinel: Bot Life Cycle Started")
+    
+    # DAILY LIMIT CHECK (3 articles per day)
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    try:
+        existing_today = supabase.table("news_articles").select("id", count="exact").gt("created_at", today_str).execute()
+        if existing_today.count is not None and existing_today.count >= 3:
+            print(f"🛑 Daily limit reached ({existing_today.count}/3). Skipping news cycle.")
+            return
+        print(f"📊 Daily Progress: {existing_today.count or 0}/3 articles.")
+    except Exception as e:
+        print(f"⚠️ Could not check daily limit: {e}")
+
     update_market_ticker()
     
     news_items = fetch_saas_news()
