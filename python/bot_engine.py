@@ -107,11 +107,11 @@ def fetch_saas_news():
     from_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
     url = "https://newsapi.org/v2/everything"
     params = {
-        'q': '(SaaS OR "Enterprise AI" OR "Cloud Computing") AND (Launch OR Funding OR Update)',
+        'q': '(B2B SaaS OR "Enterprise AI" OR "Cloud SaaS" OR "SaaS Funding" OR "SaaS M&A") AND NOT (Samsung OR smartphone OR consumer)',
         'from': from_date,
         'sortBy': 'relevancy',
         'language': 'en',
-        'pageSize': 5,
+        'pageSize': 15,  # Fetch more to have better selection since we only pick 3
         'apiKey': NEWS_API_KEY
     }
     
@@ -261,12 +261,14 @@ def main():
     
     # DAILY LIMIT CHECK (3 articles per day)
     today_str = datetime.now().strftime("%Y-%m-%d")
+    current_count = 0
     try:
         existing_today = supabase.table("news_articles").select("id", count="exact").gt("created_at", today_str).execute()
-        if existing_today.count is not None and existing_today.count >= 3:
-            print(f"🛑 Daily limit reached ({existing_today.count}/3). Skipping news cycle.")
+        current_count = existing_today.count or 0
+        if current_count >= 3:
+            print(f"🛑 Daily limit reached ({current_count}/3). Skipping news cycle.")
             return
-        print(f"📊 Daily Progress: {existing_today.count or 0}/3 articles.")
+        print(f"📊 Daily Progress: {current_count}/3 articles.")
     except Exception as e:
         print(f"⚠️ Could not check daily limit: {e}")
 
@@ -275,10 +277,43 @@ def main():
     news_items = fetch_saas_news()
     processed_count = 0
     
+    # Pre-fetch recent articles to avoid analyzing duplicates
+    recent_titles = []
+    try:
+        past_week = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+        recent_res = supabase.table("news_articles").select("title, source_url").gt("created_at", past_week).execute()
+        recent_titles = [r['title'].lower() for r in recent_res.data]
+        recent_urls = [r['source_url'] for r in recent_res.data if r.get('source_url')]
+    except Exception as e:
+        print(f"⚠️ Could not pre-fetch recent articles: {e}")
+        recent_urls = []
+
     for item in news_items:
-        if not item.get('title') or '[Removed]' in item.get('title'):
+        # Check quota INSIDE loop
+        if current_count + processed_count >= 3:
+            print(f"🛑 Stop: Hard daily limit of 3 articles reached during this run.")
+            break
+
+        title = item.get('title', '')
+        url = item.get('url', '')
+        
+        if not title or '[Removed]' in title:
             continue
             
+        # FAST SKIP: Check if URL or Title (fuzzy) already exists in pre-fetched list
+        if url in recent_urls:
+            print(f"⏭️ Skipping: URL already in recent history ({url})")
+            continue
+            
+        is_duplicate = False
+        for rt in recent_titles:
+            if title.lower()[:30] in rt or rt[:30] in title.lower():
+                is_duplicate = True
+                break
+        if is_duplicate:
+            print(f"⏭️ Skipping: Title similar to recent article ({title[:30]}...)")
+            continue
+
         analysis = analyze_with_groq(item)
         if not analysis:
             continue
@@ -304,14 +339,15 @@ def main():
             if article_data.get("source_url"):
                 existing_url = supabase.table("news_articles").select("id").eq("source_url", article_data["source_url"]).execute()
                 if existing_url.data:
-                    print(f"⏭️ Skipping: URL already exists in database.")
+                    print(f"⏭️ Skipping: URL already exists in database ({article_data['source_url']})")
                     continue
 
             # Then check duplicates by Title (fuzzy-ish check by matching the beginning)
-            title_prefix = article_data["title"][:20]
+            # Use a slightly longer prefix for better specificity
+            title_prefix = article_data["title"][:30]
             existing_title = supabase.table("news_articles").select("id").ilike("title", f"%{title_prefix}%").execute()
             if existing_title.data:
-                print(f"⏭️ Skipping: Similar title already exists.")
+                print(f"⏭️ Skipping: Similar title already exists ({title_prefix}...)")
                 continue
                 
             res = supabase.table("news_articles").insert(article_data).execute()
