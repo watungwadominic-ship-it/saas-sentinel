@@ -1344,7 +1344,7 @@ export default function App() {
   useEffect(() => {
     const handleNavigation = async () => {
       const path = window.location.pathname;
-      const articleMatch = path.match(/\/article\/(\d+)/);
+      const articleMatch = path.match(/\/article\/([^/]+)/);
       
       if (articleMatch) {
          const articleId = articleMatch[1];
