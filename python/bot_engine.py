@@ -221,7 +221,7 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
                 "media": [{
                     "status": "READY",
                     "media": asset_urn,
-                    "title": {"text": article_title},
+                    "title": {"text": to_unicode_bold(article_title)},
                     "description": {"text": article_summary[:200]}
                 }]
             }
@@ -234,7 +234,7 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
                 "media": [{
                     "status": "READY",
                     "originalUrl": sharing_url,
-                    "title": {"text": article_title},
+                    "title": {"text": to_unicode_bold(article_title)},
                     "description": {"text": article_summary[:200]}
                 }]
             }
@@ -288,10 +288,18 @@ def main():
         }
         
         try:
-            # Check duplicates
-            existing = supabase.table("news_articles").select("id").eq("title", article_data["title"]).execute()
-            if existing.data:
-                print(f"⏭️ Skipping: Intelligence already logged.")
+            # Check duplicates by URL first (most reliable)
+            if article_data.get("source_url"):
+                existing_url = supabase.table("news_articles").select("id").eq("source_url", article_data["source_url"]).execute()
+                if existing_url.data:
+                    print(f"⏭️ Skipping: URL already exists in database.")
+                    continue
+
+            # Then check duplicates by Title (fuzzy-ish check by matching the beginning)
+            title_prefix = article_data["title"][:20]
+            existing_title = supabase.table("news_articles").select("id").ilike("title", f"%{title_prefix}%").execute()
+            if existing_title.data:
+                print(f"⏭️ Skipping: Similar title already exists.")
                 continue
                 
             res = supabase.table("news_articles").insert(article_data).execute()
