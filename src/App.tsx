@@ -762,23 +762,33 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
                     (article.category || '').toUpperCase().includes('BEARISH') ? 'BEARISH' : 'NEUTRAL';
 
   const getBreakdown = (article: Article) => {
-    if (!article.breakdown) return [];
-    if (typeof article.breakdown === 'string') {
-      try {
-        const parsed = JSON.parse(article.breakdown);
-        if (Array.isArray(parsed)) return parsed;
-        if (parsed.takeaways && Array.isArray(parsed.takeaways)) return parsed.takeaways;
-      } catch (e) {
-        // If it's just a string, maybe it's one item or just text
-        return [article.breakdown];
+    if (article.breakdown) {
+      if (typeof article.breakdown === 'string') {
+        try {
+          const parsed = JSON.parse(article.breakdown);
+          if (Array.isArray(parsed)) return parsed;
+          if (parsed.takeaways && Array.isArray(parsed.takeaways)) return parsed.takeaways;
+        } catch (e) {
+          // If it's a simple comma separated string or similar
+          if (article.breakdown.includes('\n')) return article.breakdown.split('\n').filter(s => s.trim());
+          return [article.breakdown];
+        }
+      }
+      if (Array.isArray(article.breakdown)) return article.breakdown;
+      if (typeof article.breakdown === 'object' && article.breakdown !== null) {
+        const obj = article.breakdown as any;
+        if (Array.isArray(obj.takeaways)) return obj.takeaways;
+        if (Array.isArray(obj.points)) return obj.points;
       }
     }
-    if (Array.isArray(article.breakdown)) return article.breakdown;
-    // Handle object with takeaways key if stored as object in DB
-    if (typeof article.breakdown === 'object' && article.breakdown !== null) {
-      const obj = article.breakdown as any;
-      if (Array.isArray(obj.takeaways)) return obj.takeaways;
+    
+    // Fallback: If breakdown is missing, try to derive from summary or sentinel_take
+    const rawSource = article.sentinel_take || article.summary || "";
+    if (rawSource.length > 50) {
+      // Split into sentences and return the first 4 as "implications"
+      return rawSource.split(/[.!?]/).filter(s => s.trim().length > 10).slice(0, 4);
     }
+    
     return [];
   };
 
