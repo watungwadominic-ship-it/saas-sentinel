@@ -58,7 +58,8 @@ app.get(['/api/news/:id', '/news/:id'], async (req, res) => {
 
 // --- CRON ROUTES ---
 
-app.all(['/api/cron/fetch-news', '/cron/fetch-news'], async (req, res) => {
+// Using a more flexible route pattern to ensure Vercel and direct calls both reach the handler
+app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], async (req, res) => {
   try {
     console.log("[Sentinel] Starting fetch-news cron...");
     const model = await getGeminiModel();
@@ -110,7 +111,7 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news'], async (req, res) => {
   }
 });
 
-app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter'], async (req, res) => {
+app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/weekly-newsletter/'], async (req, res) => {
   try {
     const { data: subscribers } = await getSupabase().from('subscribers').select('email');
     if (!subscribers?.length) return res.json({ success: true, message: "No subscribers" });
@@ -173,7 +174,7 @@ app.get(['/sitemap.xml', '/api/sitemap.xml'], async (req, res) => {
   const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const base = `${protocol}://${host}`;
-  const { data: articles } = await getSupabase().from('news_articles').select('id, created_at').order('created_at', { ascending: false }).limit(50);
+  const { data: articles } = await getSupabase().from('news_articles').select('id, created_at').order('created_at', { ascending: false }).limit(1000);
   
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
   xml += `\n  <url><loc>${base}/</loc><priority>1.0</priority></url>`;
