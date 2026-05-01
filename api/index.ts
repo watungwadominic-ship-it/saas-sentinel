@@ -62,7 +62,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get(['/api/news', '/news'], async (req, res) => {
-  const { data, error } = await getSupabase().from('news_articles').select('*').order('created_at', { ascending: false }).limit(20);
+  const { data, error } = await getSupabase().from('news_articles').select('*').order('created_at', { ascending: false }).limit(30);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -95,7 +95,10 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], a
 
     console.log(`[Sentinel] Starting fetch-news cron (Current day count: ${count || 0})...`);
     
-    const searchPrompt = `Search for the top 3 most significant B2B SaaS and Enterprise AI news stories from the last 24 hours. Focus on: Funding (Series A+), Major Product Launches, M&A, and AI infrastructure breakthroughs. Provide summaries.`;
+    const searchPrompt = `Search for the top 3 most significant B2B SaaS, Enterprise AI, and Cloud Infrastructure news stories from the last 24 hours. 
+    Strict Focus: Only include B2B Tech, Enterprise Software, SaaS Funding (Series A+), M&A, and AI infrastructure. 
+    Exclude: Consumer gadget news, smartphones, gaming, or general retail. 
+    Provide summaries.`;
     const rawNews = await callGemini(searchPrompt);
 
     const parsePrompt = `Extract news stories from this text: "${rawNews}". Return an array of objects: [{ "title": "...", "snippet": "..." }]. Ensure the titles are professional and specific.`;
@@ -119,7 +122,14 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], a
 
       const genPrompt = `Act as an Elite SaaS Analyst for Bloomberg. Write a detailed, institutional-grade intelligence report on: "${story.title}". 
       Context: "${story.snippet}". 
-      Required JSON fields: title, summary, content, category (Funding, AI, Growth, M&A, or Strategy), sentinel_take, verdict. 
+      Required JSON fields: 
+      - title: professional headline
+      - summary: 2-sentence summary
+      - content: 150-200 words of analysis
+      - category: One of (Funding, AI, Growth, M&A, or Strategy)
+      - sentinel_take: Your unique strategic take
+      - verdict: A 1-sentence strategic Outlook
+      - breakdown: An array of exactly 4 strings, each being a specific revenue implication or strategic takeaway for a B2B audience.
       Tone: Sharp, professional, and strategic.`;
       
       const articleDataRaw = await callGemini(genPrompt, true);
