@@ -1,23 +1,19 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { supabase } from "../src/services/supabase";
-import * as gemini from "../src/services/gemini";
-import * as newsArticles from "../src/services/news_articles";
-import { postToThreads } from "../src/services/threads";
 
 const app = express();
 app.use(express.json());
 
-console.log("🚀 Sentinel API booting up...");
+// Lazy service loaders to prevent top-level crashes
+const getSupabase = async () => (await import("../src/services/supabase")).supabase;
+const getGemini = async () => (await import("../src/services/gemini"));
+const getNewsArticles = async () => (await import("../src/services/news_articles"));
+const getThreads = async () => (await import("../src/services/threads"));
 
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ 
     status: 'ok', 
     vercel: true,
-    time: new Date().toISOString(),
-    config: {
-      supabase: !!process.env.SUPABASE_URL,
-      gemini: !!process.env.GEMINI_API_KEY
-    }
+    time: new Date().toISOString()
   });
 });
 
@@ -35,6 +31,7 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
     const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
     const base = `${protocol}://${host}`;
     
+    const supabase = await getSupabase();
     let articles = [];
     try {
       const { data } = await supabase
@@ -68,6 +65,7 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
 
 app.get(["/api/news", "/news"], async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from("news_articles")
       .select("*")
@@ -82,6 +80,7 @@ app.get(["/api/news", "/news"], async (req: Request, res: Response, next: NextFu
 
 app.get(["/api/news/:id", "/news/:id"], async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from("news_articles")
       .select("*")
@@ -97,6 +96,10 @@ app.get(["/api/news/:id", "/news/:id"], async (req: Request, res: Response, next
 app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("Vercel Cron fetch-news triggered...");
+    const gemini = await getGemini();
+    const newsArticles = await getNewsArticles();
+    const threads = await getThreads();
+
     const rawNews = await gemini.fetchTopSaaSNews();
     const stories = await gemini.parseNewsIntoStories(rawNews);
     
@@ -107,7 +110,7 @@ app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: 
       if (saved && saved[0]) {
         console.log(`[BOT] News saved: ${saved[0].title}. Attempting Threads post...`);
         try {
-          await postToThreads(saved[0]);
+          await threads.postToThreads(saved[0]);
         } catch (postError) {
           console.error("[BOT] Threads post failed:", postError);
         }
@@ -127,7 +130,7 @@ app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: 
 app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("Weekly Newsletter Cron triggered...");
-    
+    const supabase = await getSupabase();
     const { data: subscribers, error: subError } = await supabase
       .from('subscribers')
       .select('email');
