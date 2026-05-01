@@ -31,9 +31,9 @@ async function callGemini(prompt: string, jsonMode = false) {
   }
   
   const genAI = new GoogleGenerativeAI(key);
-  // Using gemini-1.5-flash-latest as it is often more reliable than the short alias in some Vercel regions
+  // Using gemini-1.5-flash as it is the most stable identifier
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-1.5-flash",
     ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
   });
   
@@ -79,25 +79,44 @@ app.get(['/api/news/:id', '/news/:id'], async (req, res) => {
 app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], async (req, res) => {
   try {
     console.log("[Sentinel] Starting fetch-news cron...");
-    const searchPrompt = `Search for the top 3 most significant SaaS news stories from the last 24 hours. Focus on: Funding, Major Product Launches, and AI breakthroughs.`;
+    const supabase = getSupabase();
+    
+    const searchPrompt = `Search for the top 3 most significant B2B SaaS and Enterprise AI news stories from the last 24 hours. Focus on: Funding (Series A+), Major Product Launches, M&A, and AI infrastructure breakthroughs. Provide summaries.`;
     const rawNews = await callGemini(searchPrompt);
 
-    const parsePrompt = `Extract news stories from this text: "${rawNews}". Return an array of objects: [{ "title": "...", "snippet": "..." }]`;
+    const parsePrompt = `Extract news stories from this text: "${rawNews}". Return an array of objects: [{ "title": "...", "snippet": "..." }]. Ensure the titles are professional and specific.`;
     const storiesRaw = await callGemini(parsePrompt, true);
     const stories = JSON.parse(storiesRaw);
 
-    if (stories && stories[0]) {
-      const genPrompt = `Act as an Elite SaaS Analyst. Write a detailed report on: "${stories[0].title}". Context: "${stories[0].snippet}". 
-      Required JSON fields: title, summary, content, category (e.g. Funding, AI, Growth), sentinel_take, verdict.`;
+    if (stories && stories.length > 0) {
+      // Process first high-quality story
+      const story = stories[0];
+      
+      // EXPLICIT DUPLICATE CHECK
+      const { data: existing } = await supabase
+        .from('news_articles')
+        .select('id')
+        .ilike('title', `%${story.title.substring(0, 20)}%`)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        return res.json({ success: false, reason: "Similar article already exists in database", title: story.title });
+      }
+
+      const genPrompt = `Act as an Elite SaaS Analyst for Bloomberg. Write a detailed, institutional-grade intelligence report on: "${story.title}". 
+      Context: "${story.snippet}". 
+      Required JSON fields: title, summary, content, category (Funding, AI, Growth, M&A, or Strategy), sentinel_take, verdict. 
+      Tone: Sharp, professional, and strategic.`;
+      
       const articleDataRaw = await callGemini(genPrompt, true);
       const articleData = JSON.parse(articleDataRaw);
 
       // Save to Supabase
-      const { data: saved, error: saveError } = await getSupabase().from('news_articles').insert([{
+      const { data: saved, error: saveError } = await supabase.from('news_articles').insert([{
         ...articleData,
         created_at: new Date().toISOString(),
-        source: "SaaS Sentinel AI",
-        read_time: "5 min read"
+        source: "SaaS Sentinel Intelligence",
+        read_time: "4 min read"
       }]).select();
 
       if (saveError) {
