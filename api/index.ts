@@ -58,10 +58,10 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
     sitemap += `\n</urlset>`;
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
     return res.send(sitemap);
-  } catch (err) {
+  } catch (err: any) {
     console.error("Sitemap Generation Error:", err);
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>/</loc></url>\n</urlset>`);
+    return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>/</loc><comment>Error: ${err.message || String(err)}</comment></url>\n</urlset>`);
   }
 });
 
