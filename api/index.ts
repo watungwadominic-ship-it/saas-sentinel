@@ -1,13 +1,11 @@
 import express, { Request, Response, NextFunction } from 'express';
+import { supabase } from "../src/services/supabase.ts";
+import * as gemini from "../src/services/gemini.ts";
+import * as newsArticles from "../src/services/news_articles.ts";
+import { postToThreads } from "../src/services/threads.ts";
 
 const app = express();
 app.use(express.json());
-
-// Lazy service loaders to prevent top-level crashes
-const getSupabase = async () => (await import("../src/services/supabase")).supabase;
-const getGemini = async () => (await import("../src/services/gemini"));
-const getNewsArticles = async () => (await import("../src/services/news_articles"));
-const getThreads = async () => (await import("../src/services/threads"));
 
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ 
@@ -31,7 +29,6 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
     const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
     const base = `${protocol}://${host}`;
     
-    const supabase = await getSupabase();
     let articles = [];
     try {
       const { data } = await supabase
@@ -61,13 +58,12 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req: Request, res: Response
   } catch (err: any) {
     console.error("Sitemap Generation Error:", err);
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>/</loc><comment>Error: ${err.message || String(err)}</comment></url>\n</urlset>`);
+    return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>/</loc></url>\n</urlset>`);
   }
 });
 
 app.get(["/api/news", "/news"], async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from("news_articles")
       .select("*")
@@ -82,7 +78,6 @@ app.get(["/api/news", "/news"], async (req: Request, res: Response, next: NextFu
 
 app.get(["/api/news/:id", "/news/:id"], async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from("news_articles")
       .select("*")
@@ -98,10 +93,6 @@ app.get(["/api/news/:id", "/news/:id"], async (req: Request, res: Response, next
 app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("Vercel Cron fetch-news triggered...");
-    const gemini = await getGemini();
-    const newsArticles = await getNewsArticles();
-    const threads = await getThreads();
-
     const rawNews = await gemini.fetchTopSaaSNews();
     const stories = await gemini.parseNewsIntoStories(rawNews);
     
@@ -112,7 +103,7 @@ app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: 
       if (saved && saved[0]) {
         console.log(`[BOT] News saved: ${saved[0].title}. Attempting Threads post...`);
         try {
-          await threads.postToThreads(saved[0]);
+          await postToThreads(saved[0]);
         } catch (postError) {
           console.error("[BOT] Threads post failed:", postError);
         }
@@ -132,7 +123,6 @@ app.all(["/api/cron/fetch-news", "/cron/fetch-news"], async (req: Request, res: 
 app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("Weekly Newsletter Cron triggered...");
-    const supabase = await getSupabase();
     const { data: subscribers, error: subError } = await supabase
       .from('subscribers')
       .select('email');
@@ -157,7 +147,6 @@ app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: 
       return res.json({ success: true, message: "No news to share this week." });
     }
 
-    // Dynamic import for content generation since it's the only place and needs heavy SDK
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -208,7 +197,6 @@ app.all(["/api/cron/weekly-newsletter", "/cron/weekly-newsletter"], async (req: 
   }
 });
 
-// Proxy image bypass
 app.get(["/api/proxy-image", "/proxy-image"], async (req: Request, res: Response) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) return res.status(400).send("No URL");
