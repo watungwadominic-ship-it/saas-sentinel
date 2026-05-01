@@ -10,7 +10,7 @@ export interface Article {
   image_url?: string;
   image?: string;
   // Analysis specific fields
-  breakdown?: string[];
+  breakdown?: any;
   sentinel_take?: string;
   verdict?: string;
 }
