@@ -23,19 +23,22 @@ const getGeminiKey = () => process.env.VITE_USER_GEMINI_API_KEY || process.env.G
 // --- HELPERS ---
 
 async function callGemini(prompt: string, jsonMode = false) {
-  const { GoogleGenAI } = await import("@google/genai");
+  const { GoogleGenerativeAI } = await import("@google/generative-ai");
   const key = getGeminiKey();
   if (!key) throw new Error("GEMINI_API_KEY is missing");
   
-  const ai = new GoogleGenAI({ apiKey: key });
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: jsonMode ? { responseMimeType: "application/json" } : undefined
+  const genAI = new GoogleGenerativeAI(key);
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
   });
   
-  if (!response.text) throw new Error("Empty response from Gemini");
-  return response.text;
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+  
+  if (!text) throw new Error("Empty response from Gemini");
+  return text;
 }
 
 // --- API ROUTES ---
