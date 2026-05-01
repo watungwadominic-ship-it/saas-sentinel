@@ -6,9 +6,17 @@ import { createClient } from '@supabase/supabase-js';
 const app = express();
 app.use(express.json());
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://dpwkojtfeoxlpyevutfc.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY || 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Debug log to see incoming requests on deployed environment
+app.use((req, res, next) => {
+  console.log(`[Sentinel API] ${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
+const getSupabase = () => {
+  const url = process.env.SUPABASE_URL || 'https://dpwkojtfeoxlpyevutfc.supabase.co';
+  const key = process.env.SUPABASE_KEY || 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
+  return createClient(url, key);
+};
 
 const getGeminiKey = () => process.env.VITE_USER_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 
@@ -28,17 +36,22 @@ async function getGeminiModel(mimeType?: string) {
 // --- API ROUTES ---
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    time: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'production',
+    region: process.env.VERCEL_REGION || 'local'
+  });
 });
 
 app.get(['/api/news', '/news'], async (req, res) => {
-  const { data, error } = await supabase.from('news_articles').select('*').order('created_at', { ascending: false }).limit(20);
+  const { data, error } = await getSupabase().from('news_articles').select('*').order('created_at', { ascending: false }).limit(20);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
 app.get(['/api/news/:id', '/news/:id'], async (req, res) => {
-  const { data, error } = await supabase.from('news_articles').select('*').eq('id', req.params.id).maybeSingle();
+  const { data, error } = await getSupabase().from('news_articles').select('*').eq('id', req.params.id).maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -66,7 +79,7 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news'], async (req, res) => {
       const articleData = JSON.parse(genResult.response.text());
 
       // Save to Supabase
-      const { data: saved, error: saveError } = await supabase.from('news_articles').insert([{
+      const { data: saved, error: saveError } = await getSupabase().from('news_articles').insert([{
         ...articleData,
         created_at: new Date().toISOString(),
         source: "SaaS Sentinel AI",
@@ -99,12 +112,12 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news'], async (req, res) => {
 
 app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter'], async (req, res) => {
   try {
-    const { data: subscribers } = await supabase.from('subscribers').select('email');
+    const { data: subscribers } = await getSupabase().from('subscribers').select('email');
     if (!subscribers?.length) return res.json({ success: true, message: "No subscribers" });
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const { data: articles } = await supabase.from('news_articles').select('title, summary').gt('created_at', sevenDaysAgo.toISOString()).limit(5);
+    const { data: articles } = await getSupabase().from('news_articles').select('title, summary').gt('created_at', sevenDaysAgo.toISOString()).limit(5);
     
     if (!articles?.length) return res.json({ success: true, message: "No fresh content" });
 
@@ -160,10 +173,13 @@ app.get(['/sitemap.xml', '/api/sitemap.xml'], async (req, res) => {
   const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const base = `${protocol}://${host}`;
-  const { data: articles } = await supabase.from('news_articles').select('id, created_at').limit(100);
+  const { data: articles } = await getSupabase().from('news_articles').select('id, created_at').order('created_at', { ascending: false }).limit(50);
   
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
   xml += `\n  <url><loc>${base}/</loc><priority>1.0</priority></url>`;
+  xml += `\n  <url><loc>${base}/archive</loc><priority>0.8</priority></url>`;
+  xml += `\n  <url><loc>${base}/about</loc><priority>0.5</priority></url>`;
+  
   articles?.forEach(a => {
     xml += `\n  <url><loc>${base}/article/${a.id}</loc><lastmod>${a.created_at.split('T')[0]}</lastmod></url>`;
   });
@@ -176,6 +192,17 @@ app.get(['/robots.txt', '/api/robots.txt'], (req, res) => {
   const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
   res.setHeader('Content-Type', 'text/plain');
   res.send(`User-agent: *\nAllow: /\nSitemap: https://${host}/sitemap.xml\n`);
+});
+
+// Catch-all for API to debug routing
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: "Sentinel Route Not Found",
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    originalUrl: req.originalUrl
+  });
 });
 
 export default app;
