@@ -926,18 +926,18 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
           {/* Footer Actions */}
           <div className="flex flex-wrap gap-4 items-center mt-12 md:mt-16 pt-8 border-t border-white/5">
             <button 
-              onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`, '_blank')}
+              onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/article/${article.id || ''}`)}`, '_blank')}
               className="flex items-center gap-3 px-6 md:px-8 py-3 md:py-3.5 bg-[#0077b5] text-white rounded-xl font-black text-[9px] md:text-[10px] uppercase tracking-widest hover:brightness-110 transition-all shadow-xl shadow-[#0077b5]/20"
             >
               <svg className="w-3.5 h-3.5 md:w-4 md:h-4 fill-current" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
               Share on LinkedIn
             </button>
             <button 
-              onClick={() => window.open(`https://threads.net/intent/post?text=${encodeURIComponent(article.title)}`, '_blank')}
+              onClick={() => window.open(`https://threads.net/intent/post?text=${encodeURIComponent(`${article.title}\n\nRead more on SaaS Sentinel: ${window.location.origin}/article/${article.id || ''}`)}`, '_blank')}
               className="flex items-center gap-3 px-6 md:px-8 py-3 md:py-3.5 bg-white text-black rounded-xl font-black text-[9px] md:text-[10px] uppercase tracking-widest hover:opacity-90 transition-all shadow-xl"
             >
               <svg className="w-4 h-4 md:w-5 md:h-5 fill-current" viewBox="0 0 192 192"><path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.834C118.497 71.7915 120.315 75.82 121.411 80.7937C110.82 80.5962 98.7188 80.8999 87.0544 84.7725C74.6041 89.288 64.8878 98.0581 61.7042 109.525C59.9886 115.704 60.3341 122.753 64.2952 128.729C68.3267 134.811 75.334 139.117 84.0538 140.85C87.6201 141.558 91.3113 141.916 95.0211 141.916C105.105 141.916 115.011 138.838 122.062 133.053C126.746 129.213 130.402 124.321 132.553 118.6L143.193 124.623C139.805 133.642 133.4 141.523 126.16 146.997C117.151 153.801 106.104 157.067 95.0211 157.067C90.2223 157.067 85.4526 156.611 80.8415 155.698C68.1009 153.167 57.018 146.983 49.3248 138.355C41.8329 129.93 38.6534 118.727 40.3813 106.772C44.1522 89.6015 56.6433 76.5415 72.8427 68.6186C80.2078 65.018 88.5298 63.1513 97.2662 63.1513C104.97 63.1513 112.593 64.4447 119.576 67.019C128.691 70.384 135.539 76.8407 139.691 85.945C140.334 86.9536 140.947 87.969 141.537 88.9883ZM118.156 122.972C113.626 126.68 106.31 129.624 95.0211 129.624C92.6587 129.624 90.3129 129.408 88.0163 128.95C82.7846 127.904 78.5085 121.139C76.0125 121.139C74.3414 118.461 74.3828 115.111 75.3195 111.737C77.3005 104.593 84.1444 98.4239 94.671 94.6033C104.606 91.31 114.717 91.0776 123.634 91.8023C122.259 104.184 118.156 122.972z"/></svg>
-               Share on Threads
+              Share on Threads
             </button>
           </div>
         </div>
