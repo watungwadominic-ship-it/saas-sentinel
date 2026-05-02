@@ -150,7 +150,9 @@ def analyze_with_groq(article):
     - Keywords: LLM integration, B2B lifecycle, scalability, market volatility
     - Utility: Provide a unique "Sentinel Perspective" in analysis_content.
 
-    Return EXACTLY this JSON structure (no markdown, no preamble):
+    Return EXACTLY this JSON structure (no markdown, no preamble). 
+    IMPORTANT: If the news is NOT strictly about B2B SaaS, Enterprise Software, Cloud Infrastructure, or Fintech, return: {{"irrelevant": true}}
+    
     {{
       "title": "A professional, punchy headline",
       "summary": "A 2-sentence overview of the news",
@@ -172,6 +174,12 @@ def analyze_with_groq(article):
         )
         
         analysis = json.loads(chat_completion.choices[0].message.content)
+        
+        # Check for irrelevance
+        if analysis.get('irrelevant') is True or "no relevant" in analysis.get('title', '').lower():
+            print(f"⏭️ Skipping: Irrelevant content filtered ({analysis.get('title')})")
+            return None
+            
         return analysis
     except Exception as e:
         print(f"❌ Groq Analysis Error: {e}")
@@ -201,7 +209,7 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     print(f"📡 Sending to LinkedIn: {article_title[:50]}...")
     
     # Make headline bold for maximum visual impact
-    bold_headline = to_unicode_bold(f"SaaS Intelligence: {article_title}")
+    bold_headline = to_unicode_bold(article_title)
     commentary = f"📡 {bold_headline}\n\n{article_summary}\n\nRead more on SaaS Sentinel: {sharing_url}\n\n#SaaS #AI #MarketIntel"
     
     author_urn = get_clean_author_urn()
