@@ -179,8 +179,9 @@ def analyze_with_groq(article):
         
         analysis = json.loads(chat_completion.choices[0].message.content)
         
-        # Check for irrelevance
-        if analysis.get('irrelevant') is True or "no relevant" in analysis.get('title', '').lower():
+        # Check for irrelevance - BE EXTREMELY AGGRESSIVE
+        title_val = analysis.get('title', '').lower()
+        if analysis.get('irrelevant') is True or "no relevant" in title_val or "irrelevant" in title_val:
             print(f"⏭️ Skipping: Irrelevant content filtered ({analysis.get('title')})")
             return None
             
@@ -275,6 +276,7 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
     Note: Requires threads_content_publish and threads_basic permissions.
     """
     if not THREADS_ACCESS_TOKEN or not THREADS_USER_ID:
+        print("⚠️ Threads sync skipped: Missing THREADS_ACCESS_TOKEN or THREADS_USER_ID")
         return
 
     print(f"🧵 Sending to Threads: {article_title[:50]}...")
