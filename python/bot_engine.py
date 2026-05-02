@@ -20,6 +20,8 @@ APP_URL = os.getenv('SHARED_APP_URL', '').rstrip('/')
 # Social Media
 LINKEDIN_ACCESS_TOKEN = os.getenv('LINKEDIN_ACCESS_TOKEN')
 LINKEDIN_PERSON_URN = os.getenv('LINKEDIN_PERSON_URN')
+THREADS_ACCESS_TOKEN = os.getenv('THREADS_ACCESS_TOKEN')
+THREADS_USER_ID = os.getenv('THREADS_USER_ID')
 TWITTER_API_KEY = os.getenv('TWITTER_API_KEY')
 TWITTER_API_SECRET = os.getenv('TWITTER_API_SECRET')
 TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
@@ -151,7 +153,9 @@ def analyze_with_groq(article):
     - Utility: Provide a unique "Sentinel Perspective" in analysis_content.
 
     Return EXACTLY this JSON structure (no markdown, no preamble). 
-    IMPORTANT: If the news is NOT strictly about B2B SaaS, Enterprise Software, Cloud Infrastructure, or Fintech, return: {{"irrelevant": true}}
+    IMPORTANT: If the news is NOT strictly about B2B SaaS, Enterprise Software, Cloud Infrastructure, or Fintech, YOU MUST return EXACTLY: {{"irrelevant": true}}
+    
+    CRITICAL: The "title" MUST NOT include any prefixes like "SaaS Intelligence:" or "Sentinel Alert:". Just provide the clean, professional headline.
     
     {{
       "title": "A professional, punchy headline",
@@ -265,6 +269,61 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     except Exception as e:
         print(f"❌ LinkedIn Exception: {e}")
 
+def post_to_threads(article_title, article_summary, sharing_url, image_url):
+    """
+    Threads API Integration (Meta Graph API)
+    Note: Requires threads_content_publish and threads_basic permissions.
+    """
+    if not THREADS_ACCESS_TOKEN or not THREADS_USER_ID:
+        return
+
+    print(f"🧵 Sending to Threads: {article_title[:50]}...")
+    
+    # Threads allows captions. We combine headline and summary.
+    # Note: Unicode bold often works on Threads but might be filtered; we keep it for consistency.
+    bold_headline = to_unicode_bold(article_title)
+    caption = f"📡 {bold_headline}\n\n{article_summary}\n\nFull analysis: {sharing_url}\n\n#SaaS #AI #SaaSSentinel"
+
+    base_url = f"https://graph.threads.net/v1.0/{THREADS_USER_ID}"
+    
+    try:
+        # 1. Create Media Container (Image post is more engaging)
+        container_url = f"{base_url}/threads"
+        container_payload = {
+            "media_type": "IMAGE",
+            "image_url": image_url,
+            "text": caption,
+            "access_token": THREADS_ACCESS_TOKEN
+        }
+        
+        container_res = requests.post(container_url, data=container_payload)
+        container_data = container_res.json()
+        
+        if 'id' not in container_data:
+            print(f"❌ Threads Container Error: {container_data}")
+            return
+            
+        creation_id = container_data['id']
+        
+        # 2. Add short delay to ensure media is processed
+        time.sleep(5)
+        
+        # 3. Publish Container
+        publish_url = f"{base_url}/threads_publish"
+        publish_payload = {
+            "creation_id": creation_id,
+            "access_token": THREADS_ACCESS_TOKEN
+        }
+        
+        publish_res = requests.post(publish_url, data=publish_payload)
+        if publish_res.status_code == 200:
+            print("📅 Threads Post Successful")
+        else:
+            print(f"❌ Threads Publish Error: {publish_res.text}")
+            
+    except Exception as e:
+        print(f"❌ Threads Exception: {e}")
+
 def main():
     print("📈 SaaS Sentinel: Bot Life Cycle Started")
     
@@ -367,8 +426,18 @@ def main():
                 
                 sharing_url = f"{APP_URL}/article/{article_id}" if APP_URL else article_data["source_url"]
                 
-                print("⏳ Waiting for LinkedIn sync...")
+                print("⏳ Syncing with Social Networks...")
+                
+                # LinkedIn
                 post_to_linkedin(
+                    article_data['title'], 
+                    article_data['summary'], 
+                    sharing_url, 
+                    article_data['image_url']
+                )
+                
+                # Threads
+                post_to_threads(
                     article_data['title'], 
                     article_data['summary'], 
                     sharing_url, 
