@@ -189,12 +189,16 @@ def analyze_with_groq(article, broader_tech=False):
         
         analysis = json.loads(chat_completion.choices[0].message.content)
         
-        # Check for irrelevance - BE EXTREMELY AGGRESSIVE
+        # Check for irrelevance - BE EXTREMELY AGGRESSIVE for SaaS, but more lenient for fallback
         title_val = analysis.get('title', '').lower()
         if analysis.get('irrelevant') is True or "no relevant" in title_val or "irrelevant" in title_val:
             if not broader_tech:
                 print(f"⏭️ Skipping: Irrelevant content filtered ({analysis.get('title')})")
-            return None
+                return None
+            else:
+                # In fallback mode, we only skip if it's explicitly broken
+                if analysis.get('irrelevant') is True:
+                     return None
             
         return analysis
     except Exception as e:
