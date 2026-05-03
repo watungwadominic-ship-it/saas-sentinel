@@ -100,20 +100,26 @@ def update_market_ticker():
     symbols = ['MSFT', 'GOOGL', 'CRM', 'SNOW', 'MNDY', 'DDOG', 'ZS', 'NET']
     print(f"✅ Market Ticker Updated: {len(symbols)} symbols updated.")
 
-def fetch_saas_news():
-    print("🚀 SaaS Sentinel: Initiating Elite Market Intelligence Scan...")
+def fetch_news(topic="saas"):
     if not NEWS_API_KEY:
         print("⚠️ Warning: NEWS_API_KEY missing. Skipping news fetch.")
         return []
 
+    if topic == "saas":
+        print("🚀 SaaS Sentinel: Initiating Elite Market Intelligence Scan...")
+        query = '(B2B SaaS OR "Enterprise AI" OR "Cloud SaaS" OR "SaaS Funding" OR "SaaS M&A") AND NOT (Samsung OR smartphone OR consumer)'
+    else:
+        print("🔍 SaaS Sentinel: No SaaS news found. Initiating Broader Tech Scan Fallback...")
+        query = '(AI technology OR "Software Engineering" OR "Tech Trends" OR "SaaS Architecture") AND NOT (Samsung OR smartphone OR consumer)'
+        
     from_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
     url = "https://newsapi.org/v2/everything"
     params = {
-        'q': '(B2B SaaS OR "Enterprise AI" OR "Cloud SaaS" OR "SaaS Funding" OR "SaaS M&A") AND NOT (Samsung OR smartphone OR consumer)',
+        'q': query,
         'from': from_date,
         'sortBy': 'relevancy',
         'language': 'en',
-        'pageSize': 15,  # Fetch more to have better selection since we only pick 3
+        'pageSize': 15,
         'apiKey': NEWS_API_KEY
     }
     
@@ -127,7 +133,7 @@ def fetch_saas_news():
         print(f"❌ Error fetching NewsAPI: {e}")
         return []
 
-def analyze_with_groq(article):
+def analyze_with_groq(article, broader_tech=False):
     if not groq_client: return None
     
     title = article.get('title')
@@ -136,10 +142,14 @@ def analyze_with_groq(article):
     
     print(f"\n🧠 Deep Analyzing: {title[:70]}...")
     
-    # Strictly following the requested prompt and output keys
+    # Dynamic Category Filtering
+    category_filter = "explicitly about B2B SaaS, Enterprise Software, Cloud Infrastructure, or Fintech"
+    if broader_tech:
+        category_filter = "about Technology, Software Development, AI, or Digital Transformation"
+
     prompt = f"""You are the Lead Intelligence Engine for SaaS Sentinel. Your goal is to process raw technology news and output a structured JSON object.
     
-    STRICT CATEGORY FILTER: Only process news if it is explicitly about B2B SaaS, Enterprise Software, Cloud Infrastructure, or Fintech. 
+    STRICT CATEGORY FILTER: Only process news if it is {category_filter}. 
     EXCLUDE: Consumer electronics, smartphones, gaming, or general retail.
 
     Data Input:
@@ -182,7 +192,8 @@ def analyze_with_groq(article):
         # Check for irrelevance - BE EXTREMELY AGGRESSIVE
         title_val = analysis.get('title', '').lower()
         if analysis.get('irrelevant') is True or "no relevant" in title_val or "irrelevant" in title_val:
-            print(f"⏭️ Skipping: Irrelevant content filtered ({analysis.get('title')})")
+            if not broader_tech:
+                print(f"⏭️ Skipping: Irrelevant content filtered ({analysis.get('title')})")
             return None
             
         return analysis
@@ -344,7 +355,8 @@ def main():
 
     update_market_ticker()
     
-    news_items = fetch_saas_news()
+    # PHASE 1: Try Elite SaaS News
+    news_items = fetch_news("saas")
     processed_count = 0
     
     # Pre-fetch recent articles to avoid analyzing duplicates
@@ -358,99 +370,107 @@ def main():
         print(f"⚠️ Could not pre-fetch recent articles: {e}")
         recent_urls = []
 
-    for item in news_items:
-        # Check quota INSIDE loop
-        if current_count + processed_count >= 3:
-            print(f"🛑 Stop: Hard daily limit of 3 articles reached during this run.")
-            break
-
-        title = item.get('title', '')
-        url = item.get('url', '')
-        
-        if not title or '[Removed]' in title:
-            continue
-            
-        # FAST SKIP: Check if URL or Title (fuzzy) already exists in pre-fetched list
-        if url in recent_urls:
-            print(f"⏭️ Skipping: URL already in recent history ({url})")
-            continue
-            
-        is_duplicate = False
-        for rt in recent_titles:
-            if title.lower()[:30] in rt or rt[:30] in title.lower():
-                is_duplicate = True
+    def process_batch(items, is_fallback=False):
+        nonlocal processed_count
+        count_in_batch = 0
+        for item in items:
+            # Check quota INSIDE loop
+            if current_count + processed_count >= 3:
                 break
-        if is_duplicate:
-            print(f"⏭️ Skipping: Title similar to recent article ({title[:30]}...)")
-            continue
 
-        analysis = analyze_with_groq(item)
-        if not analysis:
-            continue
+            title = item.get('title', '')
+            url = item.get('url', '')
             
-        # Correctly mapping fields to match your Supabase schema shown in the image
-        article_data = {
-            "title": analysis.get('title'),
-            "summary": analysis.get('summary'),
-            "content": analysis.get('content'),
-            "analysis_content": analysis.get('analysis_content'),
-            "category": analysis.get('category', 'BULLISH'),
-            "confidence_score": int(analysis.get('confidence_score', 90)),
-            "strategic_impact": analysis.get('strategic_impact', 'Medium'),
-            "breakdown": analysis.get('breakdown'), # This is now a JSON object per request
-            "image_url": item.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=800",
-            "source_url": item.get('url'),
-            "published_at": item.get('publishedAt') or datetime.now().isoformat(),
-            "created_at": datetime.now().isoformat()
-        }
-        
-        try:
-            # Check duplicates by URL first (most reliable)
-            if article_data.get("source_url"):
-                existing_url = supabase.table("news_articles").select("id").eq("source_url", article_data["source_url"]).execute()
-                if existing_url.data:
-                    print(f"⏭️ Skipping: URL already exists in database ({article_data['source_url']})")
-                    continue
-
-            # Then check duplicates by Title (fuzzy-ish check by matching the beginning)
-            # Use a slightly longer prefix for better specificity
-            title_prefix = article_data["title"][:30]
-            existing_title = supabase.table("news_articles").select("id").ilike("title", f"%{title_prefix}%").execute()
-            if existing_title.data:
-                print(f"⏭️ Skipping: Similar title already exists ({title_prefix}...)")
+            if not title or '[Removed]' in title:
                 continue
                 
-            res = supabase.table("news_articles").insert(article_data).execute()
-            if res.data:
-                article_id = res.data[0]['id']
-                print(f"✅ Intelligence Logged: {analysis.get('title')[:50]}...")
-                print(f"🆔 Article ID: {article_id}")
+            # FAST SKIP: Check if URL or Title (fuzzy) already exists in pre-fetched list
+            if url in recent_urls:
+                continue
                 
-                sharing_url = f"{APP_URL}/article/{article_id}" if APP_URL else article_data["source_url"]
+            is_duplicate = False
+            for rt in recent_titles:
+                if title.lower()[:30] in rt or rt[:30] in title.lower():
+                    is_duplicate = True
+                    break
+            if is_duplicate:
+                continue
+
+            analysis = analyze_with_groq(item, broader_tech=is_fallback)
+            if not analysis:
+                continue
                 
-                print("⏳ Syncing with Social Networks...")
-                
-                # LinkedIn
-                post_to_linkedin(
-                    article_data['title'], 
-                    article_data['summary'], 
-                    sharing_url, 
-                    article_data['image_url']
-                )
-                
-                # Threads
-                post_to_threads(
-                    article_data['title'], 
-                    article_data['summary'], 
-                    sharing_url, 
-                    article_data['image_url']
-                )
-                
-                processed_count += 1
-                
-        except Exception as e:
-            print(f"❌ Database Error: {e}")
+            # Correctly mapping fields to match your Supabase schema shown in the image
+            article_data = {
+                "title": analysis.get('title'),
+                "summary": analysis.get('summary'),
+                "content": analysis.get('content'),
+                "analysis_content": analysis.get('analysis_content'),
+                "category": analysis.get('category', 'BULLISH'),
+                "confidence_score": int(analysis.get('confidence_score', 90)),
+                "strategic_impact": analysis.get('strategic_impact', 'Medium'),
+                "breakdown": analysis.get('breakdown'), # This is now a JSON object per request
+                "image_url": item.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=800",
+                "source_url": item.get('url'),
+                "published_at": item.get('publishedAt') or datetime.now().isoformat(),
+                "created_at": datetime.now().isoformat()
+            }
             
+            try:
+                # Check duplicates by URL first (most reliable)
+                if article_data.get("source_url"):
+                    existing_url = supabase.table("news_articles").select("id").eq("source_url", article_data["source_url"]).execute()
+                    if existing_url.data:
+                        continue
+
+                # Then check duplicates by Title (fuzzy-ish check by matching the beginning)
+                # Use a slightly longer prefix for better specificity
+                title_prefix = article_data["title"][:30]
+                existing_title = supabase.table("news_articles").select("id").ilike("title", f"%{title_prefix}%").execute()
+                if existing_title.data:
+                    continue
+                    
+                res = supabase.table("news_articles").insert(article_data).execute()
+                if res.data:
+                    article_id = res.data[0]['id']
+                    print(f"✅ Intelligence Logged: {analysis.get('title')[:50]}...")
+                    print(f"🆔 Article ID: {article_id}")
+                    
+                    sharing_url = f"{APP_URL}/article/{article_id}" if APP_URL else article_data["source_url"]
+                    
+                    print("⏳ Syncing with Social Networks...")
+                    
+                    # LinkedIn
+                    post_to_linkedin(
+                        article_data['title'], 
+                        article_data['summary'], 
+                        sharing_url, 
+                        article_data['image_url']
+                    )
+                    
+                    # Threads
+                    post_to_threads(
+                        article_data['title'], 
+                        article_data['summary'], 
+                        sharing_url, 
+                        article_data['image_url']
+                    )
+                    
+                    processed_count += 1
+                    count_in_batch += 1
+                    
+            except Exception as e:
+                print(f"❌ Database Error: {e}")
+        return count_in_batch
+
+    # First attempt: SaaS
+    initial_success = process_batch(news_items, is_fallback=False)
+    
+    # Check if we need fallback
+    if processed_count == 0:
+        fallback_news = fetch_news("broader")
+        process_batch(fallback_news, is_fallback=True)
+
     print(f"\n✨ Scan Complete. {processed_count} new intelligence reports generated.")
 
 if __name__ == "__main__":
