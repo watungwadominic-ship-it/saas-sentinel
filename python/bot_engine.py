@@ -18,14 +18,27 @@ SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 APP_URL = os.getenv('SHARED_APP_URL', '').rstrip('/')
 
 # Social Media
-LINKEDIN_ACCESS_TOKEN = (os.getenv('LINKEDIN_ACCESS_TOKEN') or '').strip()
-LINKEDIN_PERSON_URN = (os.getenv('LINKEDIN_PERSON_URN') or '').strip()
-THREADS_ACCESS_TOKEN = (os.getenv('THREADS_ACCESS_TOKEN') or '').strip()
-THREADS_USER_ID = (os.getenv('THREADS_USER_ID') or '').strip()
-TWITTER_API_KEY = (os.getenv('TWITTER_API_KEY') or '').strip()
-TWITTER_API_SECRET = (os.getenv('TWITTER_API_SECRET') or '').strip()
-TWITTER_ACCESS_TOKEN = (os.getenv('TWITTER_ACCESS_TOKEN') or '').strip()
-TWITTER_ACCESS_TOKEN_SECRET = (os.getenv('TWITTER_ACCESS_TOKEN_SECRET') or '').strip()
+def discover_secret(possible_names):
+    for name in possible_names:
+        val = os.getenv(name)
+        if val:
+            return val.strip()
+    # Try case-insensitive search if direct pull fails
+    all_keys = os.environ.keys()
+    for name in possible_names:
+        for k in all_keys:
+            if k.upper() == name.upper():
+                return os.environ[k].strip()
+    return ""
+
+LINKEDIN_ACCESS_TOKEN = discover_secret(['LINKEDIN_ACCESS_TOKEN'])
+LINKEDIN_PERSON_URN = discover_secret(['LINKEDIN_PERSON_URN'])
+THREADS_ACCESS_TOKEN = discover_secret(['THREADS_ACCESS_TOKEN', 'VITE_THREADS_ACCESS_TOKEN', 'THREADS_TOKEN'])
+THREADS_USER_ID = discover_secret(['THREADS_USER_ID', 'VITE_THREADS_USER_ID', 'THREADS_ID'])
+TWITTER_API_KEY = discover_secret(['TWITTER_API_KEY', 'VITE_TWITTER_API_KEY'])
+TWITTER_API_SECRET = discover_secret(['TWITTER_API_SECRET', 'VITE_TWITTER_API_SECRET'])
+TWITTER_ACCESS_TOKEN = discover_secret(['TWITTER_ACCESS_TOKEN', 'VITE_TWITTER_ACCESS_TOKEN'])
+TWITTER_ACCESS_TOKEN_SECRET = discover_secret(['TWITTER_ACCESS_TOKEN_SECRET', 'VITE_TWITTER_ACCESS_TOKEN_SECRET'])
 
 # Initialize Clients
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
@@ -363,10 +376,14 @@ def main():
     
     # Help with Threads discovery if failing
     if not social_checks["Threads"]:
-        all_env = os.environ.keys()
+        all_env = list(os.environ.keys())
         threads_related = [k for k in all_env if "THREADS" in k.upper()]
         if threads_related:
-            print(f"   💡 Found related env keys: {threads_related}")
+            print(f"   💡 System found these related keys: {threads_related}")
+            print(f"   💡 Tip: Check if the name in your Secrets tab matches exactly.")
+        else:
+            print("   💡 No keys containing 'THREADS' were found in the current environment.")
+            print("   💡 If you just added them, you may need to restart the process or re-run the workflow.")
     print("----------------------------------\n")
     
     # DAILY LIMIT CHECK (3 articles per day)
