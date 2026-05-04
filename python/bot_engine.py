@@ -290,11 +290,11 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
     Threads API Integration (Meta Graph API)
     Note: Requires threads_content_publish and threads_basic permissions.
     """
+    # Threads sync check
     if not THREADS_ACCESS_TOKEN or not THREADS_USER_ID:
         missing = []
         if not THREADS_ACCESS_TOKEN: missing.append("THREADS_ACCESS_TOKEN")
         if not THREADS_USER_ID: missing.append("THREADS_USER_ID")
-        
         print(f"⚠️ Threads sync skipped: Missing {', '.join(missing)}")
         return
 
