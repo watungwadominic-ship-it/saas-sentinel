@@ -19,16 +19,27 @@ APP_URL = os.getenv('SHARED_APP_URL', '').rstrip('/')
 
 # Social Media
 def discover_secret(possible_names):
+    # Try direct matches first
     for name in possible_names:
         val = os.getenv(name)
-        if val:
+        if val is not None and val.strip() != "":
             return val.strip()
-    # Try case-insensitive search if direct pull fails
-    all_keys = os.environ.keys()
+            
+    # Deeper search: Case-insensitive and substring match
+    all_keys = list(os.environ.keys())
     for name in possible_names:
+        # Check case-insensitive
         for k in all_keys:
             if k.upper() == name.upper():
-                return os.environ[k].strip()
+                val = os.environ[k]
+                if val and val.strip() != "":
+                    return val.strip()
+        # Check if it was saved with a suffix or prefix by mistake
+        for k in all_keys:
+            if name.upper() in k.upper():
+                val = os.environ[k]
+                if val and val.strip() != "":
+                    return val.strip()
     return ""
 
 LINKEDIN_ACCESS_TOKEN = discover_secret(['LINKEDIN_ACCESS_TOKEN'])
@@ -364,6 +375,19 @@ def main():
     
     # SYSTEM STATUS REPORT
     print("\n--- System Connectivity Status ---")
+    
+    # DEBUG: Print all env keys with repr to catch hidden characters
+    all_env_keys = list(os.environ.keys())
+    print(f"DEBUG: Found {len(all_env_keys)} environment variables.")
+    threads_keys = [k for k in all_env_keys if "THREADS" in k.upper()]
+    if threads_keys:
+        print(f"DEBUG: Detected Threads-related keys: {[repr(k) for k in threads_keys]}")
+    else:
+        # Fallback: search for any key that might be a typo
+        typos = [k for k in all_env_keys if "THREAD" in k.upper() or "TREADS" in k.upper()]
+        if typos:
+            print(f"DEBUG: Found potential typos for Threads: {[repr(k) for k in typos]}")
+
     social_checks = {
         "LinkedIn": all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]),
         "Threads": all([THREADS_ACCESS_TOKEN, THREADS_USER_ID]),
