@@ -11,7 +11,6 @@ import tweepy
 load_dotenv()
 
 # Configuration
-print(f"DEBUG: All THREADS env keys: {[k for k in os.environ.keys() if 'THREADS' in k]}")
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -295,17 +294,8 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
         missing = []
         if not THREADS_ACCESS_TOKEN: missing.append("THREADS_ACCESS_TOKEN")
         if not THREADS_USER_ID: missing.append("THREADS_USER_ID")
-        # Try to be helpful: check if they are in the environment with slightly different names
-        all_env_keys = list(os.environ.keys())
-        potential_token = [k for k in all_env_keys if "THREADS" in k and ("TOKEN" in k or k.endswith("_"))]
-        potential_id = [k for k in all_env_keys if "THREADS" in k and ("ID" in k or k.endswith("_"))]
         
         print(f"⚠️ Threads sync skipped: Missing {', '.join(missing)}")
-        print(f"   (Detected Threads keys in env: {[k for k in all_env_keys if 'THREADS' in k]})")
-        if potential_token and not THREADS_ACCESS_TOKEN:
-            print(f"   💡 Found potential token key: {potential_token[0]}")
-        if potential_id and not THREADS_USER_ID:
-            print(f"   💡 Found potential ID key: {potential_id[0]}")
         return
 
     print(f"🧵 Sending to Threads: {article_title[:50]}...")
@@ -357,7 +347,27 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
         print(f"❌ Threads Exception: {e}")
 
 def main():
-    print("📈 SaaS Sentinel: Bot Life Cycle Started [SYNC VERIFIED V2]")
+    print("📈 SaaS Sentinel: Bot Life Cycle Started")
+    
+    # SYSTEM STATUS REPORT
+    print("\n--- System Connectivity Status ---")
+    social_checks = {
+        "LinkedIn": all([LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]),
+        "Threads": all([THREADS_ACCESS_TOKEN, THREADS_USER_ID]),
+        "Twitter/X": all([TWITTER_API_KEY, TWITTER_ACCESS_TOKEN]),
+        "Groq AI": bool(GROQ_API_KEY),
+        "Supabase": all([SUPABASE_URL, SUPABASE_KEY])
+    }
+    for service, status in social_checks.items():
+        print(f"{'✅' if status else '❌'} {service}: {'Connected' if status else 'Config Missing'}")
+    
+    # Help with Threads discovery if failing
+    if not social_checks["Threads"]:
+        all_env = os.environ.keys()
+        threads_related = [k for k in all_env if "THREADS" in k.upper()]
+        if threads_related:
+            print(f"   💡 Found related env keys: {threads_related}")
+    print("----------------------------------\n")
     
     # DAILY LIMIT CHECK (3 articles per day)
     today_str = datetime.now().strftime("%Y-%m-%d")
