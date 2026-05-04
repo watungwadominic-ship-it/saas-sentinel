@@ -327,7 +327,7 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
     # Threads allows captions. We combine headline and summary.
     # Note: Unicode bold often works on Threads but might be filtered; we keep it for consistency.
     bold_headline = to_unicode_bold(article_title)
-    caption = f"📡 {bold_headline}\n\n{article_summary}\n\nFull analysis: {sharing_url}\n\n#SaaS #AI #SaaSSentinel"
+    caption = f"📡 {bold_headline}\n\n{article_summary}\n\n🔗 READ MORE: {sharing_url}\n\n#SaaS #AI #SaaSSentinel"
 
     base_url = f"https://graph.threads.net/v1.0/{THREADS_USER_ID}"
     
