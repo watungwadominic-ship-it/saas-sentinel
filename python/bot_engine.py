@@ -11,6 +11,7 @@ import tweepy
 load_dotenv()
 
 # Configuration
+print(f"DEBUG: All THREADS env keys: {[k for k in os.environ.keys() if 'THREADS' in k]}")
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -18,14 +19,14 @@ SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 APP_URL = os.getenv('SHARED_APP_URL', '').rstrip('/')
 
 # Social Media
-LINKEDIN_ACCESS_TOKEN = os.getenv('LINKEDIN_ACCESS_TOKEN')
-LINKEDIN_PERSON_URN = os.getenv('LINKEDIN_PERSON_URN')
-THREADS_ACCESS_TOKEN = os.getenv('THREADS_ACCESS_TOKEN')
-THREADS_USER_ID = os.getenv('THREADS_USER_ID')
-TWITTER_API_KEY = os.getenv('TWITTER_API_KEY')
-TWITTER_API_SECRET = os.getenv('TWITTER_API_SECRET')
-TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
-TWITTER_ACCESS_TOKEN_SECRET = os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
+LINKEDIN_ACCESS_TOKEN = (os.getenv('LINKEDIN_ACCESS_TOKEN') or '').strip()
+LINKEDIN_PERSON_URN = (os.getenv('LINKEDIN_PERSON_URN') or '').strip()
+THREADS_ACCESS_TOKEN = (os.getenv('THREADS_ACCESS_TOKEN') or '').strip()
+THREADS_USER_ID = (os.getenv('THREADS_USER_ID') or '').strip()
+TWITTER_API_KEY = (os.getenv('TWITTER_API_KEY') or '').strip()
+TWITTER_API_SECRET = (os.getenv('TWITTER_API_SECRET') or '').strip()
+TWITTER_ACCESS_TOKEN = (os.getenv('TWITTER_ACCESS_TOKEN') or '').strip()
+TWITTER_ACCESS_TOKEN_SECRET = (os.getenv('TWITTER_ACCESS_TOKEN_SECRET') or '').strip()
 
 # Initialize Clients
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
@@ -295,11 +296,12 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
         if not THREADS_ACCESS_TOKEN: missing.append("THREADS_ACCESS_TOKEN")
         if not THREADS_USER_ID: missing.append("THREADS_USER_ID")
         # Try to be helpful: check if they are in the environment with slightly different names
-        all_env_keys = os.environ.keys()
-        potential_token = [k for k in all_env_keys if "THREADS" in k and "TOKEN" in k]
-        potential_id = [k for k in all_env_keys if "THREADS" in k and "ID" in k]
+        all_env_keys = list(os.environ.keys())
+        potential_token = [k for k in all_env_keys if "THREADS" in k and ("TOKEN" in k or k.endswith("_"))]
+        potential_id = [k for k in all_env_keys if "THREADS" in k and ("ID" in k or k.endswith("_"))]
         
         print(f"⚠️ Threads sync skipped: Missing {', '.join(missing)}")
+        print(f"   (Detected Threads keys in env: {[k for k in all_env_keys if 'THREADS' in k]})")
         if potential_token and not THREADS_ACCESS_TOKEN:
             print(f"   💡 Found potential token key: {potential_token[0]}")
         if potential_id and not THREADS_USER_ID:
@@ -355,7 +357,7 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
         print(f"❌ Threads Exception: {e}")
 
 def main():
-    print("📈 SaaS Sentinel: Bot Life Cycle Started")
+    print("📈 SaaS Sentinel: Bot Life Cycle Started [SYNC VERIFIED V2]")
     
     # DAILY LIMIT CHECK (3 articles per day)
     today_str = datetime.now().strftime("%Y-%m-%d")
