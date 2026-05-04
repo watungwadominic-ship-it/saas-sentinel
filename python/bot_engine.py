@@ -291,7 +291,19 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
     Note: Requires threads_content_publish and threads_basic permissions.
     """
     if not THREADS_ACCESS_TOKEN or not THREADS_USER_ID:
-        print("⚠️ Threads sync skipped: Missing THREADS_ACCESS_TOKEN or THREADS_USER_ID")
+        missing = []
+        if not THREADS_ACCESS_TOKEN: missing.append("THREADS_ACCESS_TOKEN")
+        if not THREADS_USER_ID: missing.append("THREADS_USER_ID")
+        # Try to be helpful: check if they are in the environment with slightly different names
+        all_env_keys = os.environ.keys()
+        potential_token = [k for k in all_env_keys if "THREADS" in k and "TOKEN" in k]
+        potential_id = [k for k in all_env_keys if "THREADS" in k and "ID" in k]
+        
+        print(f"⚠️ Threads sync skipped: Missing {', '.join(missing)}")
+        if potential_token and not THREADS_ACCESS_TOKEN:
+            print(f"   💡 Found potential token key: {potential_token[0]}")
+        if potential_id and not THREADS_USER_ID:
+            print(f"   💡 Found potential ID key: {potential_id[0]}")
         return
 
     print(f"🧵 Sending to Threads: {article_title[:50]}...")
@@ -304,8 +316,8 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
     base_url = f"https://graph.threads.net/v1.0/{THREADS_USER_ID}"
     
     try:
-        # 1. Create Media Container (Image post is more engaging)
-        container_url = f"{base_url}/threads"
+        # 1. Create Media Container
+        container_url = f"https://graph.threads.net/v1.0/{THREADS_USER_ID}/threads"
         container_payload = {
             "media_type": "IMAGE",
             "image_url": image_url,
@@ -313,7 +325,8 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
             "access_token": THREADS_ACCESS_TOKEN
         }
         
-        container_res = requests.post(container_url, data=container_payload)
+        # Meta Graph API often prefers data as form-encoded for this endpoint or params
+        container_res = requests.post(container_url, params=container_payload)
         container_data = container_res.json()
         
         if 'id' not in container_data:
