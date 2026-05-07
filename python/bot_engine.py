@@ -444,8 +444,8 @@ def main():
         nonlocal processed_count
         count_in_batch = 0
         for item in items:
-            # Check quota INSIDE loop
-            if current_count + processed_count >= 3:
+            # Stop after processing exactly 1 article per run
+            if processed_count >= 1:
                 break
 
             title = item.get('title', '')
