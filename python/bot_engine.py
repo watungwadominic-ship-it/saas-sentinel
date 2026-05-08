@@ -243,6 +243,21 @@ def to_unicode_bold(text):
     }
     return "".join(bold_map.get(c, c) for c in text)
 
+def get_better_fallback_image(title):
+    """Generates a relevant tech image URL based on article keywords."""
+    keywords = ["software", "technology", "ai", "dashboard", "data", "business", "coding", "server", "cloud"]
+    title_lower = title.lower()
+    
+    # Select the first keyword found in title
+    selected_tag = "tech"
+    for kw in keywords:
+        if kw in title_lower:
+            selected_tag = kw
+            break
+            
+    # Use Unsplash source with the tag
+    return f"https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=800&keyword={selected_tag}"
+
 def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     if not LINKEDIN_ACCESS_TOKEN or not LINKEDIN_PERSON_URN:
         return
@@ -376,6 +391,32 @@ def main():
     # SYSTEM STATUS REPORT
     print("\n--- System Connectivity Status ---")
     
+    current_hour = datetime.now().hour
+    is_morning = 6 <= current_hour <= 10
+    is_afternoon = 13 <= current_hour <= 17
+    is_night = 19 <= current_hour <= 23
+    
+    eligible = is_morning or is_afternoon or is_night
+    
+    print(f"Current UTC Time: {datetime.now().strftime('%H:%M')}")
+    print(f"Time Window: {'Morning' if is_morning else 'Afternoon' if is_afternoon else 'Night' if is_night else 'OFF-PEAK'}")
+    
+    if not eligible:
+        print("⏸️ SaaS Sentinel is on standby. Next operational window starts soon.")
+        if os.getenv('GITHUB_EVENT_NAME') == 'schedule':
+            return
+
+    # Check if we already posted in the CURRENT window
+    try:
+        window_start = datetime.now().replace(hour=6 if is_morning else 13 if is_afternoon else 19, minute=0, second=0).isoformat()
+        already_posted = supabase.table("news_articles").select("id").gt("created_at", window_start).execute()
+        if already_posted.data:
+            print(f"✅ Already posted for the current {'Morning' if is_morning else 'Afternoon' if is_afternoon else 'Night'} window. Standing by.")
+            if os.getenv('GITHUB_EVENT_NAME') == 'schedule':
+                return
+    except Exception as e:
+        print(f"⚠️ Could not check window limit: {e}")
+    
     # DEBUG: Print all env keys with repr to catch hidden characters
     all_env_keys = list(os.environ.keys())
     print(f"DEBUG: Found {len(all_env_keys)} environment variables.")
@@ -480,7 +521,7 @@ def main():
                 "confidence_score": int(analysis.get('confidence_score', 90)),
                 "strategic_impact": analysis.get('strategic_impact', 'Medium'),
                 "breakdown": analysis.get('breakdown'), # This is now a JSON object per request
-                "image_url": item.get('urlToImage') or "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=800",
+                "image_url": item.get('urlToImage') or get_better_fallback_image(analysis.get('title')),
                 "source_url": item.get('url'),
                 "published_at": item.get('publishedAt') or datetime.now().isoformat(),
                 "created_at": datetime.now().isoformat()
