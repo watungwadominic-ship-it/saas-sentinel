@@ -63,6 +63,8 @@ export async function saveNewsArticle(article: Partial<Article>) {
     .insert([
       {
         title: article.title,
+        slug: article.slug,
+        meta_description: article.meta_description,
         content: article.content,
         summary: article.summary,
         category: article.category,
@@ -82,6 +84,32 @@ export async function saveNewsArticle(article: Partial<Article>) {
   }
 
   return data;
+}
+
+export async function fetchArticleBySlug(slug: string): Promise<Article | null> {
+  console.log(`[DEBUG] fetchArticleBySlug called with slug: ${slug}`);
+  try {
+    const { data, error } = await (supabase
+      .from('news_articles') as any)
+      .select('*')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`[DEBUG] Supabase error in fetchArticleBySlug for slug ${slug}:`, error);
+      return null;
+    }
+
+    if (!data) {
+      // Fallback: Try fetching by ID in case the slug is actually an ID
+      return fetchArticleById(slug);
+    }
+
+    return mapRowToArticle(data);
+  } catch (err: any) {
+    console.error(`[DEBUG] Unexpected error in fetchArticleBySlug for slug ${slug}:`, err.message || err);
+    return null;
+  }
 }
 
 export async function fetchArticleById(id: string): Promise<Article | null> {
