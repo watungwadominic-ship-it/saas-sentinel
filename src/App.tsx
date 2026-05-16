@@ -1527,6 +1527,18 @@ export default function App() {
 
   return (
     <>
+      <Helmet>
+        <title>
+          {showAbout ? "About SaaS Sentinel | Elite B2B Market Intelligence" :
+           showArchive ? "Intelligence Archive | SaaS Sentinel" :
+           showPrivacy ? "Privacy Policy | SaaS Sentinel" :
+           "SaaS Sentinel | Elite B2B Market Intelligence & SaaS Analysis"}
+        </title>
+        <meta name="description" content="SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts." />
+        <meta property="og:title" content="SaaS Sentinel | Elite B2B Market Intelligence" />
+        <meta property="og:description" content="SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts." />
+        <meta property="og:image" content="/og-image.png" />
+      </Helmet>
       <div className="min-h-screen relative transition-colors duration-500">
         {/* Background Gradients */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
