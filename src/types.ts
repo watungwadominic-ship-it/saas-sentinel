@@ -1,6 +1,8 @@
 export interface Article {
   id?: string;
   title: string;
+  slug?: string;
+  meta_description?: string;
   content: string;
   summary: string;
   category: string;
