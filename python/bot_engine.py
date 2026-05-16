@@ -181,6 +181,11 @@ def analyze_with_groq(article, broader_tech=False):
     DESCRIPTION: {description}
     RAW_CONTENT: {content}
 
+    SEO & Content Strategy:
+    - Title: Create a high-CTR, SEO-optimized headline. Focus on search intent.
+    - Meta Description: Create a 150-160 character description that is enticing and contains primary keywords.
+    - Analysis Content: Provide high-level strategic insight focusing on B2B SaaS architecture and market shifts.
+
     Writing Style: 
     - Tone: Institutional Intelligence (Bloomberg/Reuters)
     - Keywords: LLM integration, B2B lifecycle, scalability, market volatility
@@ -189,10 +194,11 @@ def analyze_with_groq(article, broader_tech=False):
     Return EXACTLY this JSON structure (no markdown, no preamble). 
     IMPORTANT: If the news is NOT strictly about B2B SaaS, Enterprise Software, Cloud Infrastructure, or Fintech, YOU MUST return EXACTLY: {{"irrelevant": true}}
     
-    CRITICAL: The "title" MUST NOT include any prefixes like "SaaS Intelligence:" or "Sentinel Alert:". Just provide the clean, professional headline.
+    CRITICAL: The "title" MUST NOT include any prefixes list "SaaS Intelligence:" or "Sentinel Alert:". Just provide the clean, professional headline.
     
     {{
       "title": "A professional, punchy headline",
+      "meta_description": "SEO optimized meta description (150-160 chars)",
       "summary": "A 2-sentence overview of the news",
       "content": "Detailed breakdown of the event (150-200 words)",
       "analysis_content": "High-level strategic insight focusing on B2B SaaS architecture and market shifts",
@@ -242,6 +248,14 @@ def to_unicode_bold(text):
         '0': '𝟬', '1': '𝟭', '2': '𝟮', '3': '𝟯', '4': '𝟰', '5': '𝟱', '6': '𝟲', '7': '𝟳', '8': '𝟴', '9': '𝟵'
     }
     return "".join(bold_map.get(c, c) for c in text)
+
+def generate_slug(text):
+    """Generates a URL-friendly slug from text."""
+    import re
+    text = text.lower()
+    text = re.sub(r'[^\w\s-]', '', text)
+    text = re.sub(r'[\s_-]+', '-', text).strip('-')
+    return text
 
 def get_better_fallback_image(title):
     """Generates a relevant tech image URL based on article keywords."""
@@ -514,6 +528,8 @@ def main():
             # Correctly mapping fields to match your Supabase schema shown in the image
             article_data = {
                 "title": analysis.get('title'),
+                "slug": generate_slug(analysis.get('title')),
+                "meta_description": analysis.get('meta_description'),
                 "summary": analysis.get('summary'),
                 "content": analysis.get('content'),
                 "analysis_content": analysis.get('analysis_content'),
@@ -547,7 +563,7 @@ def main():
                     print(f"✅ Intelligence Logged: {analysis.get('title')[:50]}...")
                     print(f"🆔 Article ID: {article_id}")
                     
-                    sharing_url = f"{APP_URL}/article/{article_id}" if APP_URL else article_data["source_url"]
+                    sharing_url = f"{APP_URL}/article/{article_data['slug']}" if APP_URL else article_data["source_url"]
                     
                     print("⏳ Syncing with Social Networks...")
                     
