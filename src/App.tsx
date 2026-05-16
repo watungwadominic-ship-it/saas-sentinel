@@ -8,9 +8,10 @@ import { inject } from '@vercel/analytics';
 import { supabase } from './services/supabase';
 import { Article } from './types';
 import { generateArticle, fetchTopSaaSNews, parseNewsIntoStories } from './services/gemini';
-import { fetchNewsArticles, saveNewsArticle, fetchArticleById } from './services/news_articles';
+import { fetchNewsArticles, saveNewsArticle, fetchArticleById, fetchArticleBySlug } from './services/news_articles';
 import { addSubscriber } from './services/subscribers';
 import ReactMarkdown from 'react-markdown';
+import { Helmet } from 'react-helmet-async';
 import { 
   Newspaper, 
   TrendingUp, 
@@ -720,6 +721,24 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
 });
 
 function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: () => void }) {
+  // JSON-LD Structured Data for NewsArticle
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    "headline": article.title,
+    "image": [
+      article.image_url || article.image
+    ],
+    "datePublished": article.date,
+    "dateModified": article.date,
+    "author": [{
+        "@type": "Organization",
+        "name": "SaaS Sentinel Intelligence Division",
+        "url": window.location.origin
+      }],
+    "description": article.meta_description || article.summary
+  };
+
   // Helper to parse breakdown points if they are JSON strings
   const parsePoint = (point: any) => {
     if (typeof point === 'object' && point !== null) {
@@ -808,6 +827,20 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
       exit={{ opacity: 0, y: -20 }}
       className="max-w-[1240px] mx-auto pb-20 px-4 md:px-8"
     >
+      <Helmet>
+        <title>{article.title} | SaaS Sentinel</title>
+        <meta name="description" content={article.meta_description || article.summary} />
+        <meta property="og:title" content={`${article.title} | SaaS Sentinel`} />
+        <meta property="og:description" content={article.meta_description || article.summary} />
+        <meta property="og:image" content={article.image_url || article.image} />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <link rel="canonical" href={`${window.location.origin}/article/${article.slug || article.id}`} />
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      </Helmet>
+
       {/* Navigation */}
       <button 
         onClick={onBack}
@@ -1120,23 +1153,11 @@ export default function App() {
   // Dynamic SEO Metadata
   useEffect(() => {
     if (selectedArticle) {
-      document.title = `${selectedArticle.title} | SaaS Sentinel`;
-      const metaDescription = document.querySelector('meta[name="description"]');
-      if (metaDescription) {
-        metaDescription.setAttribute('content', selectedArticle.summary);
-      }
-      
-      // Update Open Graph
-      const ogTitle = document.querySelector('meta[property="og:title"]');
-      if (ogTitle) ogTitle.setAttribute('content', selectedArticle.title);
-      
-      const ogDesc = document.querySelector('meta[property="og:description"]');
-      if (ogDesc) ogDesc.setAttribute('content', selectedArticle.summary);
-      
-      const ogImage = document.querySelector('meta[property="og:image"]');
-      if (ogImage) ogImage.setAttribute('content', selectedArticle.image_url);
+      // Helmet handles this now in the view
     } else if (showAbout) {
       document.title = "About SaaS Sentinel | Elite B2B Market Intelligence";
+    } else if (showArchive) {
+      document.title = "Intelligence Archive | SaaS Sentinel";
     } else {
       document.title = "SaaS Sentinel | Elite B2B Market Intelligence & SaaS Analysis";
       const metaDescription = document.querySelector('meta[name="description"]');
@@ -1144,7 +1165,7 @@ export default function App() {
         metaDescription.setAttribute('content', "SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts.");
       }
     }
-  }, [selectedArticle, showAbout]);
+  }, [selectedArticle, showAbout, showArchive]);
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -1268,35 +1289,29 @@ export default function App() {
       }
 
       if (articleId && articleId !== 'undefined' && articleId !== 'null') {
-        setLoading(true); // Ensure loading state is active while deep linking
-        console.log(`[DEBUG-APP] Deep link detected for articleId: ${articleId}`);
+        setLoading(true);
+        console.log(`[DEBUG-APP] Deep link detected for articleId/slug: ${articleId}`);
         
         // If we already have articles, try to find it
         if (articles.length > 0) {
-          const found = articles.find(a => String(a.id) === String(articleId));
+          const found = articles.find(a => String(a.id) === String(articleId) || String(a.slug) === String(articleId));
           if (found) {
             console.log(`[DEBUG-APP] Found article in current list: ${found.title}`);
-            
-            // Switch tab logic removed - merged views
             setSelectedArticle(found);
             setShowAbout(false);
             setShowPrivacy(false);
             setShowArchive(false);
-            setLoading(false); // Fix: set loading false after finding article
+            setLoading(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
-          } else {
-            console.log(`[DEBUG-APP] Article ${articleId} not found in current list of ${articles.length} articles. Fetching specifically...`);
           }
         }
 
-        // If not found in list or list not loaded yet, fetch specifically
+        // If not found in list or list not loaded yet, fetch specifically by slug (which also handles ID fallback)
         try {
-          const article = await fetchArticleById(articleId);
+          const article = await fetchArticleBySlug(articleId);
           if (article) {
             console.log(`[DEBUG-APP] Fetched article for deep link: ${article.title}`);
-            
-            // Switch tab logic removed - merged views
             setSelectedArticle(article);
             setShowAbout(false);
             setShowPrivacy(false);
@@ -1306,7 +1321,7 @@ export default function App() {
         } catch (err) {
           console.error("Failed to fetch specific article for deep link:", err);
         } finally {
-          setLoading(false); // Fix: ensure loading false after fetch attempt
+          setLoading(false);
         }
       }
     }
@@ -1389,13 +1404,13 @@ export default function App() {
       if (articleMatch) {
          const articleId = articleMatch[1];
          // Search local state first if available, else fetch
-         const existing = articles.find(a => a.id === articleId);
+         const existing = articles.find(a => a.id === articleId || a.slug === articleId);
          if (existing) {
            setSelectedArticle(existing);
          } else {
            setLoading(true);
            try {
-             const article = await fetchArticleById(articleId);
+             const article = await fetchArticleBySlug(articleId);
              if (article) setSelectedArticle(article);
            } catch (e) {
              console.error("Deep link navigation error:", e);
@@ -1420,7 +1435,7 @@ export default function App() {
   useEffect(() => {
     let targetPath = '/';
     if (selectedArticle) {
-      targetPath = `/article/${selectedArticle.id}`;
+      targetPath = `/article/${selectedArticle.slug || selectedArticle.id}`;
     } else if (showAbout) {
       targetPath = '/about';
     } else if (showArchive) {
@@ -1431,17 +1446,6 @@ export default function App() {
 
     if (window.location.pathname !== targetPath) {
       window.history.pushState(null, '', targetPath);
-    }
-
-    // Set page title for SEO
-    if (selectedArticle) {
-      document.title = `${selectedArticle.title} | SaaS Sentinel Intelligence`;
-    } else if (showAbout) {
-      document.title = "About | SaaS Sentinel Intelligence";
-    } else if (showArchive) {
-      document.title = "Archive | SaaS Sentinel Intelligence";
-    } else {
-      document.title = "SaaS Sentinel | Real-time SaaS Intelligence Monitoring";
     }
   }, [selectedArticle, showAbout, showArchive, showPrivacy]);
 
