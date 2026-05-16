@@ -11,7 +11,6 @@ import { generateArticle, fetchTopSaaSNews, parseNewsIntoStories } from './servi
 import { fetchNewsArticles, saveNewsArticle, fetchArticleById, fetchArticleBySlug } from './services/news_articles';
 import { addSubscriber } from './services/subscribers';
 import ReactMarkdown from 'react-markdown';
-import { Helmet } from 'react-helmet-async';
 import { 
   Newspaper, 
   TrendingUp, 
@@ -827,19 +826,17 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
       exit={{ opacity: 0, y: -20 }}
       className="max-w-[1240px] mx-auto pb-20 px-4 md:px-8"
     >
-      <Helmet>
-        <title>{article.title} | SaaS Sentinel</title>
-        <meta name="description" content={article.meta_description || article.summary} />
-        <meta property="og:title" content={`${article.title} | SaaS Sentinel`} />
-        <meta property="og:description" content={article.meta_description || article.summary} />
-        <meta property="og:image" content={article.image_url || article.image} />
-        <meta property="og:type" content="article" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <link rel="canonical" href={`${window.location.origin}/article/${article.slug || article.id}`} />
-        <script type="application/ld+json">
-          {JSON.stringify(structuredData)}
-        </script>
-      </Helmet>
+      <title>{article.title} | SaaS Sentinel</title>
+      <meta name="description" content={article.meta_description || article.summary} />
+      <meta property="og:title" content={`${article.title} | SaaS Sentinel`} />
+      <meta property="og:description" content={article.meta_description || article.summary} />
+      <meta property="og:image" content={article.image_url || article.image} />
+      <meta property="og:type" content="article" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <link rel="canonical" href={`${window.location.origin}/article/${article.slug || article.id}`} />
+      <script type="application/ld+json">
+        {JSON.stringify(structuredData)}
+      </script>
 
       {/* Navigation */}
       <button 
@@ -1527,18 +1524,16 @@ export default function App() {
 
   return (
     <>
-      <Helmet>
-        <title>
-          {showAbout ? "About SaaS Sentinel | Elite B2B Market Intelligence" :
-           showArchive ? "Intelligence Archive | SaaS Sentinel" :
-           showPrivacy ? "Privacy Policy | SaaS Sentinel" :
-           "SaaS Sentinel | Elite B2B Market Intelligence & SaaS Analysis"}
-        </title>
-        <meta name="description" content="SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts." />
-        <meta property="og:title" content="SaaS Sentinel | Elite B2B Market Intelligence" />
-        <meta property="og:description" content="SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts." />
-        <meta property="og:image" content="/og-image.png" />
-      </Helmet>
+      <title>
+        {showAbout ? "About SaaS Sentinel | Elite B2B Market Intelligence" :
+         showArchive ? "Intelligence Archive | SaaS Sentinel" :
+         showPrivacy ? "Privacy Policy | SaaS Sentinel" :
+         "SaaS Sentinel | Elite B2B Market Intelligence & SaaS Analysis"}
+      </title>
+      <meta name="description" content="SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts." />
+      <meta property="og:title" content="SaaS Sentinel | Elite B2B Market Intelligence" />
+      <meta property="og:description" content="SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts." />
+      <meta property="og:image" content="/og-image.png" />
       <div className="min-h-screen relative transition-colors duration-500">
         {/* Background Gradients */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
@@ -2124,10 +2119,16 @@ export class ErrorBoundary extends React.Component<{children: React.ReactNode}, 
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#d6d3cb] p-4 text-center">
           <div className="bg-white/40 backdrop-blur-xl p-8 rounded-3xl border border-white/20 max-w-md shadow-2xl">
-            <h2 className="text-xl font-bold mb-2">Platform Restart Required</h2>
-            <p className="opacity-70 mb-6">{this.state.error?.message || "Critical interface failure detected."}</p>
-            <button onClick={() => window.location.reload()} className="bg-[#f08924] text-white px-6 py-2 rounded-xl font-bold w-full">
-              Reinitialize Terminal
+            <h2 className="text-xl font-bold mb-2 uppercase tracking-tight">Intelligence Feed Interrupted</h2>
+            <p className="opacity-70 mb-6 text-sm leading-relaxed">
+              We encountered a technical anomaly while processing the elite intelligence stream. 
+              {this.state.error?.message && <code className="block mt-2 bg-black/5 p-2 rounded text-[10px] break-all">{this.state.error.message}</code>}
+            </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-accent text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest w-full hover:scale-105 transition-transform"
+            >
+              Re-establish Connection
             </button>
           </div>
         </div>
