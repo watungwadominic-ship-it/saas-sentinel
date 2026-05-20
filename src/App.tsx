@@ -719,7 +719,26 @@ const AnalysisImage = React.memo(({ src, alt, className = "", rounded = "rounded
   );
 });
 
-function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: () => void }) {
+function SentinelAnalysisView({ 
+  article, 
+  onBack,
+  articles,
+  onSelectArticle
+}: { 
+  article: Article, 
+  onBack: () => void,
+  articles?: Article[],
+  onSelectArticle?: (article: Article) => void
+}) {
+  // Get 3 related articles (excluding current) to slash bounce rate
+  const relatedArticles = React.useMemo(() => {
+    if (!articles || articles.length === 0) return [];
+    const list = articles.filter(a => a.id !== article.id && a.slug !== article.slug);
+    const sameCategory = list.filter(a => (a.category || '').toLowerCase() === (article.category || '').toLowerCase());
+    const rest = list.filter(a => (a.category || '').toLowerCase() !== (article.category || '').toLowerCase());
+    return [...sameCategory, ...rest].slice(0, 3);
+  }, [articles, article]);
+
   // JSON-LD Structured Data for NewsArticle
   const structuredData = {
     "@context": "https://schema.org",
@@ -1029,8 +1048,86 @@ function SentinelAnalysisView({ article, onBack }: { article: Article, onBack: (
               </div>
             </div>
           </div>
+
+          {/* Trending Briefs Sidebar Widget (Slash Bounce Rate) */}
+          {relatedArticles.length > 0 && (
+            <div className="glass-panel rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 border-text/10 shadow-2xl">
+              <h3 className="text-[8px] md:text-[9px] font-black text-text uppercase tracking-[0.3em] md:tracking-[0.4em] mb-6 flex items-center justify-between">
+                Trending Briefs
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
+              </h3>
+              <div className="space-y-4">
+                {relatedArticles.slice(0, 2).map((relArt) => (
+                  <div 
+                    key={relArt.id || relArt.slug}
+                    onClick={() => onSelectArticle && onSelectArticle(relArt)}
+                    className="group border-b border-white/5 pb-4 last:border-0 last:pb-0 cursor-pointer"
+                  >
+                    <h4 className="text-xs font-black text-text/80 group-hover:text-accent transition-colors line-clamp-2 leading-snug mb-1">
+                      {relArt.title}
+                    </h4>
+                    <span className="text-[8px] font-black text-[#F27D26]/60 uppercase tracking-widest">
+                      {relArt.category || 'Briefing'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
       </div>
+
+      {/* Recommended Intelligence Briefings (Designed to slash the 93% bounce rate) */}
+      {relatedArticles.length > 0 && (
+        <section className="mt-16 pt-16 border-t border-white/10 space-y-8">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-accent uppercase tracking-[0.4em] block">Continuum Intelligence</span>
+              <h3 className="text-2xl font-black text-text tracking-tight uppercase">Recommended Industry Deepdives</h3>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {relatedArticles.map((relArt) => (
+              <div 
+                key={relArt.id || relArt.slug}
+                onClick={() => onSelectArticle && onSelectArticle(relArt)}
+                className="group glass-panel rounded-2xl p-6 border-white/5 hover:border-accent/20 cursor-pointer flex flex-col justify-between transition-all duration-300"
+              >
+                <div className="space-y-4">
+                  {relArt.image_url || relArt.image ? (
+                    <div className="aspect-[16/9] rounded-xl overflow-hidden mb-4">
+                      <img 
+                        src={relArt.image_url || relArt.image} 
+                        alt={relArt.title} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[8px] font-black text-[#F27D26] bg-[#F27D26]/10 px-2 py-0.5 rounded uppercase tracking-wider">
+                      {relArt.category || 'Briefing'}
+                    </span>
+                    <span className="text-[8px] font-bold text-text/30">
+                      {formatDate(relArt.date)}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-black text-text group-hover:text-accent transition-colors line-clamp-2 leading-snug">
+                    {relArt.title}
+                  </h4>
+                  <p className="text-xs text-text/50 line-clamp-2 leading-relaxed">
+                    {relArt.summary}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 mt-6 pt-4 border-t border-white/5 text-[9px] font-black uppercase text-text/30 group-hover:text-accent tracking-widest transition-colors">
+                  Analyze dispatched intelligence <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </motion.div>
   );
 };
@@ -1726,6 +1823,11 @@ export default function App() {
               <SentinelAnalysisView 
                 article={selectedArticle} 
                 onBack={() => setSelectedArticle(null)} 
+                articles={articles}
+                onSelectArticle={(art) => {
+                  setSelectedArticle(art);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               />
             ) : (
               <div className="space-y-16">
