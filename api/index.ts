@@ -174,9 +174,23 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const { data: articles } = await getSupabase().from('news_articles').select('title, summary').gt('created_at', sevenDaysAgo.toISOString()).limit(5);
+    let { data: articles } = await getSupabase()
+      .from('news_articles')
+      .select('title, summary')
+      .gt('created_at', sevenDaysAgo.toISOString())
+      .limit(5);
     
-    if (!articles?.length) return res.json({ success: true, message: "No fresh content" });
+    if (!articles || articles.length === 0) {
+      console.log("[Sentinel Weekly Newsletter] No articles found in last 7 days. Falling back to the 5 most recent articles in the system.");
+      const { data: recentArticles } = await getSupabase()
+        .from('news_articles')
+        .select('title, summary')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      articles = recentArticles;
+    }
+    
+    if (!articles?.length) return res.json({ success: true, message: "No fresh content available to build newsletter" });
 
     const prompt = `Create a high-end HTML newsletter for 'SaaS Sentinel'. Summarize these:\n${articles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}`;
     const htmlRaw = await callGemini(prompt);
