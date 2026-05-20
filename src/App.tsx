@@ -580,68 +580,68 @@ function Sidebar({
 }: any) {
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-72 bg-bg-nav dark:bg-black/50 backdrop-blur-2xl border-r border-text/5 z-[120] hidden lg:flex flex-col p-8 shadow-2xl">
-      <div className="flex flex-col gap-4 mb-12">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-          <div className="bg-accent p-2.5 rounded-xl shadow-lg shadow-accent/20">
-            <Newspaper className="w-6 h-6 text-white" />
+    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-bg-nav dark:bg-black/50 backdrop-blur-2xl border-r border-text/5 z-[120] hidden lg:flex flex-col p-6 shadow-2xl">
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+          <div className="bg-accent p-2 rounded-xl shadow-lg shadow-accent/20">
+            <Newspaper className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-xl font-black tracking-tight text-[var(--color-sidebar-text)] uppercase">SaaS Sentinel</h1>
+          <h1 className="text-lg font-black tracking-tight text-[var(--color-sidebar-text)] uppercase">SaaS Sentinel</h1>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-2">
+      <nav className="flex-1 space-y-1.5">
         <button 
           onClick={() => { setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); setShowArchive(false); }}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${!selectedArticle && !showAbout && !showPrivacy && !showArchive ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
+          className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all font-bold text-xs ${!selectedArticle && !showAbout && !showPrivacy && !showArchive ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
         >
-          <Activity className="w-5 h-5" />
+          <Activity className="w-4 h-4" />
           Feed
         </button>
         <button 
           onClick={() => { setShowArchive(true); setSelectedArticle(null); setShowPrivacy(false); setShowAbout(false); }}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${showArchive ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
+          className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all font-bold text-xs ${showArchive ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
         >
-          <Archive className="w-5 h-5" />
+          <Archive className="w-4 h-4" />
           Archive
         </button>
         
         <button 
           onClick={() => { setShowAbout(true); setSelectedArticle(null); setShowPrivacy(false); setShowArchive(false); }}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${showAbout ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
+          className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all font-bold text-xs ${showAbout ? 'text-accent bg-accent/5' : 'text-[var(--color-sidebar-text)]/60 hover:bg-white/5 hover:text-[var(--color-sidebar-text)]'}`}
         >
-          <Brain className="w-5 h-5" />
+          <Brain className="w-4 h-4" />
           About
         </button>
       </nav>
 
-      <div className="pt-6 border-t border-white/5 space-y-4">
+      <div className="pt-5 border-t border-white/5 space-y-3">
         <button 
           onClick={() => setIsDarkMode(!isDarkMode)}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl glass-button !justify-start font-bold text-sm"
+          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl glass-button !justify-start font-bold text-xs"
         >
-          {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           {isDarkMode ? 'Light Mode' : 'Dark Mode'}
         </button>
 
         {user ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-4 py-3 glass-panel !rounded-2xl">
-              <div className="flex items-center gap-3">
-                <img src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture || ''} alt="" className="w-8 h-8 rounded-full border border-white/20" />
-                <span className="text-xs font-bold truncate max-w-[100px]">{user?.user_metadata?.full_name || 'User'}</span>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between px-3.5 py-2.5 glass-panel !rounded-xl">
+              <div className="flex items-center gap-2.5">
+                <img src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture || ''} alt="" className="w-7 h-7 rounded-full border border-white/20" />
+                <span className="text-[11px] font-bold truncate max-w-[90px]">{user?.user_metadata?.full_name || 'User'}</span>
               </div>
               <button onClick={handleLogout} className="text-text/40 hover:text-text transition-colors">
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         ) : (
           <button 
             onClick={() => document.getElementById('newsletter-card')?.scrollIntoView({ behavior: 'smooth' })}
-            className="w-full btn-accent flex items-center gap-3 px-4 py-3 !rounded-2xl font-bold text-sm"
+            className="w-full btn-accent flex items-center gap-2.5 px-3.5 py-2.5 !rounded-xl font-bold text-xs"
           >
-            <Mail className="w-5 h-5" />
+            <Mail className="w-4 h-4" />
             Subscribe
           </button>
         )}
@@ -1137,10 +1137,10 @@ function FeaturedInsightCard({ article, onClick }: { article: Article, onClick: 
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mb-12 glass-panel !rounded-[3rem] overflow-hidden border-text/5 shadow-2xl group cursor-pointer group hover:border-accent/20 transition-all duration-700"
+      className="mb-10 glass-panel !rounded-[2.5rem] overflow-hidden border-text/5 shadow-2xl group cursor-pointer hover:border-accent/20 transition-all duration-700"
       onClick={onClick}
     >
-      <div className="flex flex-col xl:flex-row min-h-[450px] xl:max-h-[600px]">
+      <div className="flex flex-col xl:flex-row min-h-[360px] xl:max-h-[460px]">
         {/* Image Section */}
         <div className="w-full xl:w-[40%] relative overflow-hidden">
           <AnalysisImage 
@@ -1150,9 +1150,9 @@ function FeaturedInsightCard({ article, onClick }: { article: Article, onClick: 
             className="!border-none !shadow-none group-hover:scale-110 transition-transform duration-1000 h-full w-full object-cover"
           />
           {/* Tag Overlay */}
-          <div className="absolute top-8 left-8 z-20">
-            <div className="flex items-center gap-2 bg-[#F27D26] text-white text-[10px] font-black px-5 py-2.5 rounded-xl uppercase tracking-[0.2em] shadow-2xl shadow-[#F27D26]/40">
-              <Zap className="w-4 h-4" />
+          <div className="absolute top-6 left-6 z-20">
+            <div className="flex items-center gap-1.5 bg-[#F27D26] text-white text-[9px] font-black px-4 py-2 rounded-lg uppercase tracking-[0.2em] shadow-2xl shadow-[#F27D26]/40">
+              <Zap className="w-3.5 h-3.5" />
               Intelligence Briefing
             </div>
           </div>
@@ -1160,52 +1160,52 @@ function FeaturedInsightCard({ article, onClick }: { article: Article, onClick: 
         </div>
         
         {/* Content Section */}
-        <div className="w-full xl:w-[60%] p-8 md:p-14 lg:p-16 flex flex-col justify-center relative">
+        <div className="w-full xl:w-[60%] p-6 md:p-10 lg:p-12 flex flex-col justify-center relative">
           {/* Abstract background element */}
           <div className="absolute -right-20 -bottom-20 opacity-[0.02] pointer-events-none">
             <Brain className="w-80 h-80 text-white" />
           </div>
 
-          <div className="relative z-10 space-y-8">
-            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.3em] text-text/30">
+          <div className="relative z-10 space-y-5">
+            <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.3em] text-text/30">
               <span>{article.source}</span>
               <div className="w-1 h-1 rounded-full bg-white/10" />
               <span>{formatDate(article.date)}</span>
               <div className="w-1 h-1 rounded-full bg-white/10" />
-              <div className="flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3 h-3" />
                 {article.readTime || '8 MIN READ'}
               </div>
             </div>
             
-            <h2 className="text-3xl md:text-5xl font-black text-text leading-[1.05] tracking-tighter group-hover:text-[#F27D26] transition-colors">
+            <h2 className="text-xl md:text-3xl lg:text-4xl font-black text-text leading-[1.1] tracking-tight group-hover:text-[#F27D26] transition-colors">
               {article.title}
             </h2>
             
-                                <p className="text-sm text-text/60 italic leading-relaxed line-clamp-4 font-medium mb-8">
-                                  "{article.summary}"
-                                </p>
+            <p className="text-xs md:text-[13px] text-text/60 italic leading-relaxed line-clamp-3 font-medium mb-4">
+              "{article.summary}"
+            </p>
 
-                                <div className="flex items-center gap-4 pt-4 border-t border-white/5">
-                                  <button
-                                    onClick={onClick}
-                                    className="px-6 py-3 bg-accent text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-accent/20 hover:scale-105 transition-all flex items-center gap-2"
-                                  >
-                                    Read Full Analysis <ChevronRight className="w-4 h-4" />
-                                  </button>
-                                  <div className="flex -space-x-2">
-                                    {[1, 2, 3].map(i => (
-                                      <div key={i} className="w-8 h-8 rounded-full border-2 border-bg-nav bg-white/5 flex items-center justify-center">
-                                        <UserIcon className="w-3.5 h-3.5 text-white/20" />
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
+            <div className="flex items-center gap-4 pt-4 border-t border-white/5">
+              <button
+                onClick={onClick}
+                className="px-5 py-2.5 bg-accent text-white rounded-lg font-black text-[11px] uppercase tracking-widest shadow-xl shadow-accent/20 hover:scale-105 transition-all flex items-center gap-1.5"
+              >
+                Read Full Analysis <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex -space-x-1.5">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="w-7 h-7 rounded-full border-2 border-bg-nav bg-white/5 flex items-center justify-center">
+                    <UserIcon className="w-3 text-white/20" />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </motion.div>
-    );
+      </div>
+    </motion.div>
+  );
 }
 
 export default function App() {
@@ -1654,7 +1654,7 @@ export default function App() {
             handleLogout={handleLogout}
           />
 
-          <div className="flex-1 flex flex-col min-w-0 lg:ml-72">
+          <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
             {/* Smart Header Container (Mobile/Tablet) */}
             <motion.div 
               initial={{ y: 0 }}
@@ -1810,8 +1810,8 @@ export default function App() {
           </AnimatePresence>
 
         {/* Main Content */}
-        <main className="flex-1 pt-40 lg:pt-8 pb-12 transition-all duration-500 relative z-10">
-          <div className="max-w-[1800px] mx-auto px-4 md:px-12">
+        <main className="flex-1 pt-32 lg:pt-6 pb-10 transition-all duration-500 relative z-10">
+          <div className="max-w-[1550px] mx-auto px-4 md:px-8">
             <AnimatePresence mode="wait">
             {showArchive ? (
               <ArchivePage key="archive-page" onSelect={(article) => { setSelectedArticle(article); setShowArchive(false); }} />
@@ -1834,21 +1834,21 @@ export default function App() {
                 {/* News Feed */}
                 <section className="min-w-0">
                   {/* Liquid Glass Search Bar */}
-                  <div className="mb-16 relative group max-w-5xl mx-auto">
-                    <div className="absolute inset-0 bg-accent/5 blur-2xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
-                    <div className="relative glass-panel !rounded-3xl flex items-center px-6 py-2 border-white/20 shadow-xl focus-within:border-accent/30 transition-all">
-                      <Search className="w-5 h-5 text-text/30 mr-4" />
+                  <div className="mb-10 relative group max-w-5xl mx-auto">
+                    <div className="absolute inset-0 bg-accent/5 blur-2xl rounded-2xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
+                    <div className="relative glass-panel !rounded-2xl flex items-center px-4.5 py-1.5 border-white/20 shadow-xl focus-within:border-accent/30 transition-all">
+                      <Search className="w-4 h-4 text-text/30 mr-3" />
                       <input 
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search Intelligence (e.g. AI, Microsoft, Funding)..."
-                        className="w-full bg-transparent border-none outline-none text-text placeholder:text-text/20 py-3 font-medium"
+                        className="w-full bg-transparent border-none outline-none text-text placeholder:text-text/20 py-2.5 text-xs md:text-sm font-medium"
                       />
                       {searchQuery && (
                         <button 
                           onClick={() => setSearchQuery('')}
-                          className="text-[10px] font-black uppercase tracking-widest text-text/40 hover:text-accent transition-colors"
+                          className="text-[9px] font-black uppercase tracking-widest text-text/40 hover:text-accent transition-colors"
                         >
                           Clear
                         </button>
@@ -1866,21 +1866,21 @@ export default function App() {
                         onClick={() => setSelectedArticle(filteredArticles[0])} 
                       />
 
-                      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_340px] gap-8 md:gap-10 items-start px-0">
+                      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-6 md:gap-8 items-start px-0">
                         {/* Remaining Articles Grid */}
-                        <div className="space-y-12">
-                          <div className="flex items-center justify-between border-b border-text/5 pb-4">
-                            <h2 className="text-xl font-bold flex items-center gap-2 text-text">
-                              <Activity className="w-5 h-5 text-accent" />
+                        <div className="space-y-8">
+                          <div className="flex items-center justify-between border-b border-text/5 pb-3">
+                            <h2 className="text-lg font-bold flex items-center gap-2 text-text">
+                              <Activity className="w-4.5 h-4.5 text-accent" />
                               Intelligence Feed
                             </h2>
-                            <div className="flex gap-2">
-                              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                              <span className="text-[10px] font-bold text-text/40 uppercase tracking-widest">Live Updates</span>
+                            <div className="flex gap-2 border border-accent/20 bg-accent/5 px-2.5 py-1 rounded-full items-center">
+                              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                              <span className="text-[8px] font-bold text-accent uppercase tracking-widest">Live Updates</span>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6 md:gap-8">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-5 md:gap-6">
                             {displayedArticles.slice(1).map((article) => (
                               <motion.article 
                                 key={article.id}
@@ -1888,7 +1888,7 @@ export default function App() {
                                 initial={{ opacity: 0, y: 30 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true, margin: "-50px" }}
-                                className="group glass-panel !bg-bg hover:!bg-card-hover !rounded-[2.5rem] cursor-pointer flex flex-col h-full transition-all duration-500 border-text/5 hover:border-accent/20 shadow-xl overflow-hidden"
+                                className="group glass-panel !bg-bg hover:!bg-card-hover !rounded-2xl cursor-pointer flex flex-col h-full transition-all duration-500 border-text/5 hover:border-accent/20 shadow-xl overflow-hidden"
                                 onClick={() => setSelectedArticle(article)}
                               >
                                 <div className="relative aspect-[16/10] overflow-hidden shrink-0">
@@ -1898,8 +1898,8 @@ export default function App() {
                                     rounded="rounded-none"
                                     className="!border-none !shadow-none group-hover:scale-105 transition-transform duration-700"
                                   />
-                                  <div className="absolute top-4 left-4 z-20">
-                                    <span className={`text-[9px] font-black px-4 py-1.5 rounded-lg uppercase tracking-widest border backdrop-blur-xl shadow-lg ${
+                                  <div className="absolute top-3.5 left-3.5 z-20">
+                                    <span className={`text-[8px] font-black px-3 py-1 rounded-md uppercase tracking-wider border backdrop-blur-xl shadow-lg ${
                                       (article.category || '').toUpperCase().includes('BULLISH') ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' :
                                       (article.category || '').toUpperCase().includes('BEARISH') ? 'bg-rose-500/20 text-rose-500 border-rose-500/30' :
                                       'bg-accent/20 text-accent border-accent/30'
@@ -1909,28 +1909,28 @@ export default function App() {
                                   </div>
                                 </div>
                                 
-                                <div className="p-6 flex-1 flex flex-col">
-                                <div className="flex justify-between items-center mb-3">
-                                  <span className="text-[9px] font-black text-text/30 uppercase tracking-[0.2em]">{article.source}</span>
-                                  <span className="text-[9px] font-bold text-text/20">{article.readTime}</span>
+                                <div className="p-5 flex-1 flex flex-col">
+                                <div className="flex justify-between items-center mb-2.5">
+                                  <span className="text-[8px] font-black text-text/30 uppercase tracking-[0.2em]">{article.source}</span>
+                                  <span className="text-[8px] font-bold text-text/20">{article.readTime}</span>
                                 </div>
 
-                                <h3 className="text-lg font-black group-hover:text-accent transition-colors leading-[1.25] mb-3 line-clamp-2">
+                                <h3 className="text-[14px] md:text-[15px] font-black group-hover:text-accent transition-colors leading-[1.3] mb-2 line-clamp-2">
                                   {article.title}
                                 </h3>
                                 
-                                <p className="text-xs text-text/50 leading-relaxed line-clamp-3 italic mb-4">
+                                <p className="text-[11px] text-text/50 leading-relaxed line-clamp-3 italic mb-3">
                                   "{article.summary}"
                                 </p>
 
-                                <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between">
+                                <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
                                   <button
                                     onClick={() => setSelectedArticle(article)}
-                                    className="text-accent font-black text-[10px] uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all"
+                                    className="text-accent font-black text-[9px] uppercase tracking-widest flex items-center gap-1 group-hover:gap-1.5 transition-all"
                                   >
                                     Read Analysis <ChevronRight className="w-3 h-3" />
                                   </button>
-                                  <span className="text-[9px] text-text/20 font-black uppercase tracking-widest">{formatDate(article.date)}</span>
+                                  <span className="text-[8px] text-text/20 font-black uppercase tracking-widest">{formatDate(article.date)}</span>
                                 </div>
                                 </div>
                               </motion.article>
