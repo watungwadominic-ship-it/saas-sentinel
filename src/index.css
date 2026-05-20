@@ -12,20 +12,20 @@
   --animate-spin-slow: spin 3s linear infinite;
   --animate-shimmer: shimmer 1.5s infinite linear;
 
-  /* Light Theme (Default) */
-  --color-bg: #f8f9fa;
-  --color-text: #1a1a1a;
+  /* Light Theme (Default) - Warm Editorial Neutral */
+  --color-bg: #dfddd6;
+  --color-text: #1b1c1e;
   --color-accent: #f08924;
-  --color-ticker-bg: #ffffff;
-  --color-nav-bg: #ffffff;
-  --color-sidebar-bg: #f1f3f5;
-  --color-nav-text: #495057;
-  --color-sidebar-text: #212529;
-  --color-glass: rgba(255, 255, 255, 0.8);
-  --color-glass-border: rgba(0, 0, 0, 0.08);
-  --color-glass-pill: rgba(255, 255, 255, 0.6);
-  --color-sunlight: rgba(240, 137, 36, 0.05);
-  --color-card-hover: rgba(255, 255, 255, 0.95);
+  --color-ticker-bg: rgba(255, 255, 255, 0.45);
+  --color-nav-bg: #d4d2cb;
+  --color-sidebar-bg: #cac8c1;
+  --color-nav-text: #3c3e42;
+  --color-sidebar-text: #1b1c1e;
+  --color-glass: rgba(255, 255, 255, 0.55);
+  --color-glass-border: rgba(0, 0, 0, 0.06);
+  --color-glass-pill: rgba(255, 255, 255, 0.4);
+  --color-sunlight: rgba(240, 137, 36, 0.03);
+  --color-card-hover: rgba(255, 255, 255, 0.85);
 
   --animate-spin-slow: spin 3s linear infinite;
 }
