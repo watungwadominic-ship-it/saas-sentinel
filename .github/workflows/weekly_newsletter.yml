@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Trigger Newsletter API
         run: |
-          URL="${{ secrets.SHARED_APP_URL || 'https://saas-sentinel-cyan.vercel.app' }}"
+          URL="${{ secrets.PRODUCTION_APP_URL || 'https://saas-sentinel-cyan.vercel.app' }}"
           echo "Triggering newsletter at $URL/api/cron/weekly-newsletter"
           curl -X POST "$URL/api/cron/weekly-newsletter" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
