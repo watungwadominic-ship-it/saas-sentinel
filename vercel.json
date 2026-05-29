@@ -10,7 +10,6 @@
     { "source": "/proxy-image", "destination": "/api/index.ts" },
     { "source": "/robots.txt", "destination": "/api/index.ts" },
     { "source": "/sitemap.xml", "destination": "/api/index.ts" },
-    { "source": "/google0b246266b793db91.html", "destination": "/api/index.ts" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
