@@ -264,6 +264,11 @@ app.get(['/robots.txt', '/api/robots.txt'], (req, res) => {
   res.send(`User-agent: *\nAllow: /\nSitemap: https://${host}/sitemap.xml\n`);
 });
 
+app.get(['/google0b246266b793db91.html', '/api/google0b246266b793db91.html'], (req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`google-site-verification: google0b246266b793db91.html`);
+});
+
 // Catch-all for API to debug routing
 app.use('/api', (req, res) => {
   res.status(404).json({
