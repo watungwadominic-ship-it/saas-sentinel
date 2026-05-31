@@ -206,7 +206,7 @@
 }
 
 .out-of-generations-overlay {
-  display: none !important;
+  display: none !important; 
 }
 
 @keyframes shimmer {
