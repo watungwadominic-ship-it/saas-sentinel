@@ -2225,7 +2225,7 @@ export class ErrorBoundary extends React.Component<{children: React.ReactNode}, 
             <p className="opacity-70 mb-6 text-sm leading-relaxed">
               We encountered a technical anomaly while processing the elite intelligence stream. 
               {this.state.error?.message && <code className="block mt-2 bg-black/5 p-2 rounded text-[10px] break-all">{this.state.error.message}</code>}
-            </p>
+            </p> 
             <button 
               onClick={() => window.location.reload()} 
               className="bg-accent text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest w-full hover:scale-105 transition-transform"
