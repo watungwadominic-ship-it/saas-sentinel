@@ -265,7 +265,7 @@ app.get(['/robots.txt', '/api/robots.txt'], (req, res) => {
 });
 
 // Catch-all for API to debug routing
-app.use('/api', (req, res) => { 
+app.use('/api', (req, res) => {
   res.status(404).json({
     error: "Sentinel Route Not Found",
     method: req.method,
