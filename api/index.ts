@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
+import { getSocialBoost } from '../src/services/social_booster';
 
 // --- CONFIG & INITS ---
 
@@ -148,13 +149,97 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], a
         throw saveError;
       }
 
+      // Optimize and enrich the post text for engagement and views
+      const boostResult = saved?.[0] ? getSocialBoost(saved[0].title, saved[0].summary, saved[0].category) : null;
+
       // Optional: Post to Threads
-      if (process.env.THREADS_USER_ID && process.env.THREADS_ACCESS_TOKEN && saved?.[0]) {
+      if (process.env.THREADS_USER_ID && process.env.THREADS_ACCESS_TOKEN && saved?.[0] && boostResult) {
         try {
-          const postText = `📢 SaaS INTELLIGENCE: ${saved[0].title}\n\n${saved[0].summary}\n\nRead more: https://saas-sentinel-cyan.vercel.app/article/${saved[0].id}`;
+          const article = saved[0];
+          let postText = `📢 SaaS INTELLIGENCE: ${article.title}\n\n${article.summary}\n\n💡 ${boostResult.cta}\n\nRead more: https://saas-sentinel-cyan.vercel.app/article/${article.id}`;
+          
+          if (boostResult.mentions.length > 0) {
+            postText += `\n\nCc: ${boostResult.mentions.join(' ')}`;
+          }
+          if (boostResult.tags.length > 0) {
+            postText += `\n\n${boostResult.tags.join(' ')}`;
+          }
+
           await fetch(`https://graph.threads.net/v1.0/${process.env.THREADS_USER_ID}/threads?media_type=TEXT&text=${encodeURIComponent(postText)}&access_token=${process.env.THREADS_ACCESS_TOKEN}`, { method: 'POST' });
         } catch (postErr) {
           console.error("Threads post error:", postErr);
+        }
+      }
+
+      // Optional: Post to LinkedIn
+      if (saved?.[0] && boostResult) {
+        const liToken = process.env.LINKEDIN_ACCESS_TOKEN;
+        const liUrn = process.env.LINKEDIN_PERSON_URN;
+        
+        if (liToken && liUrn) {
+          try {
+            const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
+            const protocol = req.headers['x-forwarded-proto'] || 'https';
+            const base = `${protocol}://${host}`;
+            const article = saved[0];
+            const sharingUrl = article.slug ? `${base}/article/${article.slug}` : `${base}/article/${article.id}`;
+            
+            let commentary = `📡 SaaS Sentiment Intelligence: ${article.title}\n\n${article.summary}\n\n💡 ${boostResult.cta}\n\nRead the full strategic analysis: ${sharingUrl}`;
+            
+            if (boostResult.mentions.length > 0) {
+              commentary += `\n\nCc: ${boostResult.mentions.join(' ')}`;
+            }
+            if (boostResult.tags.length > 0) {
+              commentary += `\n\n${boostResult.tags.join(' ')}`;
+            }
+            
+            // Clean author URN
+            let authorUrn = liUrn.trim();
+            if (!authorUrn.startsWith("urn:li:")) {
+              authorUrn = `urn:li:person:${authorUrn}`;
+            }
+
+            const requestBody = {
+              author: authorUrn,
+              lifecycleState: "PUBLISHED",
+              specificContent: {
+                "com.linkedin.ugc.ShareContent": {
+                  shareCommentary: { text: commentary },
+                  shareMediaCategory: "ARTICLE",
+                  media: [{
+                    status: "READY",
+                    originalUrl: sharingUrl,
+                    title: { text: article.title },
+                    description: { text: (article.summary || "").substring(0, 200) }
+                  }]
+                }
+              },
+              visibility: {
+                "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+              }
+            };
+
+            const liRes = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${liToken}`,
+                "Content-Type": "application/json",
+                "X-Restli-Protocol-Version": "2.0.0"
+              },
+              body: JSON.stringify(requestBody)
+            });
+
+            if (liRes.ok) {
+              console.log("💼 LinkedIn Post Successful");
+            } else {
+              const resText = await liRes.text();
+              console.error("❌ LinkedIn error response:", resText);
+            }
+          } catch (liErr) {
+            console.error("❌ LinkedIn posting exception:", liErr);
+          }
+        } else {
+          console.log("ℹ️ LinkedIn config missing (LINKEDIN_ACCESS_TOKEN or LINKEDIN_PERSON_URN not set in environment). Skipping LinkedIn dispatch.");
         }
       }
 
