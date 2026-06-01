@@ -1,5 +1,6 @@
 
 import { Article } from '../types';
+import { getSocialBoost } from './social_booster';
 
 export async function postToThreads(article: Article) {
   const userId = process.env.THREADS_USER_ID;
@@ -10,7 +11,18 @@ export async function postToThreads(article: Article) {
     return { success: false, error: 'Credentials missing' };
   }
 
-  const text = `📢 INTELLIGENCE BRIEF: ${article.title}\n\n${article.summary}\n\nRead more: https://saas-sentinel.com/article/${article.id}\n\n#SaaS #AI #Intelligence`;
+  // Optimize and enrich the post text for engagement and views
+  const { mentions, tags, cta } = getSocialBoost(article.title, article.summary, article.category);
+  
+  let text = `📢 INTELLIGENCE BRIEF: ${article.title}\n\n${article.summary}\n\n💡 ${cta}\n\n🔗 Read more: https://saas-sentinel.com/article/${article.id}`;
+  
+  if (mentions.length > 0) {
+    text += `\n\nCc: ${mentions.join(' ')}`;
+  }
+  
+  if (tags.length > 0) {
+    text += `\n\n${tags.join(' ')}`;
+  }
 
   try {
     // 1. Create a container
