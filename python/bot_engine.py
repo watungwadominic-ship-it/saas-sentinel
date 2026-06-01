@@ -274,6 +274,10 @@ def get_better_fallback_image(title):
 
 def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     if not LINKEDIN_ACCESS_TOKEN or not LINKEDIN_PERSON_URN:
+        missing = []
+        if not LINKEDIN_ACCESS_TOKEN: missing.append("LINKEDIN_ACCESS_TOKEN")
+        if not LINKEDIN_PERSON_URN: missing.append("LINKEDIN_PERSON_URN")
+        print(f"ℹ️ LinkedIn post skipped. Missing environment variables: {', '.join(missing)}")
         return
     
     # Attempt to upload image for "Large Image" post
@@ -557,13 +561,45 @@ def main():
                 if existing_title.data:
                     continue
                     
-                res = supabase.table("news_articles").insert(article_data).execute()
-                if res.data:
+                # Try inserting. If PGRST204 occurs or columns are missing, fallback gracefully.
+                res = None
+                try:
+                    res = supabase.table("news_articles").insert(article_data).execute()
+                except Exception as db_err:
+                    err_str = str(db_err).lower()
+                    if "meta_description" in err_str or "pgrst204" in err_str:
+                        print("⚠️ 'meta_description' column missing or schema cache is stale. Retrying without 'meta_description'...")
+                        if "meta_description" in article_data:
+                            del article_data["meta_description"]
+                        try:
+                            res = supabase.table("news_articles").insert(article_data).execute()
+                        except Exception as db_err2:
+                            err_str2 = str(db_err2).lower()
+                            if "slug" in err_str2 or "pgrst204" in err_str2:
+                                print("⚠️ 'slug' column missing or schema cache is stale. Retrying without 'slug' or 'meta_description'...")
+                                if "slug" in article_data:
+                                    del article_data["slug"]
+                                res = supabase.table("news_articles").insert(article_data).execute()
+                            else:
+                                raise db_err2
+                    elif "slug" in err_str:
+                        print("⚠️ 'slug' column missing or schema cache is stale. Retrying without 'slug'...")
+                        if "slug" in article_data:
+                            del article_data["slug"]
+                        res = supabase.table("news_articles").insert(article_data).execute()
+                    else:
+                        raise db_err
+
+                if res and res.data:
                     article_id = res.data[0]['id']
                     print(f"✅ Intelligence Logged: {analysis.get('title')[:50]}...")
                     print(f"🆔 Article ID: {article_id}")
                     
-                    sharing_url = f"{APP_URL}/article/{article_data['slug']}" if APP_URL else article_data["source_url"]
+                    # Sharing URL: Use slug if still present in article_data, otherwise ID fallback
+                    if article_data.get('slug'):
+                        sharing_url = f"{APP_URL}/article/{article_data['slug']}" if APP_URL else article_data["source_url"]
+                    else:
+                        sharing_url = f"{APP_URL}/article/{article_id}" if APP_URL else article_data["source_url"]
                     
                     print("⏳ Syncing with Social Networks...")
                     
