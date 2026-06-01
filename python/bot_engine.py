@@ -272,7 +272,79 @@ def get_better_fallback_image(title):
     # Use Unsplash source with the tag
     return f"https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=800&keyword={selected_tag}"
 
-def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
+def get_social_boost(title, summary, category=None):
+    text_to_search = f"{title} {summary}".lower()
+    
+    # Predefined known verified handles on Threads / Social platforms
+    handles_mapping = {
+        "microsoft": "@microsoft",
+        "salesforce": "@salesforce",
+        "openai": "@openai",
+        "stripe": "@stripe",
+        "google": "@google",
+        "meta": "@meta",
+        "apple": "@apple",
+        "nvidia": "@nvidia",
+        "figma": "@figma",
+        "adobe": "@adobe",
+        "hubspot": "@hubspot",
+        "shopify": "@shopify",
+        "slack": "@slack",
+        "databricks": "@databricks",
+        "snowflake": "@snowflake",
+        "zoom": "@zoom",
+        "canva": "@canva",
+        "atlassian": "@atlassian",
+        "gitlab": "@gitlab",
+        "github": "@github",
+        "notion": "@notion",
+        "y combinator": "@ycombinator",
+        "yc": "@ycombinator",
+        "sam altman": "@sama",
+        "elon musk": "@elonmusk",
+        "mark zuckerberg": "@zuck",
+        "anthropic": "@anthropic_co",
+        "klarna": "@klarna",
+        "vanta": "@vanta",
+        "rippling": "@rippling",
+        "clickup": "@clickup",
+        "deel": "@deel",
+        "gusto": "@gusto"
+    }
+
+    found_mentions = []
+    for key, handle in handles_mapping.items():
+        if key in text_to_search:
+            found_mentions.append(handle)
+            
+    found_mentions = list(dict.fromkeys(found_mentions))
+    
+    tags = ["#SaaS", "#B2B", "#Startups", "#SaaSSentinel"]
+    if category:
+        cat = category.strip().lower()
+        if "ai" in cat or "artificial" in cat or "bullish" in cat:
+            tags.extend(["#AI", "#GenerativeAI", "#Tech", "#LLM"])
+        elif "fund" in cat or "venture" in cat or "m&a" in cat:
+            tags.extend(["#Funding", "#VentureCapital", "#VC", "#Investing", "#MAndA"])
+        elif "growth" in cat or "market" in cat or "plg" in cat:
+            tags.extend(["#PLG", "#GrowthHacking", "#Marketing", "#Sales"])
+        elif "strategy" in cat or "product" in cat:
+            tags.extend(["#BusinessStrategy", "#ProductLed", "#Leadership"])
+            
+    tags = list(dict.fromkeys(tags))
+    
+    ctas = [
+        "How will this impact your SaaS strategy this quarter?",
+        "What is your take on this development?",
+        "A game-changer for B2B founders and tech leaders alike.",
+        "Crucial shift in the competitive landscape. How are you adapting?",
+        "Our strategic briefing has the breakdown."
+    ]
+    
+    cta = ctas[len(title) % len(ctas)]
+    return found_mentions, tags, cta
+
+def post_to_linkedin(article_title, article_summary, sharing_url, image_url, category=None):
     if not LINKEDIN_ACCESS_TOKEN or not LINKEDIN_PERSON_URN:
         missing = []
         if not LINKEDIN_ACCESS_TOKEN: missing.append("LINKEDIN_ACCESS_TOKEN")
@@ -287,7 +359,13 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     
     # Make headline bold for maximum visual impact
     bold_headline = to_unicode_bold(article_title)
-    commentary = f"📡 {bold_headline}\n\n{article_summary}\n\nRead more on SaaS Sentinel: {sharing_url}\n\n#SaaS #AI #MarketIntel"
+    mentions, tags, cta = get_social_boost(article_title, article_summary, category)
+    
+    commentary = f"📡 {bold_headline}\n\n{article_summary}\n\n💡 {cta}\n\nRead more on SaaS Sentinel: {sharing_url}"
+    if mentions:
+        commentary += f"\n\nCc: {' '.join(mentions)}"
+    if tags:
+        commentary += f"\n\n{' '.join(tags)}"
     
     author_urn = get_clean_author_urn()
     post_url = "https://api.linkedin.com/v2/ugcPosts"
@@ -342,7 +420,7 @@ def post_to_linkedin(article_title, article_summary, sharing_url, image_url):
     except Exception as e:
         print(f"❌ LinkedIn Exception: {e}")
 
-def post_to_threads(article_title, article_summary, sharing_url, image_url):
+def post_to_threads(article_title, article_summary, sharing_url, image_url, category=None):
     """
     Threads API Integration (Meta Graph API)
     Note: Requires threads_content_publish and threads_basic permissions.
@@ -358,9 +436,14 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url):
     print(f"🧵 Sending to Threads: {article_title[:50]}...")
     
     # Threads allows captions. We combine headline and summary.
-    # Note: Unicode bold often works on Threads but might be filtered; we keep it for consistency.
     bold_headline = to_unicode_bold(article_title)
-    caption = f"📡 {bold_headline}\n\n{article_summary}\n\n🔗 READ MORE: {sharing_url}\n\n#SaaS #AI #SaaSSentinel"
+    mentions, tags, cta = get_social_boost(article_title, article_summary, category)
+    
+    caption = f"📡 {bold_headline}\n\n{article_summary}\n\n💡 {cta}\n\n🔗 READ MORE: {sharing_url}"
+    if mentions:
+        caption += f"\n\nCc: {' '.join(mentions)}"
+    if tags:
+        caption += f"\n\n{' '.join(tags)}"
 
     base_url = f"https://graph.threads.net/v1.0/{THREADS_USER_ID}"
     
@@ -608,7 +691,8 @@ def main():
                         article_data['title'], 
                         article_data['summary'], 
                         sharing_url, 
-                        article_data['image_url']
+                        article_data['image_url'],
+                        article_data.get('category')
                     )
                     
                     # Threads
@@ -616,7 +700,8 @@ def main():
                         article_data['title'], 
                         article_data['summary'], 
                         sharing_url, 
-                        article_data['image_url']
+                        article_data['image_url'],
+                        article_data.get('category')
                     )
                     
                     processed_count += 1
