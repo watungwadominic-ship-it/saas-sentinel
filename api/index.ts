@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { getSocialBoost, buildThreadsPost } from '../src/services/social_booster';
+import { getSocialBoost, buildThreadsPost } from './social_booster';
 
 // --- CONFIG & INITS ---
 
