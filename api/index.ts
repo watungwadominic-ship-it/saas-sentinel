@@ -322,22 +322,48 @@ app.get(['/api/proxy-image', '/proxy-image'], async (req, res) => {
 // --- UTILS ---
 
 app.get(['/sitemap.xml', '/api/sitemap.xml'], async (req, res) => {
-  const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
-  const protocol = req.headers['x-forwarded-proto'] || 'https';
-  const base = `${protocol}://${host}`;
-  const { data: articles } = await getSupabase().from('news_articles').select('id, created_at').order('created_at', { ascending: false }).limit(1000);
-  
-  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
-  xml += `\n  <url><loc>${base}/</loc><priority>1.0</priority></url>`;
-  xml += `\n  <url><loc>${base}/archive</loc><priority>0.8</priority></url>`;
-  xml += `\n  <url><loc>${base}/about</loc><priority>0.5</priority></url>`;
-  
-  articles?.forEach(a => {
-    xml += `\n  <url><loc>${base}/article/${a.id}</loc><lastmod>${a.created_at.split('T')[0]}</lastmod></url>`;
-  });
-  xml += `\n</urlset>`;
-  res.setHeader('Content-Type', 'application/xml');
-  res.send(xml);
+  try {
+    const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const base = `${protocol}://${host}`;
+    
+    const { data: articles, error } = await getSupabase()
+      .from('news_articles')
+      .select('id, slug, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1000);
+    
+    if (error) {
+      console.error("Supabase sitemap query error:", error);
+    }
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
+    xml += `\n  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`;
+    xml += `\n  <url><loc>${base}/archive</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`;
+    xml += `\n  <url><loc>${base}/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>`;
+    xml += `\n  <url><loc>${base}/privacy</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>`;
+    
+    if (articles && Array.isArray(articles)) {
+      articles.forEach(a => {
+        const identifier = a.slug || a.id;
+        if (identifier) {
+          let mod = new Date().toISOString().split('T')[0];
+          if (a.created_at && typeof a.created_at === 'string') {
+            mod = a.created_at.split('T')[0];
+          }
+          xml += `\n  <url><loc>${base}/article/${identifier}</loc><lastmod>${mod}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`;
+        }
+      });
+    }
+    
+    xml += `\n</urlset>`;
+    res.setHeader('Content-Type', 'application/xml');
+    return res.send(xml);
+  } catch (err) {
+    console.error("Global Sitemap Error:", err);
+    res.setHeader('Content-Type', 'application/xml');
+    return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>/</loc></url>\n</urlset>`);
+  }
 });
 
 app.get(['/robots.txt', '/api/robots.txt'], (req, res) => {
