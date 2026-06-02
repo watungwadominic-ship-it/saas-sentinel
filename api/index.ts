@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { getSocialBoost } from '../src/services/social_booster';
+import { getSocialBoost, buildThreadsPost } from '../src/services/social_booster';
 
 // --- CONFIG & INITS ---
 
@@ -153,17 +153,14 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], a
       const boostResult = saved?.[0] ? getSocialBoost(saved[0].title, saved[0].summary, saved[0].category) : null;
 
       // Optional: Post to Threads
-      if (process.env.THREADS_USER_ID && process.env.THREADS_ACCESS_TOKEN && saved?.[0] && boostResult) {
+      if (process.env.THREADS_USER_ID && process.env.THREADS_ACCESS_TOKEN && saved?.[0]) {
         try {
           const article = saved[0];
-          let postText = `📢 SaaS INTELLIGENCE: ${article.title}\n\n${article.summary}\n\n💡 ${boostResult.cta}\n\nRead more: https://saas-sentinel-cyan.vercel.app/article/${article.id}`;
+          const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
+          const protocol = req.headers['x-forwarded-proto'] || 'https';
+          const base = `${protocol}://${host}`;
           
-          if (boostResult.mentions.length > 0) {
-            postText += `\n\nCc: ${boostResult.mentions.join(' ')}`;
-          }
-          if (boostResult.tags.length > 0) {
-            postText += `\n\n${boostResult.tags.join(' ')}`;
-          }
+          const postText = buildThreadsPost(article.title, article.summary, article.id || '', article.category, base);
 
           await fetch(`https://graph.threads.net/v1.0/${process.env.THREADS_USER_ID}/threads?media_type=TEXT&text=${encodeURIComponent(postText)}&access_token=${process.env.THREADS_ACCESS_TOKEN}`, { method: 'POST' });
         } catch (postErr) {
