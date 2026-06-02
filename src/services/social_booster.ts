@@ -96,3 +96,77 @@ export function getSocialBoost(title: string, summary: string, category?: string
     cta
   };
 }
+
+export function buildThreadsPost(
+  title: string,
+  summary: string,
+  articleIdOrSlug: string,
+  category?: string,
+  originUrl?: string
+): string {
+  const MAX_LEN = 485; // safe character boundary for Threads (max 500)
+  const shareId = articleIdOrSlug || '';
+  const baseDomain = originUrl || 'https://saas-sentinel.com';
+  const cleanBase = baseDomain.replace(/\/$/, "");
+  
+  const header = `📢 INTELLIGENCE BRIEF: ${title}\n\n`;
+  const footer = `\n\n🔗 Read more: ${cleanBase}/article/${shareId}`;
+  
+  const boost = getSocialBoost(title, summary, category);
+  let mentions = boost.mentions;
+  let tags = boost.tags;
+  let cta = boost.cta;
+  
+  if (mentions.length > 3) mentions = mentions.slice(0, 3);
+  if (tags.length > 4) tags = tags.slice(0, 4);
+  
+  // Progressively build option text helper
+  const getOptText = (incCta: boolean, incMentions: boolean, incTags: boolean): string => {
+    let opt = "";
+    if (incCta && cta) opt += `\n\n💡 ${cta}`;
+    if (incMentions && mentions.length > 0) opt += `\n\nCc: ${mentions.join(' ')}`;
+    if (incTags && tags.length > 0) opt += `\n\n${tags.join(' ')}`;
+    return opt;
+  };
+  
+  // Try with everything
+  let optText = getOptText(true, true, true);
+  let totalNonSummaryLen = header.length + optText.length + footer.length;
+  
+  if (totalNonSummaryLen + summary.length <= MAX_LEN) {
+    return `${header}${summary}${optText}${footer}`;
+  }
+  
+  // 1. Try with everything and truncate summary (minimum 140 chars for summary readability)
+  let availableForSummary = MAX_LEN - totalNonSummaryLen;
+  if (availableForSummary >= 140) {
+    const truncated = summary.substring(0, availableForSummary - 3).trim() + "...";
+    return `${header}${truncated}${optText}${footer}`;
+  }
+  
+  // 2. Drop tags, try again
+  optText = getOptText(true, true, false);
+  totalNonSummaryLen = header.length + optText.length + footer.length;
+  availableForSummary = MAX_LEN - totalNonSummaryLen;
+  if (availableForSummary >= 140) {
+    const truncated = summary.substring(0, availableForSummary - 3).trim() + "...";
+    return `${header}${truncated}${optText}${footer}`;
+  }
+  
+  // 3. Drop mentions, try again
+  optText = getOptText(true, false, false);
+  totalNonSummaryLen = header.length + optText.length + footer.length;
+  availableForSummary = MAX_LEN - totalNonSummaryLen;
+  if (availableForSummary >= 140) {
+    const truncated = summary.substring(0, availableForSummary - 3).trim() + "...";
+    return `${header}${truncated}${optText}${footer}`;
+  }
+  
+  // 4. Drop CTA as well. Max space for header, summary and link
+  optText = "";
+  totalNonSummaryLen = header.length + footer.length;
+  availableForSummary = MAX_LEN - totalNonSummaryLen;
+  const truncated = summary.substring(0, Math.max(20, availableForSummary - 3)).trim() + "...";
+  return `${header}${truncated}${footer}`;
+}
+
