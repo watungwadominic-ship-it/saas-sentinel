@@ -344,6 +344,65 @@ def get_social_boost(title, summary, category=None):
     cta = ctas[len(title) % len(ctas)]
     return found_mentions, tags, cta
 
+def build_threads_post(title, summary, sharing_url, category=None):
+    MAX_LEN = 485  # safe character limit
+    bold_headline = to_unicode_bold(title)
+    
+    header = f"📡 {bold_headline}\n\n"
+    footer = f"\n\n🔗 READ MORE: {sharing_url}"
+    
+    mentions, tags, cta = get_social_boost(title, summary, category)
+    if len(mentions) > 3:
+        mentions = mentions[:3]
+    if len(tags) > 4:
+        tags = tags[:4]
+        
+    def get_opt_text(inc_cta, inc_mentions, inc_tags):
+        opt = ""
+        if inc_cta and cta:
+            opt += f"\n\n💡 {cta}"
+        if inc_mentions and mentions:
+            opt += f"\n\nCc: {' '.join(mentions)}"
+        if inc_tags and tags:
+            opt += f"\n\n{' '.join(tags)}"
+        return opt
+        
+    # Try with everything
+    opt_text = get_opt_text(True, True, True)
+    total_non_summary_len = len(header) + len(opt_text) + len(footer)
+    
+    if total_non_summary_len + len(summary) <= MAX_LEN:
+        return f"{header}{summary}{opt_text}{footer}"
+        
+    # 1. Truncate summary if there is at least 140 chars left for it
+    available = MAX_LEN - total_non_summary_len
+    if available >= 140:
+        truncated = summary[:available - 3].strip() + "..."
+        return f"{header}{truncated}{opt_text}{footer}"
+        
+    # 2. Drop tags, try again
+    opt_text = get_opt_text(True, True, False)
+    total_non_summary_len = len(header) + len(opt_text) + len(footer)
+    available = MAX_LEN - total_non_summary_len
+    if available >= 140:
+        truncated = summary[:available - 3].strip() + "..."
+        return f"{header}{truncated}{opt_text}{footer}"
+        
+    # 3. Drop mentions, try again
+    opt_text = get_opt_text(True, False, False)
+    total_non_summary_len = len(header) + len(opt_text) + len(footer)
+    available = MAX_LEN - total_non_summary_len
+    if available >= 140:
+        truncated = summary[:available - 3].strip() + "..."
+        return f"{header}{truncated}{opt_text}{footer}"
+        
+    # 4. Drop CTA as well
+    opt_text = ""
+    total_non_summary_len = len(header) + len(footer)
+    available = MAX_LEN - total_non_summary_len
+    truncated = summary[:max(20, available - 3)].strip() + "..."
+    return f"{header}{truncated}{footer}"
+
 def post_to_linkedin(article_title, article_summary, sharing_url, image_url, category=None):
     if not LINKEDIN_ACCESS_TOKEN or not LINKEDIN_PERSON_URN:
         missing = []
@@ -435,15 +494,7 @@ def post_to_threads(article_title, article_summary, sharing_url, image_url, cate
 
     print(f"🧵 Sending to Threads: {article_title[:50]}...")
     
-    # Threads allows captions. We combine headline and summary.
-    bold_headline = to_unicode_bold(article_title)
-    mentions, tags, cta = get_social_boost(article_title, article_summary, category)
-    
-    caption = f"📡 {bold_headline}\n\n{article_summary}\n\n💡 {cta}\n\n🔗 READ MORE: {sharing_url}"
-    if mentions:
-        caption += f"\n\nCc: {' '.join(mentions)}"
-    if tags:
-        caption += f"\n\n{' '.join(tags)}"
+    caption = build_threads_post(article_title, article_summary, sharing_url, category)
 
     base_url = f"https://graph.threads.net/v1.0/{THREADS_USER_ID}"
     
