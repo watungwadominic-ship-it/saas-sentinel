@@ -43,11 +43,15 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req, res) => {
     const protocol = req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
     const base = (process.env.SHARED_APP_URL || `${protocol}://${host}`).replace(/\/$/, '');
     
-    const { data: articles } = await supabase
+    const { data: articles, error } = await supabase
       .from("news_articles")
-      .select("id, updated_at, created_at")
+      .select("id, slug, updated_at, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
+    
+    if (error) {
+      console.error("Supabase sitemap query error in server.ts:", error);
+    }
     
     let sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
     sitemap += `\n  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`;
@@ -55,10 +59,17 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req, res) => {
     sitemap += `\n  <url><loc>${base}/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>`;
     sitemap += `\n  <url><loc>${base}/privacy</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>`;
 
-    if (articles) {
+    if (articles && Array.isArray(articles)) {
       articles.forEach((a: any) => {
-        const mod = (a.updated_at || a.created_at || new Date().toISOString()).split('T')[0];
-        sitemap += `\n  <url><loc>${base}/article/${a.id}</loc><lastmod>${mod}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`;
+        const identifier = a.slug || a.id;
+        if (identifier) {
+          const rawMod = a.updated_at || a.created_at;
+          let mod = new Date().toISOString().split('T')[0];
+          if (rawMod && typeof rawMod === 'string') {
+            mod = rawMod.split('T')[0];
+          }
+          sitemap += `\n  <url><loc>${base}/article/${identifier}</loc><lastmod>${mod}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`;
+        }
       });
     }
     sitemap += `\n</urlset>`;
@@ -66,6 +77,7 @@ app.get(["/sitemap.xml", "/api/sitemap.xml"], async (req, res) => {
     return res.send(sitemap);
   } catch (err) {
     console.error("Sitemap Error:", err);
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
     return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>/</loc></url>\n</urlset>`);
   }
 });
