@@ -114,6 +114,145 @@ app.get("/api/news/:id", async (req, res) => {
   }
 });
 
+// --- DYNAMIC METADATA SERVER-SIDE INJECTION FOR ARTICLES ---
+app.get(['/article/:slugOrId', '/news/:slugOrId'], async (req, res) => {
+  const { slugOrId } = req.params;
+  const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
+  const protocol = (req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https');
+  const base = `${protocol}://${host}`;
+
+  try {
+    // First, try matching by slug
+    let { data: article } = await supabase
+      .from('news_articles')
+      .select('*')
+      .eq('slug', slugOrId)
+      .maybeSingle();
+
+    // If not found by slug, try by id (UUID lookup)
+    if (!article) {
+      const { data: byId } = await supabase
+        .from('news_articles')
+        .select('*')
+        .eq('id', slugOrId)
+        .maybeSingle();
+      if (byId) article = byId;
+    }
+
+    // Load static index.html template to inject metadata into
+    let htmlPath = path.join(process.cwd(), 'dist', 'index.html');
+    if (!fs.existsSync(htmlPath)) {
+      htmlPath = path.join(process.cwd(), 'index.html');
+    }
+
+    let html = '';
+    if (fs.existsSync(htmlPath)) {
+      html = fs.readFileSync(htmlPath, 'utf8');
+    } else {
+      html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
+    }
+
+    if (article) {
+      const title = `${article.title} | SaaS Sentinel`;
+      const desc = (article.meta_description || article.summary || 'SaaS Sentinel B2B Intelligence').trim();
+      let img = article.image_url || article.image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1200&h=630&auto=format&fit=crop';
+      
+      // Ensure the image URL is absolute for crawler parsers
+      if (img.startsWith('/')) {
+        img = `${base}${img}`;
+      } else if (img.startsWith('proxy-image') || img.startsWith('/proxy-image')) {
+        const queryUrl = img.includes('url=') ? decodeURIComponent(img.split('url=')[1]) : '';
+        img = queryUrl || `${base}${img}`;
+      }
+
+      const url = `${base}/article/${article.slug || article.id}`;
+      const published = article.created_at || new Date().toISOString();
+      const modified = article.updated_at || article.created_at || new Date().toISOString();
+
+      // JSON-LD structured data Schema
+      const ldJsonObj = {
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        "headline": article.title,
+        "description": desc,
+        "image": [img],
+        "datePublished": published,
+        "dateModified": modified,
+        "author": [{
+          "@type": "Person",
+          "name": "SaaS Sentinel Intelligence",
+          "url": base
+        }],
+        "publisher": {
+          "@type": "Organization",
+          "name": "SaaS Sentinel",
+          "logo": {
+            "@type": "ImageObject",
+            "url": `${base}/logo.png`
+          }
+        },
+        "mainEntityOfPage": {
+          "@type": "WebPage",
+          "@id": url
+        }
+      };
+      
+      const ldJsonString = JSON.stringify(ldJsonObj, null, 2);
+
+      const injectedHead = `
+    <!-- Dynamically Injected Rich Search SEO metadata -->
+    <title>${title}</title>
+    <meta name="description" content="${desc.replace(/"/g, '&quot;')}" />
+    <meta name="thumbnail" content="${img}" />
+    <link rel="canonical" href="${url}" />
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="${url}" />
+    <meta property="og:title" content="${title.replace(/"/g, '&quot;')}" />
+    <meta property="og:description" content="${desc.replace(/"/g, '&quot;')}" />
+    <meta property="og:image" content="${img}" />
+    <meta property="og:image:secure_url" content="${img}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="${url}" />
+    <meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:description" content="${desc.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:image" content="${img}" />
+    
+    <!-- Rich Structured Schema (JSON-LD) -->
+    <script type="application/ld+json">
+    ${ldJsonString}
+    </script>
+      `;
+
+      // Remove the static default title and any canonical tags from the template
+      html = html.replace(/<title>[^<]*<\/title>/gi, '');
+      html = html.replace(/<link rel="canonical"[^>]*>/gi, '');
+      
+      // Inject right at the top of head elements
+      html = html.replace('<head>', `<head>${injectedHead}`);
+    }
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (err: any) {
+    console.error("Dynamic Metadata Handler Crashed in server.ts:", err);
+    // Serve index.html safely
+    let htmlPath = path.join(process.cwd(), 'dist', 'index.html');
+    if (!fs.existsSync(htmlPath)) {
+      htmlPath = path.join(process.cwd(), 'index.html');
+    }
+    if (fs.existsSync(htmlPath)) {
+      return res.sendFile(htmlPath);
+    }
+    return res.status(500).send("Server Error");
+  }
+});
+
 app.all("/api/cron/fetch-news", async (req, res) => {
   try {
     console.log("Cron job triggered...");
