@@ -202,6 +202,8 @@ app.get(['/article/:slugOrId', '/news/:slugOrId'], async (req, res) => {
       const injectedHead = `
     <!-- Dynamically Injected Rich Search SEO metadata -->
     <title>${title}</title>
+    <meta name="robots" content="max-image-preview:large, max-snippet:-1, max-video-preview:-1, index, follow" />
+    <meta name="googlebot" content="max-image-preview:large, index, follow" />
     <meta name="description" content="${desc.replace(/"/g, '&quot;')}" />
     <meta name="thumbnail" content="${img}" />
     <link rel="canonical" href="${url}" />
