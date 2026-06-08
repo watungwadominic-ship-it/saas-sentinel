@@ -201,9 +201,8 @@ async function callGemini(prompt: string, jsonMode = false) {
   }
   
   const genAI = new GoogleGenerativeAI(key);
-  // Using gemini-1.5-flash-latest as it is more specific and often fixes the 404
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-3.5-flash",
     ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
   });
   
