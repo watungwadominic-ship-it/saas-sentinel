@@ -299,7 +299,7 @@ async function callGemini(prompt: string, jsonMode = false) {
   
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-3.5-flash",
     ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
   });
   
