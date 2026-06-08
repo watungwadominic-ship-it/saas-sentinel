@@ -11,7 +11,12 @@ app.use(express.json());
 
 // Import services statically for Vercel bundling
 // We use lazy initialization in the routes to ensure startup is fast
-import { supabase } from "./src/services/supabase";
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL || 'https://dpwkojtfeoxlpyevutfc.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 import * as gemini from "./src/services/gemini";
 import * as newsArticles from "./src/services/news_articles";
 import { postToThreads } from "./src/services/threads";
@@ -279,6 +284,102 @@ app.all("/api/cron/fetch-news", async (req, res) => {
   } catch (e: any) { 
     console.error("Cron Error:", e);
     res.status(500).json({ error: e.message }); 
+  }
+});
+
+const getGeminiKey = () => process.env.VITE_USER_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+
+async function callGemini(prompt: string, jsonMode = false) {
+  const { GoogleGenerativeAI } = await import("@google/generative-ai");
+  const key = getGeminiKey();
+  if (!key) {
+    console.error("[Sentinel] GEMINI_API_KEY IS MISSING");
+    throw new Error("GEMINI_API_KEY is missing");
+  }
+  
+  const genAI = new GoogleGenerativeAI(key);
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash-latest",
+    ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
+  });
+  
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    if (!text) throw new Error("Empty response from Gemini");
+    return text;
+  } catch (error: any) {
+    console.error("[Sentinel] Gemini Call Failed in server.ts:", error);
+    throw error;
+  }
+}
+
+app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/weekly-newsletter/'], async (req, res) => {
+  try {
+    const { data: subscribers } = await supabase.from('subscribers').select('email');
+    
+    let emails = (subscribers || []).map(s => s.email).filter(Boolean);
+    let isTestFallback = false;
+    
+    if (emails.length === 0) {
+      console.log("[Sentinel Weekly Newsletter] No subscribers registered in the database. Falling back to sending a testing preview to the verified owner: watungwadominic@gmail.com.");
+      emails = ['watungwadominic@gmail.com'];
+      isTestFallback = true;
+    }
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    let { data: articles } = await supabase
+      .from('news_articles')
+      .select('title, summary')
+      .gt('created_at', sevenDaysAgo.toISOString())
+      .limit(5);
+    
+    if (!articles || articles.length === 0) {
+      console.log("[Sentinel Weekly Newsletter] No articles found in last 7 days. Falling back to the 5 most recent articles in the system.");
+      const { data: recentArticles } = await supabase
+        .from('news_articles')
+        .select('title, summary')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      articles = recentArticles;
+    }
+    
+    if (!articles?.length) return res.json({ success: true, message: "No fresh content available to build newsletter" });
+
+    const prompt = `Create a high-end HTML newsletter for 'SaaS Sentinel'. Summarize these:\n${articles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}`;
+    const htmlRaw = await callGemini(prompt);
+    const html = htmlRaw.replace(/```html|```/g, '').trim();
+
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.default.createTransport({
+      host: process.env.SMTP_HOST,
+      port: 465,
+      secure: true,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    });
+
+    let sent = 0;
+    for (const email of emails) {
+      try {
+        await transporter.sendMail({
+          from: `"SaaS Sentinel" <${process.env.SMTP_USER}>`,
+          to: email,
+          subject: (isTestFallback ? `[PREVIEW] ` : '') + `Weekly Intelligence: ${articles[0].title.substring(0, 40)}...`,
+          html: isTestFallback 
+            ? `<div style="background-color:#fff3cd; color:#856404; padding:12px; font-family:sans-serif; border-radius:6px; margin-bottom:15px; border:1px solid #ffeeba;"><strong>Admin Preview Notice:</strong> This email was dispatched to you (watungwadominic@gmail.com) as a live delivery preview because the 'subscribers' table in your Supabase database is registered with 0 sign-ups. Once direct users subscribe in the website footer, they will receive this automatically.</div>` + html 
+            : html
+        });
+        sent++;
+      } catch (e) { 
+        console.error("Email fail for", email, e); 
+      }
+    }
+    res.json({ success: true, sent, fallback: isTestFallback });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
