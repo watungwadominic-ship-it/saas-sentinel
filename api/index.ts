@@ -184,7 +184,7 @@ app.use((req, res, next) => {
 
 const getSupabase = () => {
   const url = process.env.SUPABASE_URL || 'https://dpwkojtfeoxlpyevutfc.supabase.co';
-  const key = process.env.SUPABASE_KEY || 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
   return createClient(url, key);
 };
 
@@ -564,7 +564,15 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], a
 app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/weekly-newsletter/'], async (req, res) => {
   try {
     const { data: subscribers } = await getSupabase().from('subscribers').select('email');
-    if (!subscribers?.length) return res.json({ success: true, message: "No subscribers" });
+    
+    let emails = (subscribers || []).map(s => s.email).filter(Boolean);
+    let isTestFallback = false;
+    
+    if (emails.length === 0) {
+      console.log("[Sentinel Weekly Newsletter] No subscribers registered in the database. Falling back to sending a testing preview to the verified owner: watungwadominic@gmail.com.");
+      emails = ['watungwadominic@gmail.com'];
+      isTestFallback = true;
+    }
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -599,18 +607,22 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
     });
 
     let sent = 0;
-    for (const sub of subscribers) {
+    for (const email of emails) {
       try {
         await transporter.sendMail({
           from: `"SaaS Sentinel" <${process.env.SMTP_USER}>`,
-          to: sub.email,
-          subject: `Weekly Intelligence: ${articles[0].title.substring(0, 40)}...`,
-          html
+          to: email,
+          subject: (isTestFallback ? `[PREVIEW] ` : '') + `Weekly Intelligence: ${articles[0].title.substring(0, 40)}...`,
+          html: isTestFallback 
+            ? `<div style="background-color:#fff3cd; color:#856404; padding:12px; font-family:sans-serif; border-radius:6px; margin-bottom:15px; border:1px solid #ffeeba;"><strong>Admin Preview Notice:</strong> This email was dispatched to you (watungwadominic@gmail.com) as a live delivery preview because the 'subscribers' table in your Supabase database is registered with 0 sign-ups. Once direct users subscribe in the website footer, they will receive this automatically.</div>` + html 
+            : html
         });
         sent++;
-      } catch (e) { console.error("Email fail", e); }
+      } catch (e) { 
+        console.error("Email fail for", email, e); 
+      }
     }
-    res.json({ success: true, sent });
+    res.json({ success: true, sent, fallback: isTestFallback });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
