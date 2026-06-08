@@ -29,7 +29,7 @@ export async function fetchTopSaaSNews(topArticlesContext?: string) {
     const ai = await getAI();
     if (!ai) throw new Error("Gemini API key missing or SDK failed to load");
     
-    const modelName = "gemini-1.5-flash";
+    const modelName = "gemini-3.5-flash";
     const query = "(SaaS OR 'Enterprise AI' OR 'Cloud Computing') AND (Launch OR Funding OR Update)";
     const prompt = `Search for the top 3 most significant SaaS news stories from the last 24 hours using this query: "${query}".`;
 
@@ -48,7 +48,7 @@ export async function generateArticle(headline: string, snippet: string) {
     if (!ai) throw new Error("Gemini API key missing or SDK failed to load");
     
     const model = ai.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "gemini-3.5-flash",
       generationConfig: { responseMimeType: "application/json" }
     });
     
@@ -69,7 +69,7 @@ export async function parseNewsIntoStories(rawNews: string) {
     if (!ai) throw new Error("Gemini API key missing or SDK failed to load");
     
     const model = ai.getGenerativeModel({ 
-      model: "gemini-1.5-flash", 
+      model: "gemini-3.5-flash", 
       generationConfig: { responseMimeType: "application/json" } 
     });
     const prompt = `Extract news stories from: ${rawNews}`;
