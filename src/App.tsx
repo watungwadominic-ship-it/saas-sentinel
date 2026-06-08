@@ -2124,7 +2124,7 @@ export default function App() {
                 ))}
               </div>
 
-              <div className="flex gap-8 text-[10px] font-bold text-text/20 uppercase tracking-widest">
+              <div className="flex flex-wrap gap-8 text-[10px] font-bold text-text/20 uppercase tracking-widest justify-center md:justify-end">
                 <button onClick={() => { setShowAbout(true); setShowPrivacy(false); setSelectedArticle(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-text transition-colors">About</button>
                 <button onClick={() => { setShowPrivacy(true); setShowAbout(false); setShowArchive(false); setSelectedArticle(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-text transition-colors">Privacy</button>
                 <button onClick={() => { setShowArchive(true); setShowAbout(false); setShowPrivacy(false); setSelectedArticle(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-text transition-colors">Archive</button>
