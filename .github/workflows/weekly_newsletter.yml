@@ -19,7 +19,28 @@ jobs:
           # Remove trailing slash if present
           URL="${URL%/}"
           
-          echo "Triggering newsletter at $URL/api/cron/weekly-newsletter"
-          curl -X POST "$URL/api/cron/weekly-newsletter" \
+          echo "Connecting to SaaS Sentinel Dispatcher at $URL..."
+          RESPONSE=$(curl -s -S -X POST "$URL/api/cron/weekly-newsletter" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -f
+            -H "Content-Type: application/json")
+          
+          if echo "$RESPONSE" | grep -q '"success":true'; then
+            echo "--------------------------------------------------------"
+            echo "🚀  SaaS Sentinel Automated Newsletter Bot  🚀"
+            echo "--------------------------------------------------------"
+            echo "🟢  Weekly Newsletter Dispatched Successfully!"
+            
+            # Extract and display clean response details safely
+            SENT=$(echo "$RESPONSE" | grep -o '"sent":[0-9]*' | cut -d: -f2 || echo "0")
+            FALLBACK=$(echo "$RESPONSE" | grep -o '"fallback":[^,}]*' | cut -d: -f2 || echo "false")
+            
+            echo "📧  Subscribers notified: $SENT"
+            if [ "$FALLBACK" = "true" ]; then
+              echo "📢  No external subscribers found. Dispatched master preview copy successfully."
+            fi
+            echo "--------------------------------------------------------"
+          else
+            echo "🔴  Newsletter Bot reported an error:"
+            echo "$RESPONSE"
+            exit 1
+          fi
