@@ -24,23 +24,57 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json")
           
+          # Print raw response for debugging in case of any issues
+          echo "Debug RAW Response: $RESPONSE"
+          
           if echo "$RESPONSE" | grep -q '"success":true'; then
             echo "--------------------------------------------------------"
             echo "🚀  SaaS Sentinel Automated Newsletter Bot  🚀"
             echo "--------------------------------------------------------"
-            echo "🟢  Weekly Newsletter Dispatched Successfully!"
+            echo "🟢  Weekly Newsletter Dispatch Completed!"
             
-            # Extract and display clean response details safely
+            # Extract response details safely
             SENT=$(echo "$RESPONSE" | grep -o '"sent":[0-9]*' | cut -d: -f2 || echo "0")
             FALLBACK=$(echo "$RESPONSE" | grep -o '"fallback":[^,}]*' | cut -d: -f2 || echo "false")
+            DB_STATUS=$(echo "$RESPONSE" | grep -o '"dbStatus":"[^"]*' | cut -d'"' -f4 || echo "unknown")
+            DB_MSG=$(echo "$RESPONSE" | grep -o '"dbMessage":"[^"]*' | cut -d'"' -f4 || echo "")
+            SMTP_OK=$(echo "$RESPONSE" | grep -o '"smtpConfigured":[^,}]*' | cut -d: -f2 || echo "true")
+            ACTUAL_COUNT=$(echo "$RESPONSE" | grep -o '"actualDbCount":[0-9]*' | cut -d: -f2 || echo "0")
+            SUBSCRIBERS_LEN=$(echo "$RESPONSE" | grep -o '"subscribersQueryLength":[^,}]*' | cut -d: -f2 || echo "null")
+            ERRORS=$(echo "$RESPONSE" | grep -o '"errors":\[[^]]*\]' || echo "")
             
-            echo "📧  Subscribers notified: $SENT"
-            if [ "$FALLBACK" = "true" ]; then
-              echo "📢  No external subscribers found. Dispatched master preview copy successfully."
+            echo "📧  Email Dispatch Metrics:"
+            echo "    -> Successfully Dispatched emails: $SENT"
+            echo "    -> Fallback mode activated: $FALLBACK"
+            echo "    -> Table rows in DB metadata: $ACTUAL_COUNT rows"
+            echo "    -> Subscribers successfully read via current api key: $SUBSCRIBERS_LEN"
+            echo ""
+            echo "📋  System Status:"
+            echo "    -> Database connection status: $DB_STATUS $DB_MSG"
+            
+            if [ "$SMTP_OK" = "false" ]; then
+              echo "    -> SMTP STATUS: 🔴 NOT CONFIGURING SMTP (SMTP_USER/SMTP_PASS are missing in your Vercel Dashboard env!)"
+            else
+              echo "    -> SMTP STATUS: 🟢 SMTP Configuration Present"
+            fi
+            
+            if [ ! -z "$ERRORS" ] && [ "$ERRORS" != "[]" ]; then
+              echo ""
+              echo "⚠️   Delivery Warning Logs:"
+              echo "    $ERRORS"
+            fi
+            
+            if [ "$SUBSCRIBERS_LEN" = "0" ] && [ "$ACTUAL_COUNT" -gt 0 ]; then
+              echo ""
+              echo "💡  IMPORTANT SECURITY/RLS WARNING:"
+              echo "    Your database metadata registers $ACTUAL_COUNT subscribers, but the query fetched 0 list items."
+              echo "    This occurs because your Vercel environment is using the public anon key with Row Level Security (RLS) enabled."
+              echo "    To resolve this, add 'SUPABASE_SERVICE_ROLE_KEY' to your Vercel Dashboard Environment Variables"
+              echo "    under the name 'SUPABASE_SERVICE_ROLE_KEY' (or override 'SUPABASE_KEY' with your service_role secret key)."
             fi
             echo "--------------------------------------------------------"
           else
-            echo "🔴  Newsletter Bot reported an error:"
+            echo "🔴  Newsletter Bot reported a failure response:"
             echo "$RESPONSE"
             exit 1
           fi
