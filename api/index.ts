@@ -562,16 +562,28 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], a
 
 app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/weekly-newsletter/'], async (req, res) => {
   try {
-    const { data: subscribers } = await getSupabase().from('subscribers').select('email');
+    const supabaseClient = getSupabase();
+    const { data: subscribers, error: subError } = await supabaseClient.from('subscribers').select('email');
+    
+    let dbStatus = "ok";
+    let dbMessage = "";
+    if (subError) {
+      dbStatus = "error";
+      dbMessage = subError.message;
+      console.error("[Sentinel Weekly Newsletter] Supabase subscribers fetch error:", subError);
+    }
     
     let emails = (subscribers || []).map(s => s.email).filter(Boolean);
     let isTestFallback = false;
     
     if (emails.length === 0) {
-      console.log("[Sentinel Weekly Newsletter] No subscribers registered in the database. Falling back to sending a testing preview to the verified owner: watungwadominic@gmail.com.");
+      console.warn("[Sentinel Weekly Newsletter] No subscribers retrieved or query got blocked. Falling back to sending a testing preview to the verified owner: watungwadominic@gmail.com.");
       emails = ['watungwadominic@gmail.com'];
       isTestFallback = true;
     }
+
+    const { data: checkTotal, error: checkErr } = await supabaseClient.from('subscribers').select('*', { count: 'exact', head: true });
+    const actualDbCount = checkTotal === null ? 0 : (checkTotal || []).length || 0; // fallback tracking
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -582,7 +594,7 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
       .limit(5);
     
     if (!articles || articles.length === 0) {
-      console.log("[Sentinel Weekly Newsletter] No articles found in last 7 days. Falling back to the 5 most recent articles in the system.");
+      console.log("[Sentinel Weekly Newsletter] No articles found in last 7 days. Falling back to the 5 most recent articles.");
       const { data: recentArticles } = await getSupabase()
         .from('news_articles')
         .select('title, summary')
@@ -591,37 +603,74 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
       articles = recentArticles;
     }
     
-    if (!articles?.length) return res.json({ success: true, message: "No fresh content available to build newsletter" });
+    if (!articles?.length) {
+      return res.json({ 
+        success: true, 
+        sent: 0, 
+        message: "No fresh content available to build newsletter",
+        dbStatus,
+        dbMessage
+      });
+    }
 
     const prompt = `Create a high-end HTML newsletter for 'SaaS Sentinel'. Summarize these:\n${articles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}`;
     const htmlRaw = await callGemini(prompt);
     const html = htmlRaw.replace(/```html|```/g, '').trim();
 
-    const nodemailer = await import('nodemailer');
-    const transporter = nodemailer.default.createTransport({
-      host: process.env.SMTP_HOST,
-      port: 465,
-      secure: true,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-    });
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    
+    let smtpCheck = "ok";
+    const errors: string[] = [];
+    
+    if (!smtpUser || !smtpPass) {
+      smtpCheck = "missing_credentials";
+      errors.push(`SMTP environment variables are not configured in your hosting dashboard. Please set SMTP_USER and SMTP_PASS under environment variables.`);
+    }
 
     let sent = 0;
-    for (const email of emails) {
-      try {
-        await transporter.sendMail({
-          from: `"SaaS Sentinel" <${process.env.SMTP_USER}>`,
-          to: email,
-          subject: (isTestFallback ? `[PREVIEW] ` : '') + `Weekly Intelligence: ${articles[0].title.substring(0, 40)}...`,
-          html: isTestFallback 
-            ? `<div style="background-color:#fff3cd; color:#856404; padding:12px; font-family:sans-serif; border-radius:6px; margin-bottom:15px; border:1px solid #ffeeba;"><strong>Admin Preview Notice:</strong> This email was dispatched to you (watungwadominic@gmail.com) as a live delivery preview because the 'subscribers' table in your Supabase database is registered with 0 sign-ups. Once direct users subscribe in the website footer, they will receive this automatically.</div>` + html 
-            : html
-        });
-        sent++;
-      } catch (e) { 
-        console.error("Email fail for", email, e); 
+    if (smtpCheck === "ok") {
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        host: smtpHost,
+        port: Number(process.env.SMTP_PORT) || 465,
+        secure: true,
+        auth: { user: smtpUser, pass: smtpPass }
+      });
+
+      for (const email of emails) {
+        try {
+          await transporter.sendMail({
+            from: `"SaaS Sentinel" <${smtpUser}>`,
+            to: email,
+            subject: (isTestFallback ? `[PREVIEW] ` : '') + `Weekly Intelligence: ${articles[0].title.substring(0, 40)}...`,
+            html: isTestFallback 
+              ? `<div style="background-color:#fff3cd; color:#856404; padding:12px; font-family:sans-serif; border-radius:6px; margin-bottom:15px; border:1px solid #ffeeba;"><strong>Admin Preview Notice:</strong> This email was dispatched to you (watungwadominic@gmail.com) as a live delivery preview because the 'subscribers' table in your Supabase database returned 0 registered emails. If you have sign-ups but see this notice, please ensure 'SUPABASE_SERVICE_ROLE_KEY' is set in your environment variables to bypass Row Level Security (RLS) on your table.</div>` + html 
+              : html
+          });
+          sent++;
+        } catch (e: any) { 
+          console.error("Email fail for", email, e); 
+          errors.push(`${email}: ${e.message}`);
+        }
       }
     }
-    res.json({ success: true, sent, fallback: isTestFallback });
+
+    res.json({ 
+      success: true, 
+      sent, 
+      fallback: isTestFallback, 
+      dbStatus, 
+      dbMessage, 
+      errors: errors.length > 0 ? errors : undefined,
+      diagnostics: {
+        smtpHost,
+        smtpConfigured: smtpCheck === "ok",
+        subscribersQueryLength: subscribers ? subscribers.length : null,
+        actualDbCount
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
