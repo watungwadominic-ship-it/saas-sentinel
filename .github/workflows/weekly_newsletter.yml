@@ -22,7 +22,12 @@ jobs:
           echo "Connecting to SaaS Sentinel Dispatcher at $URL..."
           RESPONSE=$(curl -s -S -X POST "$URL/api/cron/weekly-newsletter" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json")
+            -H "Content-Type: application/json" \
+            -H "x-supabase-url: ${{ secrets.SUPABASE_URL }}" \
+            -H "x-supabase-key: ${{ secrets.SUPABASE_KEY }}" \
+            -H "x-gmail-user: ${{ secrets.GMAIL_USER }}" \
+            -H "x-gmail-pass: ${{ secrets.GMAIL_PASS }}" \
+            -H "x-gemini-api-key: ${{ secrets.GEMINI_API_KEY }}")
           
           # Print raw response for debugging in case of any issues
           echo "Debug RAW Response: $RESPONSE"
