@@ -327,12 +327,14 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
     const supabaseClient = createClient(dbUrl, dbKey);
     const { data: subscribers, error: subError } = await supabaseClient.from('subscribers').select('email');
     
-    let dbStatus = "ok";
-    let dbMessage = "";
     if (subError) {
-      dbStatus = "error";
-      dbMessage = subError.message;
       console.error("[Sentinel Weekly Newsletter] Supabase subscribers fetch error:", subError);
+      return res.status(500).json({
+        success: false,
+        error: "Subscribers fetch failed: " + subError.message,
+        dbStatus: "error",
+        dbMessage: subError.message
+      });
     }
     
     let emails = (subscribers || []).map(s => s.email).filter(Boolean);
@@ -347,21 +349,43 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
     const { data: checkTotal, error: checkErr } = await supabaseClient.from('subscribers').select('*', { count: 'exact', head: true });
     const actualDbCount = checkTotal === null ? 0 : (checkTotal || []).length || 0;
 
+    const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    let { data: articles } = await supabaseClient
+    let { data: articles, error: articlesErr } = await supabaseClient
       .from('news_articles')
-      .select('title, summary')
+      .select('title, summary, slug, id, created_at, image_url')
       .gt('created_at', sevenDaysAgo.toISOString())
       .limit(5);
     
+    if (articlesErr) {
+      console.error("[Sentinel Weekly Newsletter] Supabase articles query failed:", articlesErr);
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch news articles: " + articlesErr.message,
+        dbStatus: "error"
+      });
+    }
+
     if (!articles || articles.length === 0) {
       console.log("[Sentinel Weekly Newsletter] No articles found in last 7 days. Falling back to the 5 most recent articles in the system.");
-      const { data: recentArticles } = await supabaseClient
+      const { data: recentArticles, error: recentErr } = await supabaseClient
         .from('news_articles')
-        .select('title, summary')
+        .select('title, summary, slug, id, created_at, image_url')
         .order('created_at', { ascending: false })
         .limit(5);
+
+      if (recentErr) {
+        console.error("[Sentinel Weekly Newsletter] Supabase recent articles query failed:", recentErr);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to fetch recent fallback articles: " + recentErr.message,
+          dbStatus: "error"
+        });
+      }
       articles = recentArticles;
     }
     
@@ -370,15 +394,70 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
         success: true, 
         sent: 0, 
         message: "No fresh content available to build newsletter",
-        dbStatus,
-        dbMessage
+        dbStatus: "ok"
       });
     }
 
     const headerGeminiKey = req.headers['x-gemini-api-key'] as string;
-    const prompt = `Create a high-end HTML newsletter for 'SaaS Sentinel'. Summarize these:\n${articles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}`;
+    
+    const prompt = `You are the lead newsletter writer for 'SaaS Sentinel', a premier technology intelligence publication.
+Generate an exceptionally clean, responsive, and high-end HTML newsletter summarizing the past week's stories. 
+
+Core requirements:
+1. OUTPUT ONLY THE PURE, VALID HTML. Do NOT wrap it in any Markdown code fences or blocks (like \`\`\`html or \`\`\`), and do NOT include any conversational preamble or postscript message outside the HTML. Start directly with <!DOCTYPE html> or <html lang="en">.
+2. Styling must use clean inline styles (CSS in style elements is also fine if supported, but prefer inline CSS for maximum email client compatibility).
+3. Do not include any warning, diagnostic, or debug notices. The content must be absolute professional brand quality ready for final consumers.
+4. Colors & Theme: Use SaaS Sentinel's custom high-end tech aesthetic:
+   - Deep rich charcoal backgrounds (#0f172a or #1e293b) for structural elements layout
+   - White background for the main email wrapper body (#ffffff)
+   - Accent colors in luxury teals/cyans (#06b6d4, #0891b2) and steel slate (#64748b)
+   - Dark modern readable typography (System sans-serif, Inter, Helvetica, Arial)
+5. Layout Sections:
+   - Header: A beautifully styled, centered header reading "SaaS Sentinel • Weekly Intelligence". Modern, high-contrast, premium styling with a cyan accent border or element.
+   - Subline: "Technical depth, financial realities, and strategic insights from the SaaS ecosystem."
+   - Date Banner: Presenting today's date in an elegant text style.
+   - Featured Articles: For each of the follow articles, create a modern, luxurious card element with generous padding (e.g., padding: 25px; border-radius: 12px; margin-bottom: 24px; background-color: #f8fafc; border: 1px solid #e2e8f0; text-align: left; overflow: hidden;). include:
+     * Card Banner Image: If a non-empty image URL is provided in the '- Image:' field for that article, you MUST include a beautifully styled card top banner: <img src="[Image URL]" referrerPolicy="no-referrer" style="width: 100%; max-height: 240px; object-fit: cover; border-radius: 8px; display: block; margin-bottom: 16px;" alt="Article illustration" /> at the top of the card. If the Image field is empty, do not place any img element.
+     * A small cyan category badge (e.g. "SaaS Intelligence Briefing" or "Tech Deep-Dive")
+     * The Title of the article in heavy charcoal (#0f172a)
+     * The summary beautifully formatted into clean, highly readable paragraphs or short bullet highlights
+     * A beautiful action button styled with: background-color: #0891b2; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; display: inline-block; letter-spacing: 0.5px; margin-top: 12px; displaying "Read Full Intelligence Briefing →".
+     * Provide EXACT link pointing to the article: Use the exact URL given in the corresponding '- Link:' field for that article as the 'href' attribute value. Do NOT change, shorten, or truncate this URL.
+   - Weekly Conclusion: A brief professional sign-off summarizing market trends.
+   - Footer: Centered, small slate-gray typography (#64748b) containing:
+     * "You are receiving this intelligence report because you subscribed to SaaS Sentinel. We appreciate you being part of our subscriber-first community."
+     * Unsubscribe Action link: "If you wish to change your delivery options or unsubscribe, you may do so at any time by visiting ${baseUrl}?action=unsubscribe."
+     * Brand block: "© 2026 SaaS Sentinel, Inc. • London, UK • Technical intelligence for the modern enterprise."
+
+Here are the articles to summarize and generate exact card actions for:
+${articles.map((a, i) => `ARTICLE ${i+1}:
+- Title: ${a.title}
+- Summary: ${a.summary}
+- Link: ${baseUrl}/news/${a.slug || a.id || ''}
+- Image: ${a.image_url || ''}
+`).join('\n')}`;
+
     const htmlRaw = await callGemini(prompt, false, headerGeminiKey);
-    const html = htmlRaw.replace(/```html|```/g, '').trim();
+    
+    // Extract HTML using our robust clean-up routine to prevent any conversational leakages
+    const cleanHtmlOutput = (raw: string): string => {
+      const match = raw.match(/```html([\s\S]*?)```/i);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+      const matchGeneric = raw.match(/```([\s\S]*?)```/);
+      if (matchGeneric && matchGeneric[1]) {
+        return matchGeneric[1].trim();
+      }
+      const firstAngle = raw.indexOf('<');
+      const lastAngle = raw.lastIndexOf('>');
+      if (firstAngle !== -1 && lastAngle !== -1 && lastAngle > firstAngle) {
+        return raw.substring(firstAngle, lastAngle + 1).trim();
+      }
+      return raw.trim();
+    };
+
+    const html = cleanHtmlOutput(htmlRaw);
 
     const headerSmtpUser = req.headers['x-gmail-user'] as string || req.headers['x-smtp-user'] as string;
     const headerSmtpPass = req.headers['x-gmail-pass'] as string || req.headers['x-smtp-pass'] as string;
@@ -392,7 +471,7 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
     
     if (!smtpUser || !smtpPass) {
       smtpCheck = "missing_credentials";
-      errors.push(`SMTP environment variables are not configured in your hosting dashboard. Please set SMTP_USER and SMTP_PASS under environment variables.`);
+      errors.push(`SMTP environment variables are not configured in your hosting dashboard.`);
     }
 
     let sent = 0;
@@ -410,10 +489,8 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
           await transporter.sendMail({
             from: `"SaaS Sentinel" <${smtpUser}>`,
             to: email,
-            subject: (isTestFallback ? `[PREVIEW] ` : '') + `Weekly Intelligence: ${articles[0].title.substring(0, 40)}...`,
-            html: isTestFallback 
-              ? `<div style="background-color:#fff3cd; color:#856404; padding:12px; font-family:sans-serif; border-radius:6px; margin-bottom:15px; border:1px solid #ffeeba;"><strong>Admin Preview Notice:</strong> This email was dispatched to you (watungwadominic@gmail.com) as a live delivery preview because the 'subscribers' table in your Supabase database returned 0 registered emails. If you have sign-ups but see this notice, please ensure 'SUPABASE_SERVICE_ROLE_KEY' is set in your environment variables to bypass Row Level Security (RLS) on your table.</div>` + html 
-              : html
+            subject: (isTestFallback ? `[PREVIEW] ` : '') + `SaaS Sentinel Weekly Intelligence: ${articles[0].title.substring(0, 50)}...`,
+            html: html // Ensure pristine, error-free HTML is sent to the address without system/debug warning banners
           });
           sent++;
         } catch (e: any) { 
@@ -427,8 +504,8 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
       success: true, 
       sent, 
       fallback: isTestFallback, 
-      dbStatus, 
-      dbMessage, 
+      dbStatus: "ok", 
+      dbMessage: "", 
       errors: errors.length > 0 ? errors : undefined,
       diagnostics: {
         smtpHost,
