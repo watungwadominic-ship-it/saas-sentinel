@@ -192,9 +192,9 @@ const getGeminiKey = () => process.env.VITE_USER_GEMINI_API_KEY || process.env.G
 
 // --- HELPERS ---
 
-async function callGemini(prompt: string, jsonMode = false) {
+async function callGemini(prompt: string, jsonMode = false, apiKeyOverride?: string) {
   const { GoogleGenerativeAI } = await import("@google/generative-ai");
-  const key = getGeminiKey();
+  const key = apiKeyOverride || getGeminiKey();
   if (!key) {
     console.error("[Sentinel] GEMINI_API_KEY IS MISSING");
     throw new Error("GEMINI_API_KEY is missing");
@@ -562,7 +562,13 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], a
 
 app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/weekly-newsletter/'], async (req, res) => {
   try {
-    const supabaseClient = getSupabase();
+    const headerUrl = req.headers['x-supabase-url'] as string;
+    const headerKey = (req.headers['x-supabase-service-role-key'] as string) || (req.headers['x-supabase-key'] as string);
+    
+    const dbUrl = headerUrl || process.env.SUPABASE_URL || 'https://dpwkojtfeoxlpyevutfc.supabase.co';
+    const dbKey = headerKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'sb_publishable_WumEuqpPeooXrt1nkO9l_w_zWa37BgE';
+    
+    const supabaseClient = createClient(dbUrl, dbKey);
     const { data: subscribers, error: subError } = await supabaseClient.from('subscribers').select('email');
     
     let dbStatus = "ok";
@@ -587,7 +593,7 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    let { data: articles } = await getSupabase()
+    let { data: articles } = await supabaseClient
       .from('news_articles')
       .select('title, summary')
       .gt('created_at', sevenDaysAgo.toISOString())
@@ -595,7 +601,7 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
     
     if (!articles || articles.length === 0) {
       console.log("[Sentinel Weekly Newsletter] No articles found in last 7 days. Falling back to the 5 most recent articles.");
-      const { data: recentArticles } = await getSupabase()
+      const { data: recentArticles } = await supabaseClient
         .from('news_articles')
         .select('title, summary')
         .order('created_at', { ascending: false })
@@ -613,12 +619,16 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
       });
     }
 
+    const headerGeminiKey = req.headers['x-gemini-api-key'] as string;
     const prompt = `Create a high-end HTML newsletter for 'SaaS Sentinel'. Summarize these:\n${articles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}`;
-    const htmlRaw = await callGemini(prompt);
+    const htmlRaw = await callGemini(prompt, false, headerGeminiKey);
     const html = htmlRaw.replace(/```html|```/g, '').trim();
 
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const headerSmtpUser = req.headers['x-gmail-user'] as string || req.headers['x-smtp-user'] as string;
+    const headerSmtpPass = req.headers['x-gmail-pass'] as string || req.headers['x-smtp-pass'] as string;
+
+    const smtpUser = headerSmtpUser || process.env.SMTP_USER || process.env.GMAIL_USER;
+    const smtpPass = headerSmtpPass || process.env.SMTP_PASS || process.env.GMAIL_PASS;
     const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
     
     let smtpCheck = "ok";
@@ -626,7 +636,7 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
     
     if (!smtpUser || !smtpPass) {
       smtpCheck = "missing_credentials";
-      errors.push(`SMTP environment variables are not configured in your hosting dashboard. Please set SMTP_USER and SMTP_PASS under environment variables.`);
+      errors.push(`SMTP environment variables are not configured in your hosting dashboard or passed in headers. Please set SMTP_USER and SMTP_PASS under environment variables or pass as headers.`);
     }
 
     let sent = 0;
@@ -668,7 +678,14 @@ app.all(['/api/cron/weekly-newsletter', '/cron/weekly-newsletter', '/api/cron/we
         smtpHost,
         smtpConfigured: smtpCheck === "ok",
         subscribersQueryLength: subscribers ? subscribers.length : null,
-        actualDbCount
+        actualDbCount,
+        envKeys: {
+          supabaseUrl: dbUrl ? `${dbUrl.substring(0, 15)}...` : "not set",
+          supabaseKey: dbKey ? `${dbKey.substring(0, 8)}...${dbKey.substring(dbKey.length - 4)}` : "not set",
+          supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? `${process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 8)}...${process.env.SUPABASE_SERVICE_ROLE_KEY.substring(process.env.SUPABASE_SERVICE_ROLE_KEY.length - 4)}` : "not set",
+          smtpUser: smtpUser ? `${smtpUser.substring(0, 4)}...` : "not set",
+          smtpPass: smtpPass ? "set" : "not set"
+        }
       }
     });
   } catch (err: any) {
