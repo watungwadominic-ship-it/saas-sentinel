@@ -336,6 +336,8 @@ app.get(['/article/:slugOrId', '/news/:slugOrId'], async (req, res) => {
     <meta name="googlebot" content="max-image-preview:large, index, follow" />
     <meta name="description" content="${desc.replace(/"/g, '&quot;')}" />
     <meta name="thumbnail" content="${img}" />
+    <meta itemprop="image" content="${img}" />
+    <link rel="image_src" href="${img}" />
     <link rel="canonical" href="${url}" />
     
     <!-- Open Graph -->
@@ -795,7 +797,7 @@ app.get(['/sitemap.xml', '/api/sitemap.xml'], async (req, res) => {
     
     const { data: articles, error } = await getSupabase()
       .from('news_articles')
-      .select('id, slug, created_at')
+      .select('id, slug, created_at, image_url, title')
       .order('created_at', { ascending: false })
       .limit(1000);
     
@@ -803,7 +805,21 @@ app.get(['/sitemap.xml', '/api/sitemap.xml'], async (req, res) => {
       console.error("Supabase sitemap query error:", error);
     }
 
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
+    const escapeXml = (unsafe: string): string => {
+      if (!unsafe) return '';
+      return unsafe.replace(/[<>&'"]/g, (c) => {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
+          default: return c;
+        }
+      });
+    };
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">`;
     xml += `\n  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`;
     xml += `\n  <url><loc>${base}/archive</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`;
     xml += `\n  <url><loc>${base}/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>`;
@@ -817,7 +833,22 @@ app.get(['/sitemap.xml', '/api/sitemap.xml'], async (req, res) => {
           if (a.created_at && typeof a.created_at === 'string') {
             mod = a.created_at.split('T')[0];
           }
-          xml += `\n  <url><loc>${base}/article/${identifier}</loc><lastmod>${mod}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`;
+          const articleUrl = `${base}/article/${identifier}`;
+          xml += `\n  <url>\n    <loc>${articleUrl}</loc>\n    <lastmod>${mod}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>`;
+          
+          const img = a.image_url;
+          if (img) {
+            let absoluteImg = img;
+            if (img.startsWith('/')) {
+              absoluteImg = `${base}${img}`;
+            }
+            xml += `\n    <image:image>\n      <image:loc>${escapeXml(absoluteImg)}</image:loc>`;
+            if (a.title) {
+              xml += `\n      <image:title>${escapeXml(a.title)}</image:title>`;
+            }
+            xml += `\n    </image:image>`;
+          }
+          xml += `\n  </url>`;
         }
       });
     }
