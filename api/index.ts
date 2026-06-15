@@ -258,14 +258,19 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get(['/api/news', '/news'], async (req, res) => {
+app.get('/api/news', async (req, res) => {
   const { data, error } = await getSupabase().from('news_articles').select('*').order('created_at', { ascending: false }).limit(30);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-app.get(['/api/news/:id', '/news/:id'], async (req, res) => {
-  const { data, error } = await getSupabase().from('news_articles').select('*').eq('id', req.params.id).maybeSingle();
+app.get('/api/news/:id', async (req, res) => {
+  const isNumeric = /^\d+$/.test(req.params.id);
+  const query = getSupabase().from('news_articles').select('*');
+  const { data, error } = await (isNumeric 
+    ? query.eq('id', req.params.id) 
+    : query.eq('slug', req.params.id)
+  ).maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -287,8 +292,8 @@ app.get(['/article/:slugOrId', '/news/:slugOrId'], async (req, res) => {
       .eq('slug', slugOrId)
       .maybeSingle();
 
-    // If not found by slug, try by id (UUID lookup)
-    if (!article) {
+    // If not found by slug, try by id (only if numeric)
+    if (!article && /^\d+$/.test(slugOrId)) {
       const { data: byId } = await supabase
         .from('news_articles')
         .select('*')
