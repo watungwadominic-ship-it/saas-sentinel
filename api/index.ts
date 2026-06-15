@@ -201,22 +201,50 @@ async function callGemini(prompt: string, jsonMode = false, apiKeyOverride?: str
   }
   
   const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-3.5-flash",
-    ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
-  });
+  const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest"];
+  let lastError: any = null;
   
-  try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+  for (const modelName of modelsToTry) {
+    const model = genAI.getGenerativeModel({ 
+      model: modelName,
+      ...(jsonMode ? { generationConfig: { responseMimeType: "application/json" } } : {})
+    });
     
-    if (!text) throw new Error("Empty response from Gemini");
-    return text;
-  } catch (error: any) {
-    console.error("[Sentinel] Gemini Call Failed:", error);
-    throw error;
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[Sentinel] Calling Gemini (Model: ${modelName}, Attempt: ${attempt}/${maxRetries})...`);
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        if (!text) throw new Error("Empty response from Gemini");
+        return text;
+      } catch (error: any) {
+        lastError = error;
+        const errMsg = error?.message || String(error);
+        console.warn(`[Sentinel] Gemini attempt ${attempt} failed on model ${modelName}:`, errMsg);
+        
+        // If it's a model-not-found error, or other critical non-retryable errors, we can break early to try next model, 
+        // but 503 or transient errors should definitely retry.
+        if (errMsg.includes("503") || errMsg.includes("high demand") || errMsg.includes("Service Unavailable") || errMsg.includes("rate limit") || errMsg.includes("too many requests") || errMsg.includes("fetch")) {
+          // Retryable
+        } else if (attempt === 1 && (errMsg.includes("not found") || errMsg.includes("404") || errMsg.includes("not support"))) {
+          // Non-retryable model error, fall back directly
+          break;
+        }
+        
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`[Sentinel] Retrying in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
   }
+  
+  console.error("[Sentinel] All Gemini models and retry attempts failed.");
+  throw lastError || new Error("Gemini call failed after retries and fallbacks");
 }
 
 // --- API ROUTES ---
