@@ -135,11 +135,12 @@ app.get("/api/news", async (req, res) => {
 
 app.get("/api/news/:id", async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("news_articles")
-      .select("*")
-      .eq("id", req.params.id)
-      .maybeSingle();
+    const isNumeric = /^\d+$/.test(req.params.id);
+    const query = supabase.from("news_articles").select("*");
+    const { data, error } = await (isNumeric 
+      ? query.eq("id", req.params.id) 
+      : query.eq("slug", req.params.id)
+    ).maybeSingle();
     
     if (error) throw error;
     res.json(data);
@@ -163,8 +164,8 @@ app.get(['/article/:slugOrId', '/news/:slugOrId'], async (req, res) => {
       .eq('slug', slugOrId)
       .maybeSingle();
 
-    // If not found by slug, try by id (UUID lookup)
-    if (!article) {
+    // If not found by slug, try by id (only if numeric)
+    if (!article && /^\d+$/.test(slugOrId)) {
       const { data: byId } = await supabase
         .from('news_articles')
         .select('*')
