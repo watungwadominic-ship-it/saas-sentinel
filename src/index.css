@@ -47,6 +47,10 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
   body {
     background-color: var(--color-bg);
     color: var(--color-text);
@@ -206,7 +210,7 @@
 }
 
 .out-of-generations-overlay {
-  display: none !important; 
+  display: none !important;
 }
 
 @keyframes shimmer {
