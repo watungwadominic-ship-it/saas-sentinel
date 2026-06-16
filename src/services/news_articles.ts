@@ -88,6 +88,7 @@ export async function saveNewsArticle(article: Partial<Article>) {
 
 export async function fetchArticleBySlug(slug: string): Promise<Article | null> {
   console.log(`[DEBUG] fetchArticleBySlug called with slug: ${slug}`);
+  if (!slug) return null;
   try {
     const { data, error } = await (supabase
       .from('news_articles') as any)
@@ -101,8 +102,11 @@ export async function fetchArticleBySlug(slug: string): Promise<Article | null> 
     }
 
     if (!data) {
-      // Fallback: Try fetching by ID in case the slug is actually an ID
-      return fetchArticleById(slug);
+      // Fallback: Try fetching by ID only if the slug looks like a valid numeric ID
+      if (/^\d+$/.test(slug)) {
+        return fetchArticleById(slug);
+      }
+      return null;
     }
 
     return mapRowToArticle(data);
@@ -114,6 +118,15 @@ export async function fetchArticleBySlug(slug: string): Promise<Article | null> 
 
 export async function fetchArticleById(id: string): Promise<Article | null> {
   console.log(`[DEBUG] fetchArticleById called with id: ${id}`);
+  if (!id) return null;
+  
+  // Guard: If the ID is not numeric, do not attempt to query it as bigint ID
+  const isNumeric = /^\d+$/.test(id);
+  if (!isNumeric) {
+    console.log(`[DEBUG] fetchArticleById aborted: id ${id} is not numeric`);
+    return null;
+  }
+
   try {
     // Attempt to use cached API
     const isProduction = typeof window !== 'undefined' && 
@@ -124,7 +137,7 @@ export async function fetchArticleById(id: string): Promise<Article | null> {
       const response = await fetch(`/api/news/${id}`);
       if (response.ok) {
         const data = await response.json();
-        return mapRowToArticle(data);
+        return data ? mapRowToArticle(data) : null;
       }
     }
   } catch (e) {
