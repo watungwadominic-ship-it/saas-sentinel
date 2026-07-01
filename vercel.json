@@ -12,6 +12,11 @@
     { "source": "/sitemap.xml", "destination": "/api/index.ts" },
     { "source": "/article/(.*)", "destination": "/api/index.ts" },
     { "source": "/news/(.*)", "destination": "/api/index.ts" },
+    { "source": "/about", "destination": "/api/index.ts" },
+    { "source": "/privacy", "destination": "/api/index.ts" },
+    { "source": "/archive", "destination": "/api/index.ts" },
+    { "source": "/", "destination": "/api/index.ts" },
+    { "source": "/index.html", "destination": "/api/index.ts" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
