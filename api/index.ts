@@ -275,32 +275,174 @@ app.get('/api/news/:id', async (req, res) => {
   res.json(data);
 });
 
-// --- DYNAMIC METADATA SERVER-SIDE INJECTION FOR ARTICLES ---
-app.get(['/article/:slugOrId', '/news/:slugOrId'], async (req, res) => {
-  const { slugOrId } = req.params;
+// --- UTILS FOR STATIC HTML SEEDING & SEO PRE-RENDERING ---
+
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return '';
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function parseInlineMarkdown(text: string): string {
+  let inline = escapeHtml(text);
+  inline = inline.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #0f172a; font-weight: 800;">$1</strong>');
+  inline = inline.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  inline = inline.replace(/`(.*?)`/g, '<code style="background-color: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 13px; color: #f43f5e;">$1</code>');
+  return inline;
+}
+
+function renderMarkdownToStaticHtml(markdown: string | null | undefined): string {
+  if (!markdown) return '';
+  
+  const lines = markdown.split('\n');
+  let html = '';
+  let inList = false;
+  
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) {
+      if (inList) {
+        html += '</ul>\n';
+        inList = false;
+      }
+      continue;
+    }
+    
+    // Check for Headings
+    if (line.startsWith('### ')) {
+      if (inList) { html += '</ul>\n'; inList = false; }
+      html += `<h4 style="font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 25px; margin-bottom: 12px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">${escapeHtml(line.slice(4))}</h4>\n`;
+    } else if (line.startsWith('## ')) {
+      if (inList) { html += '</ul>\n'; inList = false; }
+      html += `<h3 style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 32px; margin-bottom: 16px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">${escapeHtml(line.slice(3))}</h3>\n`;
+    } else if (line.startsWith('# ')) {
+      if (inList) { html += '</ul>\n'; inList = false; }
+      html += `<h2 style="font-size: 26px; font-weight: 800; color: #0f172a; margin-top: 36px; margin-bottom: 20px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">${escapeHtml(line.slice(2))}</h2>\n`;
+    }
+    // Check for bullet lists
+    else if (line.startsWith('* ') || line.startsWith('- ')) {
+      if (!inList) {
+        html += '<ul style="padding-left: 20px; margin-bottom: 20px; list-style-type: disc;">\n';
+        inList = true;
+      }
+      const itemContent = line.slice(2);
+      html += `<li style="margin-bottom: 10px; font-size: 16px; color: #334155; line-height: 1.8;">${parseInlineMarkdown(itemContent)}</li>\n`;
+    }
+    // Numbers list
+    else if (/^\d+\.\s/.test(line)) {
+      if (inList) { html += '</ul>\n'; inList = false; }
+      const match = line.match(/^(\d+)\.\s(.*)/);
+      if (match) {
+        html += `<div style="margin-bottom: 15px; font-size: 16px; color: #334155; line-height: 1.8;"><strong style="color: #0f172a; font-weight: 800;">${match[1]}.</strong> ${parseInlineMarkdown(match[2])}</div>\n`;
+      }
+    }
+    // Standard paragraph
+    else {
+      if (inList) { html += '</ul>\n'; inList = false; }
+      html += `<p style="font-size: 16px; color: #334155; line-height: 1.8; margin-bottom: 24px;">${parseInlineMarkdown(line)}</p>\n`;
+    }
+  }
+  
+  if (inList) {
+    html += '</ul>\n';
+  }
+  
+  return html;
+}
+
+const formatStaticDate = (dateString: string | null | undefined) => {
+  if (!dateString) return 'Recent';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Recent';
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+};
+
+// Generates a deterministic, gorgeous, relevant Unsplash image for any category / title
+function getDeterministicImage(title: string, category: string): string {
+  const aiImages = [
+    'photo-1677442136019-21780ecad995', // Neural net abstract
+    'photo-1620712943543-bcc4688e7485', // AI chip representation
+    'photo-1507146426996-ef05306b995a', // Robotics code
+    'photo-1485827404703-89b55fcc595e', // Sci-fi AI
+    'photo-1526374965328-7f61d4dc18c5', // Cyberspace code grid
+    'photo-1531746020798-e6953c6e8e04', // Machine vision
+  ];
+  const fundingImages = [
+    'photo-1551288049-bbda38a5f9a2', // Tech analytics dashboard
+    'photo-1559526324-4b87b5e36e44', // Growth charts
+    'photo-1526304640581-d334cdbbf45e', // Capital abstract
+    'photo-1590283603385-17ffb3a7f29f', // Candlestick charting
+    'photo-1611974789855-9c2a0a7236a3', // Trading terminal
+  ];
+  const growthImages = [
+    'photo-1460925895917-afdab827c52f', // Web design growth wireframe
+    'photo-1519389950473-47ba0277781c', // Collaborative tech team
+    'photo-1551434678-e076c223a692', // Group review metrics
+    'photo-1454165804606-c3d57bc86b40', // Performance review
+    'photo-1552664730-d307ca884978', // Team boardroom workshop
+  ];
+  const strategyImages = [
+    'photo-1507679799987-c73779587ccf', // Elegant executive decision making
+    'photo-1507238691740-187a5b1d37b8', // Modern clean workstation strategy
+    'photo-1451187580459-43490279c0fa', // Global abstract sphere
+    'photo-1522071820081-009f0129c71c', // Business discussion
+    'photo-1512428559087-560fa5ceab42', // High level flow diagram
+  ];
+  const generalImages = [
+    'photo-1519389950473-47ba0277781c', // Tech workspace
+    'photo-1486406146926-c627a92ad1ab', // Architecture enterprise skyscraper
+    'photo-1498050108023-c5249f4df085', // MacBook workspace
+    'photo-1451187580459-43490279c0fa', // Data network globe
+  ];
+
+  const cat = (category || '').toLowerCase();
+  let pool = generalImages;
+  if (cat.includes('ai') || cat.includes('intelligence') || cat.includes('infrastructure')) {
+    pool = aiImages;
+  } else if (cat.includes('funding') || cat.includes('capital') || cat.includes('series') || cat.includes('finance')) {
+    pool = fundingImages;
+  } else if (cat.includes('growth') || cat.includes('marketing') || cat.includes('sales')) {
+    pool = growthImages;
+  } else if (cat.includes('strategy') || cat.includes('operations') || cat.includes('m&a') || cat.includes('deal')) {
+    pool = strategyImages;
+  }
+
+  // Calculate a simple, deterministic hash from the title
+  let hash = 0;
+  const str = title || '';
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  const index = Math.abs(hash) % pool.length;
+  const photoId = pool[index];
+  return `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&q=80&w=1200&h=630`;
+}
+
+// --- DYNAMIC METADATA & CONTENT SERVER-SIDE PRE-RENDERING FOR ALL PAGES ---
+app.get(['/article/:slugOrId', '/news/:slugOrId', '/about', '/privacy', '/archive', '/', '/index.html'], async (req, res, next) => {
+  if (process.env.NODE_ENV !== "production") {
+    return next();
+  }
   const host = req.headers.host || 'saas-sentinel-cyan.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const base = `${protocol}://${host}`;
+  const pathName = req.path;
 
   try {
     const supabase = getSupabase();
     
-    // First, try matching by slug
-    let { data: article } = await supabase
-      .from('news_articles')
-      .select('*')
-      .eq('slug', slugOrId)
-      .maybeSingle();
-
-    // If not found by slug, try by id (only if numeric)
-    if (!article && /^\d+$/.test(slugOrId)) {
-      const { data: byId } = await supabase
-        .from('news_articles')
-        .select('*')
-        .eq('id', slugOrId)
-        .maybeSingle();
-      if (byId) article = byId;
-    }
+    // Default fallback values
+    let title = "SaaS Sentinel | Elite B2B Market Intelligence & SaaS Analysis";
+    let desc = "SaaS Sentinel is the premier intelligence hub for high-growth software ecosystems. Get real-time AI-driven analysis on SaaS market shifts, venture capital trends, and technical architectures.";
+    let img = "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1200&h=630&auto=format&fit=crop";
+    let url = `${base}${pathName}`;
+    let bodyHtml = "";
+    let ldJsonObj: any = null;
 
     // Load static index.html template to inject metadata into
     let htmlPath = path.join(process.cwd(), 'dist', 'index.html');
@@ -315,99 +457,443 @@ app.get(['/article/:slugOrId', '/news/:slugOrId'], async (req, res) => {
       html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>SaaS Sentinel</title></head><body><div id="root"></div></body></html>`;
     }
 
-    if (article) {
-      const title = `${article.title} | SaaS Sentinel`;
-      const desc = (article.meta_description || article.summary || 'SaaS Sentinel B2B Intelligence').trim();
-      let img = article.image_url || article.image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1200&h=630&auto=format&fit=crop';
+    if (pathName.startsWith('/article/') || pathName.startsWith('/news/')) {
+      // --- ARTICLE PAGE PRE-RENDERING ---
+      const slugOrId = pathName.split('/').pop() || '';
       
-      // Ensure the image URL is absolute for crawler parsers
-      if (img.startsWith('/')) {
-        img = `${base}${img}`;
-      } else if (img.startsWith('proxy-image') || img.startsWith('/proxy-image')) {
-        const queryUrl = img.includes('url=') ? decodeURIComponent(img.split('url=')[1]) : '';
-        img = queryUrl || `${base}${img}`;
+      // First, try matching by slug
+      let { data: article } = await supabase
+        .from('news_articles')
+        .select('*')
+        .eq('slug', slugOrId)
+        .maybeSingle();
+
+      // If not found by slug, try by id (only if numeric)
+      if (!article && /^\d+$/.test(slugOrId)) {
+        const { data: byId } = await supabase
+          .from('news_articles')
+          .select('*')
+          .eq('id', slugOrId)
+          .maybeSingle();
+        if (byId) article = byId;
       }
 
-      const url = `${base}/article/${article.slug || article.id}`;
-      const published = article.created_at || new Date().toISOString();
-      const modified = article.updated_at || article.created_at || new Date().toISOString();
-
-      // JSON-LD structured data Schema
-      const ldJsonObj = {
-        "@context": "https://schema.org",
-        "@type": "NewsArticle",
-        "headline": article.title,
-        "description": desc,
-        "image": [img],
-        "datePublished": published,
-        "dateModified": modified,
-        "author": [{
-          "@type": "Person",
-          "name": "SaaS Sentinel Intelligence",
-          "url": base
-        }],
-        "publisher": {
-          "@type": "Organization",
-          "name": "SaaS Sentinel",
-          "logo": {
-            "@type": "ImageObject",
-            "url": `${base}/logo.png`
+      if (article) {
+        title = `${article.title} | SaaS Sentinel`;
+        desc = (article.meta_description || article.summary || 'SaaS Sentinel B2B Intelligence').trim();
+        
+        // Dynamic deterministic image selection if none is provided or if it's invalid
+        const rawImg = (article.image_url || article.image || '').trim();
+        if (rawImg) {
+          if (rawImg.startsWith('/')) {
+            img = `${base}${rawImg}`;
+          } else if (rawImg.startsWith('proxy-image') || rawImg.startsWith('/proxy-image')) {
+            const queryUrl = rawImg.includes('url=') ? decodeURIComponent(rawImg.split('url=')[1]) : '';
+            img = queryUrl || `${base}${rawImg}`;
+          } else if (!rawImg.startsWith('http') && rawImg.length > 5 && !rawImg.includes('/') && !rawImg.includes(':')) {
+            const cleanId = rawImg.replace(/^photo-/, '');
+            img = `https://images.unsplash.com/photo-${cleanId}?auto=format&fit=crop&q=80&w=1200&h=630`;
+          } else {
+            img = rawImg;
           }
-        },
-        "mainEntityOfPage": {
-          "@type": "WebPage",
-          "@id": url
+        } else {
+          img = getDeterministicImage(article.title, article.category || '');
         }
-      };
-      
-      const ldJsonString = JSON.stringify(ldJsonObj, null, 2);
+        
+        url = `${base}/article/${article.slug || article.id}`;
+        const published = article.created_at || new Date().toISOString();
+        const modified = article.updated_at || article.created_at || new Date().toISOString();
 
-      const injectedHead = `
+        // JSON-LD dynamic Schema
+        ldJsonObj = {
+          "@context": "https://schema.org",
+          "@type": "NewsArticle",
+          "headline": article.title,
+          "description": desc,
+          "image": [img],
+          "datePublished": published,
+          "dateModified": modified,
+          "author": [{
+            "@type": "Person",
+            "name": "SaaS Sentinel Intelligence",
+            "url": base
+          }],
+          "publisher": {
+            "@type": "Organization",
+            "name": "SaaS Sentinel",
+            "logo": {
+              "@type": "ImageObject",
+              "url": `${base}/logo.png`
+            }
+          },
+          "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": url
+          }
+        };
+
+        // Render full static content with premium formatting
+        bodyHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; line-height: 1.8;">
+            <header style="margin-bottom: 45px; border-bottom: 2px solid #f1f5f9; padding-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+              <div>
+                <a href="/" style="text-decoration: none; color: #F27D26; font-weight: 900; font-size: 26px; letter-spacing: -0.05em; text-transform: uppercase;">SAAS SENTINEL</a>
+                <span style="display: block; font-size: 11px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 800;">High-Precision SaaS Market Intelligence</span>
+              </div>
+              <div>
+                <a href="/archive" style="text-decoration: none; color: #2563eb; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;">Intelligence Vault</a>
+              </div>
+            </header>
+            
+            <main>
+              <article>
+                <span style="display: inline-block; background-color: #f1f5f9; color: #334155; padding: 6px 14px; border-radius: 9999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px;">
+                  ${escapeHtml(article.category || 'MARKET DIRECTIVE')}
+                </span>
+                <h1 style="font-size: 38px; font-weight: 900; color: #0f172a; line-height: 1.2; margin: 0 0 24px 0; letter-spacing: -0.03em;">
+                  ${escapeHtml(article.title)}
+                </h1>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; color: #64748b; font-size: 13px; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9; font-weight: 500;">
+                  <span><strong>Published:</strong> ${escapeHtml(formatStaticDate(article.date || article.created_at))}</span>
+                  <span>•</span>
+                  <span><strong>Reading Time:</strong> ${escapeHtml(article.readTime || '6 min read')}</span>
+                  <span>•</span>
+                  <span><strong>Reporting:</strong> Intelligence Division</span>
+                </div>
+
+                ${img ? `
+                <div style="margin-bottom: 40px; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);">
+                  <img src="${escapeHtml(img)}" alt="${escapeHtml(article.title)}" style="width: 100%; height: auto; display: block; object-fit: cover; max-height: 400px;" />
+                </div>
+                ` : ''}
+
+                <div style="font-size: 19px; font-weight: 600; color: #1e293b; line-height: 1.6; margin-bottom: 40px; border-left: 5px solid #F27D26; padding-left: 24px; font-style: italic;">
+                  ${escapeHtml(article.summary || '')}
+                </div>
+
+                <div style="font-size: 17px; color: #334155;">
+                  ${renderMarkdownToStaticHtml(article.content)}
+                </div>
+
+                ${(article.sentinel_take || article.summary) ? `
+                <section style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 24px; padding: 35px; margin-top: 55px; box-shadow: inset 0 2px 4px 0 rgba(0,0,0,0.01);">
+                  <h2 style="font-size: 20px; font-weight: 900; color: #F27D26; margin-top: 0; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.05em;">Sentinel's Strategic Outlook</h2>
+                  
+                  <div style="margin-bottom: 20px; font-size: 16px;">
+                    <strong style="display: block; color: #0f172a; font-weight: 800; margin-bottom: 8px; text-transform: uppercase; font-size: 12px; letter-spacing: 0.05em;">Analysis Summary:</strong>
+                    <p style="margin: 0; line-height: 1.7; color: #475569;">${escapeHtml(article.sentinel_take || article.summary)}</p>
+                  </div>
+                </section>
+                ` : ''}
+              </article>
+            </main>
+
+            <footer style="margin-top: 80px; padding-top: 40px; border-top: 2px solid #f1f5f9; font-size: 13px; color: #94a3b8; text-align: center; line-height: 1.6;">
+              <p style="margin-bottom: 12px; font-weight: 600; color: #64748b;">© 2026 SaaS Sentinel. All strategic intelligence analyses are human-verified.</p>
+              <div style="display: flex; justify-content: center; gap: 24px; font-weight: 700;">
+                <a href="/" style="color: #475569; text-decoration: none;">Home</a>
+                <a href="/about" style="color: #475569; text-decoration: none;">About us</a>
+                <a href="/privacy" style="color: #475569; text-decoration: none;">Privacy Policy</a>
+                <a href="/archive" style="color: #475569; text-decoration: none;">Intelligence Archive</a>
+              </div>
+            </footer>
+          </div>
+        `;
+      }
+    } else if (pathName === '/about') {
+      // --- ABOUT PAGE PRE-RENDERING ---
+      title = "About SaaS Sentinel | Elite B2B Market Intelligence";
+      desc = "Proprietary AI-driven strategic intelligence tracking real-time B2B software ecosystem cycles, venture capital shifts, and technical architectures with 99% reliability.";
+      url = `${base}/about`;
+
+      bodyHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; line-height: 1.8;">
+          <header style="margin-bottom: 45px; border-bottom: 2px solid #f1f5f9; padding-bottom: 24px;">
+            <a href="/" style="text-decoration: none; color: #F27D26; font-weight: 900; font-size: 26px; letter-spacing: -0.05em; text-transform: uppercase;">SAAS SENTINEL</a>
+            <span style="display: block; font-size: 11px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 800;">High-Precision SaaS Market Intelligence</span>
+          </header>
+
+          <main>
+            <h1 style="font-size: 38px; font-weight: 900; color: #0f172a; line-height: 1.25; margin-bottom: 25px; letter-spacing: -0.03em;">About SaaS Sentinel</h1>
+            <p style="font-size: 18px; font-weight: 600; color: #1e293b; line-height: 1.6; margin-bottom: 35px; border-left: 5px solid #F27D26; padding-left: 20px; font-style: italic;">
+              Elite B2B Market Intelligence & Deep Strategic SaaS Analysis.
+            </p>
+
+            <h2 style="font-size: 24px; font-weight: 850; color: #0f172a; margin-top: 40px; margin-bottom: 15px;">The Vision</h2>
+            <p style="font-size: 16px; color: #334155; margin-bottom: 20px;">
+              SaaS Sentinel is a premier, full-scale corporate intelligence hub designed for the modern B2B software ecosystem. We bridge the gap between volatile news cycles and actionable corporate execution using highly refined algorithms and strategic validation to provide deep indicators of market shifts.
+            </p>
+            <p style="font-size: 16px; color: #334155; margin-bottom: 20px;">
+              In an increasingly complex landscape, tracking vertical software acquisitions, venture capital rounds, and SaaS index health requires absolute data rigor. Our research has provided founders, developers, and institutional investors with an elite competitive advantage.
+            </p>
+
+            <h2 style="font-size: 24px; font-weight: 850; color: #0f172a; margin-top: 40px; margin-bottom: 15px;">Founder Authority</h2>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 20px; padding: 25px; margin-bottom: 40px;">
+              <h3 style="font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 0; margin-bottom: 5px;">Dominic Watungwa</h3>
+              <p style="color: #F27D26; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 15px;">Lead Architect & Chief Strategist</p>
+              <p style="font-size: 15px; color: #475569; margin: 0; line-height: 1.7;">
+                Dominic is the principal founder and strategist behind SaaS Sentinel. With years of experience leading software development, technology stacks, and analyzing enterprise product-led growth (PLG) setups, he oversees the deployment of the portal's analytics engine alongside editorial peer reviews.
+              </p>
+            </div>
+
+            <h2 style="font-size: 24px; font-weight: 850; color: #0f172a; margin-top: 40px; margin-bottom: 15px;">Editorial Standards</h2>
+            <ul style="padding-left: 20px; margin-bottom: 30px; line-height: 1.8; color: #334155; font-size: 15px;">
+              <li style="margin-bottom: 10px;"><strong>Proprietary Deep Curation:</strong> All articles are synthesized from top B2B data signals.</li>
+              <li style="margin-bottom: 10px;"><strong>Quantitative Analysis:</strong> Every brief is rigorously cross-referenced against actual public financial metrics.</li>
+              <li style="margin-bottom: 10px;"><strong>Privacy & Data Rights:</strong> Zero third-party data selling, complete email security.</li>
+              <li style="margin-bottom: 10px;"><strong>Sustained Quality Benchmark:</strong> Peer reviewed content to guarantee 99% accuracy.</li>
+            </ul>
+          </main>
+
+          <footer style="margin-top: 80px; padding-top: 40px; border-top: 2px solid #f1f5f9; font-size: 13px; color: #94a3b8; text-align: center;">
+            <p style="margin-bottom: 12px; font-weight: 600; color: #64748b;">© 2026 SaaS Sentinel. All rights reserved.</p>
+            <div style="display: flex; justify-content: center; gap: 24px; font-weight: 700;">
+              <a href="/" style="color: #475569; text-decoration: none;">Home</a>
+              <a href="/about" style="color: #475569; text-decoration: none;">About us</a>
+              <a href="/privacy" style="color: #475569; text-decoration: none;">Privacy Policy</a>
+              <a href="/archive" style="color: #475569; text-decoration: none;">Intelligence Archive</a>
+            </div>
+          </footer>
+        </div>
+      `;
+    } else if (pathName === '/privacy') {
+      // --- PRIVACY POLICY PRE-RENDERING ---
+      title = "Privacy Policy | SaaS Sentinel";
+      desc = "At SaaS Sentinel, we maintain full transparency, absolute security, and clear data protection policies for our newsletter subscribers and readers.";
+      url = `${base}/privacy`;
+
+      bodyHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; line-height: 1.8;">
+          <header style="margin-bottom: 45px; border-bottom: 2px solid #f1f5f9; padding-bottom: 24px;">
+            <a href="/" style="text-decoration: none; color: #F27D26; font-weight: 900; font-size: 26px; letter-spacing: -0.05em; text-transform: uppercase;">SAAS SENTINEL</a>
+            <span style="display: block; font-size: 11px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 800;">High-Precision SaaS Market Intelligence</span>
+          </header>
+
+          <main>
+            <h1 style="font-size: 38px; font-weight: 900; color: #0f172a; line-height: 1.25; margin-bottom: 25px; letter-spacing: -0.03em;">Privacy Policy</h1>
+
+            <h2 style="font-size: 22px; font-weight: 850; color: #0f172a; margin-top: 30px; margin-bottom: 12px;">1. Introduction</h2>
+            <p style="font-size: 16px; color: #334155; margin-bottom: 20px;">
+              At SaaS Sentinel, we are committed to defending your data privacy. This privacy policy describes the scope of compliance regarding how we securely collect, use, and process your personal information when you subscribe to our briefings.
+            </p>
+
+            <h2 style="font-size: 22px; font-weight: 850; color: #0f172a; margin-top: 30px; margin-bottom: 12px;">2. Information Collection & Use</h2>
+            <p style="font-size: 16px; color: #334155; margin-bottom: 20px;">
+              We collect your professional email address strictly and voluntarily when you sign up for our weekly SaaS Intelligence updates. We use this email only to distribute the curated briefings, breaking updates, and tactical reviews. We do not rent, distribute, or sell subscriber emails to third parties.
+            </p>
+
+            <h2 style="font-size: 22px; font-weight: 850; color: #0f172a; margin-top: 30px; margin-bottom: 12px;">3. Data Storage & Hosting</h2>
+            <p style="font-size: 16px; color: #334155; margin-bottom: 20px;">
+              Your database entries are safely mapped and retained inside <strong>Supabase</strong>, a high-integrity PostgreSQL database infrastructure with advanced row-level security (RLS). Communication delivery and list curation are managed through Google Workspace (Gmail SMTP relays), complying with rigorous spam-prevention rules.
+            </p>
+
+            <h2 style="font-size: 22px; font-weight: 850; color: #0f172a; margin-top: 30px; margin-bottom: 12px;">4. Cookies & Analytics</h2>
+            <p style="font-size: 16px; color: #334155; margin-bottom: 20px;">
+              We run privacy-first analytics tools (such as Vercel Web Analytics) to review aggregated site visits. Contextual advertisements are delivered safely via networks compiled strictly to preserve user integrity.
+            </p>
+
+            <h2 style="font-size: 22px; font-weight: 850; color: #0f172a; margin-top: 30px; margin-bottom: 12px;">5. Unsubscribe & Data Erasure</h2>
+            <p style="font-size: 16px; color: #334155; margin-bottom: 20px;">
+              Every communication distributed by SaaS Sentinel has a distinct 1-click unsubscribe option. You can also contact us direct at <a href="mailto:watungwadominic@gmail.com" style="color: #2563eb; text-decoration: none; font-weight: 600;">watungwadominic@gmail.com</a> to request immediate and complete physical erasure of your records from our databases.
+            </p>
+          </main>
+
+          <footer style="margin-top: 80px; padding-top: 40px; border-top: 2px solid #f1f5f9; font-size: 13px; color: #94a3b8; text-align: center;">
+            <p style="margin-bottom: 12px; font-weight: 600; color: #64748b;">© 2026 SaaS Sentinel. All rights reserved.</p>
+            <div style="display: flex; justify-content: center; gap: 24px; font-weight: 700;">
+              <a href="/" style="color: #475569; text-decoration: none;">Home</a>
+              <a href="/about" style="color: #475569; text-decoration: none;">About us</a>
+              <a href="/privacy" style="color: #475569; text-decoration: none;">Privacy Policy</a>
+              <a href="/archive" style="color: #475569; text-decoration: none;">Intelligence Archive</a>
+            </div>
+          </footer>
+        </div>
+      `;
+    } else if (pathName === '/archive') {
+      // --- ARCHIVE PAGE PRE-RENDERING ---
+      title = "Intelligence Archive | SaaS Sentinel";
+      desc = "Uncompromised historic archive of SaaS Sentinel briefs. Instant B2B tactical intelligence and executive summaries across software verticals.";
+      url = `${base}/archive`;
+
+      const { data: articles } = await supabase
+        .from('news_articles')
+        .select('id, title, slug, summary, category, date, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      let listHtml = "";
+      if (articles && Array.isArray(articles)) {
+        articles.forEach(a => {
+          const lUrl = `/article/${a.slug || a.id}`;
+          listHtml += `
+            <div style="padding: 24px 0; border-bottom: 1px solid #f1f5f9;">
+              <span style="font-size: 11px; font-weight: 800; color: #F27D26; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; margin-bottom: 6px;">
+                ${escapeHtml(a.category || 'MARKET SIGNALS')}
+              </span>
+              <h3 style="font-size: 20px; font-weight: 800; margin: 0 0 10px 0; line-height: 1.3;">
+                <a href="${lUrl}" style="text-decoration: none; color: #0f172a; hover:color:#F27D26; transition:color 0.2s;">${escapeHtml(a.title)}</a>
+              </h3>
+              <p style="font-size: 14.5px; color: #475569; margin: 0 0 12px 0; line-height: 1.6;">${escapeHtml(a.summary || '')}</p>
+              <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">
+                <span>${escapeHtml(formatStaticDate(a.date || a.created_at))}</span>
+                <span style="margin: 0 8px;">•</span>
+                <a href="${lUrl}" style="color: #2563eb; text-decoration: none; font-weight: 700;">Analyze briefing &rarr;</a>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      bodyHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; line-height: 1.8;">
+          <header style="margin-bottom: 45px; border-bottom: 2px solid #f1f5f9; padding-bottom: 24px;">
+            <a href="/" style="text-decoration: none; color: #F27D26; font-weight: 900; font-size: 26px; letter-spacing: -0.05em; text-transform: uppercase;">SAAS SENTINEL</a>
+            <span style="display: block; font-size: 11px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 800;">High-Precision SaaS Market Intelligence</span>
+          </header>
+
+          <main>
+            <h1 style="font-size: 38px; font-weight: 900; color: #0f172a; line-height: 1.25; margin-bottom: 10px; letter-spacing: -0.03em;">Intelligence Archive</h1>
+            <p style="font-size: 15px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 40px;">Deep Vault of Past Curation Records</p>
+
+            <div style="margin-top: 20px;">
+              ${listHtml || '<p style="color:#64748b;">No archived signals stored in active cluster database.</p>'}
+            </div>
+          </main>
+
+          <footer style="margin-top: 80px; padding-top: 40px; border-top: 2px solid #f1f5f9; font-size: 13px; color: #94a3b8; text-align: center;">
+            <p style="margin-bottom: 12px; font-weight: 600; color: #64748b;">© 2026 SaaS Sentinel. All rights reserved.</p>
+            <div style="display: flex; justify-content: center; gap: 24px; font-weight: 700;">
+              <a href="/" style="color: #475569; text-decoration: none;">Home</a>
+              <a href="/about" style="color: #475569; text-decoration: none;">About us</a>
+              <a href="/privacy" style="color: #475569; text-decoration: none;">Privacy Policy</a>
+              <a href="/archive" style="color: #475569; text-decoration: none;">Intelligence Archive</a>
+            </div>
+          </footer>
+        </div>
+      `;
+    } else {
+      // --- HOME PAGE PRE-RENDERING ---
+      const { data: articles } = await supabase
+        .from('news_articles')
+        .select('id, title, slug, summary, category, date, created_at')
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      let listHtml = "";
+      if (articles && Array.isArray(articles)) {
+        articles.forEach(a => {
+          const lUrl = `/article/${a.slug || a.id}`;
+          listHtml += `
+            <div style="padding: 24px 0; border-bottom: 1px solid #f1f5f9;">
+              <span style="font-size: 11px; font-weight: 800; color: #F27D26; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; margin-bottom: 6px;">
+                ${escapeHtml(a.category || 'TACTICAL UPDATE')}
+              </span>
+              <h3 style="font-size: 21px; font-weight: 850; margin: 0 0 10px 0; line-height: 1.3;">
+                <a href="${lUrl}" style="text-decoration: none; color: #0f172a; hover:color:#F27D26;">${escapeHtml(a.title)}</a>
+              </h3>
+              <p style="font-size: 14.5px; color: #475569; margin: 0 0 12px 0; line-height: 1.6;">${escapeHtml(a.summary || '')}</p>
+              <div style="font-size: 12px; color: #94a3b8; font-weight: 500;">
+                <span>${escapeHtml(formatStaticDate(a.date || a.created_at))}</span>
+                <span style="margin: 0 8px;">•</span>
+                <a href="${lUrl}" style="color: #2563eb; text-decoration: none; font-weight: 700;">Open Strategic Analysis &rarr;</a>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      bodyHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; line-height: 1.8;">
+          <header style="margin-bottom: 45px; border-bottom: 2px solid #f1f5f9; padding-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+            <div>
+              <a href="/" style="text-decoration: none; color: #F27D26; font-weight: 900; font-size: 26px; letter-spacing: -0.05em; text-transform: uppercase;">SAAS SENTINEL</a>
+              <span style="display: block; font-size: 11px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 800;">High-Precision SaaS Market Intelligence</span>
+            </div>
+            <div style="display: flex; gap: 15px; font-weight: 700; font-size: 13px;">
+              <a href="/archive" style="text-decoration: none; color: #2563eb;">Archive</a>
+              <a href="/about" style="text-decoration: none; color: #2563eb;">About</a>
+            </div>
+          </header>
+
+          <main>
+            <div style="background-color: #fafafa; border: 1px solid #eaeaea; border-radius: 20px; padding: 30px; margin-bottom: 40px; text-align: center;">
+              <h2 style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 0; margin-bottom: 10px; letter-spacing: -0.02em;">SaaS Sentinel Intelligence Division</h2>
+              <p style="font-size: 15px; color: #475569; margin-bottom: 20px; line-height: 1.6;">Our automated neural analysts crawl thousands of enterprise channels daily to synthesize raw business signals into high-fidelity directives.</p>
+              <a href="/about" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 24px; border-radius: 10px; text-decoration: none; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Meet Dominic & Read Policy &rarr;</a>
+            </div>
+
+            <h2 style="font-size: 24px; font-weight: 900; color: #0f172a; margin-bottom: 15px; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">Executive Dispatch Feed</h2>
+            <div style="margin-top: 20px;">
+              ${listHtml || '<p style="color:#64748b;">Searching and analyzing newest market triggers...</p>'}
+            </div>
+          </main>
+
+          <footer style="margin-top: 80px; padding-top: 40px; border-top: 2px solid #f1f5f9; font-size: 13px; color: #94a3b8; text-align: center; line-height: 1.6;">
+            <p style="margin-bottom: 12px; font-weight: 600; color: #64748b;">© 2026 SaaS Sentinel. Elite B2B Market Analysis.</p>
+            <div style="display: flex; justify-content: center; gap: 24px; font-weight: 700;">
+              <a href="/" style="color: #475569; text-decoration: none;">Home</a>
+              <a href="/about" style="color: #475569; text-decoration: none;">About us</a>
+              <a href="/privacy" style="color: #475569; text-decoration: none;">Privacy Policy</a>
+              <a href="/archive" style="color: #475569; text-decoration: none;">Intelligence Archive</a>
+            </div>
+          </footer>
+        </div>
+      `;
+    }
+
+    // Replace the default head metas with the dynamically generated head meta blocks
+    let ldJsonString = "";
+    if (ldJsonObj) {
+      ldJsonString = `\n    <script type="application/ld+json">\n    ${JSON.stringify(ldJsonObj, null, 2)}\n    </script>`;
+    }
+
+    const injectedHead = `
     <!-- Dynamically Injected Rich Search SEO metadata -->
-    <title>${title}</title>
+    <title>${escapeHtml(title)}</title>
     <meta name="robots" content="max-image-preview:large, max-snippet:-1, max-video-preview:-1, index, follow" />
     <meta name="googlebot" content="max-image-preview:large, index, follow" />
-    <meta name="description" content="${desc.replace(/"/g, '&quot;')}" />
-    <meta name="thumbnail" content="${img}" />
-    <meta itemprop="image" content="${img}" />
-    <link rel="image_src" href="${img}" />
-    <link rel="canonical" href="${url}" />
+    <meta name="description" content="${escapeHtml(desc)}" />
+    <meta name="thumbnail" content="${escapeHtml(img)}" />
+    <meta itemprop="image" content="${escapeHtml(img)}" />
+    <link rel="image_src" href="${escapeHtml(img)}" />
+    <link rel="canonical" href="${escapeHtml(url)}" />
     
     <!-- Open Graph -->
     <meta property="og:type" content="article" />
-    <meta property="og:url" content="${url}" />
-    <meta property="og:title" content="${title.replace(/"/g, '&quot;')}" />
-    <meta property="og:description" content="${desc.replace(/"/g, '&quot;')}" />
-    <meta property="og:image" content="${img}" />
-    <meta property="og:image:secure_url" content="${img}" />
+    <meta property="og:url" content="${escapeHtml(url)}" />
+    <meta property="og:title" content="${escapeHtml(title)}" />
+    <meta property="og:description" content="${escapeHtml(desc)}" />
+    <meta property="og:image" content="${escapeHtml(img)}" />
+    <meta property="og:image:secure_url" content="${escapeHtml(img)}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="${url}" />
-    <meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}" />
-    <meta name="twitter:description" content="${desc.replace(/"/g, '&quot;')}" />
-    <meta name="twitter:image" content="${img}" />
-    
-    <!-- Rich Structured Schema (JSON-LD) -->
-    <script type="application/ld+json">
+    <meta name="twitter:url" content="${escapeHtml(url)}" />
+    <meta name="twitter:title" content="${escapeHtml(title)}" />
+    <meta name="twitter:description" content="${escapeHtml(desc)}" />
+    <meta name="twitter:image" content="${escapeHtml(img)}" />
     ${ldJsonString}
-    </script>
-      `;
+    `;
 
-      // Remove the static default title and any canonical tags from the template
-      html = html.replace(/<title>[^<]*<\/title>/gi, '');
-      html = html.replace(/<link rel="canonical"[^>]*>/gi, '');
-      
-      // Inject right at the top of head elements
-      html = html.replace('<head>', `<head>${injectedHead}`);
+    // Remove static default title and any canonical tags from template
+    html = html.replace(/<title>[^<]*<\/title>/gi, '');
+    html = html.replace(/<link rel="canonical"[^>]*>/gi, '');
+    
+    // Inject custom head metadata right at the top of <head>
+    html = html.replace('<head>', `<head>${injectedHead}`);
+    
+    // Inject the rich pre-rendered HTML content inside the #root main div for crawl indexation
+    if (bodyHtml) {
+      html = html.replace('<div id="root"></div>', `<div id="root">${bodyHtml}</div>`);
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(html);
   } catch (err: any) {
-    console.error("Dynamic Metadata Handler Crashed:", err);
+    console.error("Dynamic Metadata SSR Handler Crashed:", err);
     // Serve index.html as a fallback safely
     let htmlPath = path.join(process.cwd(), 'dist', 'index.html');
     if (!fs.existsSync(htmlPath)) {
@@ -477,6 +963,13 @@ app.all(['/api/cron/fetch-news', '/cron/fetch-news', '/api/cron/fetch-news/'], a
       - sentinel_take: Your unique strategic take
       - verdict: A 1-sentence strategic Outlook
       - breakdown: An array of exactly 4 strings, each being a specific revenue implication or strategic takeaway for a B2B audience.
+      - image_url: A highly relevant, premium absolute Unsplash image URL. Please select one of these exact options based on the category:
+        * AI / Enterprise AI: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=1200"
+        * Funding / Venture Capital / Series A+: "https://images.unsplash.com/photo-1551288049-bbda38a5f9a2?auto=format&fit=crop&q=80&w=1200"
+        * Growth / Sales / Marketing: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=1200"
+        * Strategy / Decisions: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1200"
+        * M&A / Deals / Mergers: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200"
+        If none are appropriate, pick a high-quality professional technology/business photo ID from Unsplash and format it as: "https://images.unsplash.com/photo-[PHOTO_ID]?auto=format&fit=crop&q=80&w=1200".
       Tone: Sharp, professional, and strategic.`;
       
       const articleDataRaw = await callGemini(genPrompt, true);
@@ -830,7 +1323,7 @@ app.get(['/sitemap.xml', '/api/sitemap.xml'], async (req, res) => {
     
     const { data: articles, error } = await getSupabase()
       .from('news_articles')
-      .select('id, slug, created_at, image_url, title')
+      .select('id, slug, created_at, image_url, title, category')
       .order('created_at', { ascending: false })
       .limit(1000);
     
@@ -869,12 +1362,25 @@ app.get(['/sitemap.xml', '/api/sitemap.xml'], async (req, res) => {
           const articleUrl = `${base}/article/${identifier}`;
           xml += `\n  <url>\n    <loc>${articleUrl}</loc>\n    <lastmod>${mod}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>`;
           
-          const img = a.image_url;
-          if (img) {
-            let absoluteImg = img;
-            if (img.startsWith('/')) {
-              absoluteImg = `${base}${img}`;
+          let rawImg = (a.image_url || '').trim();
+          let absoluteImg = '';
+          if (rawImg) {
+            if (rawImg.startsWith('/')) {
+              absoluteImg = `${base}${rawImg}`;
+            } else if (rawImg.startsWith('proxy-image') || rawImg.startsWith('/proxy-image')) {
+              const queryUrl = rawImg.includes('url=') ? decodeURIComponent(rawImg.split('url=')[1]) : '';
+              absoluteImg = queryUrl || `${base}${rawImg}`;
+            } else if (!rawImg.startsWith('http') && rawImg.length > 5 && !rawImg.includes('/') && !rawImg.includes(':')) {
+              const cleanId = rawImg.replace(/^photo-/, '');
+              absoluteImg = `https://images.unsplash.com/photo-${cleanId}?auto=format&fit=crop&q=80&w=1200&h=630`;
+            } else {
+              absoluteImg = rawImg;
             }
+          } else {
+            absoluteImg = getDeterministicImage(a.title || '', a.category || '');
+          }
+
+          if (absoluteImg) {
             xml += `\n    <image:image>\n      <image:loc>${escapeXml(absoluteImg)}</image:loc>`;
             if (a.title) {
               xml += `\n      <image:title>${escapeXml(a.title)}</image:title>`;
